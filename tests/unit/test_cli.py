@@ -81,6 +81,6 @@ def test_schema_command_writes_one_schema_per_config_file(tmp_path, capsys):
     names = {p.name for p in (tmp_path / "s").iterdir()}
     assert names == {
         f"{n}.schema.json"
-        for n in ("models", "mcp_servers", "channels", "schedules", "categories", "security")
+        for n in ("models", "mcp_servers", "channels", "schedules", "categories", "security", "telemetry")
     }
     json.loads((tmp_path / "s" / "models.schema.json").read_text())

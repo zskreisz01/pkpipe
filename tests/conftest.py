@@ -76,3 +76,36 @@ def synthetic_vault(tmp_path: Path) -> Path:
 def lmstudio() -> dict[str, str]:
     """Base URL and model name of the live local model server; use together with @pytest.mark.live."""
     return {"base_url": live.model_base_url(), "model": live.model_name()}
+
+
+@pytest.fixture
+def otel():
+    """In-memory telemetry (spans + metrics), installed as the active Telemetry; default content policy."""
+    from pkpipe import telemetry
+    from tests.support.otel import make_in_memory
+
+    o = make_in_memory()
+    telemetry.configure(o.telemetry)
+    yield o
+    telemetry.reset()
+    o.telemetry.shutdown()
+
+
+@pytest.fixture
+def otel_factory():
+    """Like ``otel`` but with a custom ContentPolicy: ``otel_factory(ContentPolicy(frozenset({'flow'})))``."""
+    from pkpipe import telemetry
+    from tests.support.otel import make_in_memory
+
+    created = []
+
+    def make(policy=None):
+        o = make_in_memory(policy)
+        telemetry.configure(o.telemetry)
+        created.append(o)
+        return o
+
+    yield make
+    telemetry.reset()
+    for o in created:
+        o.telemetry.shutdown()

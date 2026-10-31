@@ -1,7 +1,7 @@
 ---
 spec_id: 003-observability
 title: OpenTelemetry tracing and metrics
-status: Draft
+status: Completed
 description: OTLP traces and metrics for flows, steps, LLM, tool and HTTP calls, with pkpipe-specific attributes, to Langfuse or Phoenix. Content capture configurable and off for private data.
 relevant_when:
   - OpenTelemetry

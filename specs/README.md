@@ -8,7 +8,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | --- | --- | --- | --- |
 | [001-foundation-and-docs](001-foundation-and-docs/spec.md) | Repository foundation and documentation site | Completed |  |
 | [002-model-port](002-model-port/spec.md) | ModelPort and OpenAI-compatible model adapter | Completed | research · data-model |
-| [003-observability](003-observability/spec.md) | OpenTelemetry tracing and metrics | Draft | research |
+| [003-observability](003-observability/spec.md) | OpenTelemetry tracing and metrics | Completed | research |
 | [004-obsidian-vault-mcp](004-obsidian-vault-mcp/spec.md) | obsidian-vault MCP server | Draft | research · data-model |
 | [005-flow-engine](005-flow-engine/spec.md) | Flow engine: compiler, step executors, run service, scheduler | Draft | research · data-model |
 | [006-notifications](006-notifications/spec.md) | Notification port and channels | Draft |  |
