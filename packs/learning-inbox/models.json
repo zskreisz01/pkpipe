@@ -1,13 +1,17 @@
 {
   "default": {
-    "base_url": "env:PKPIPE_MODEL_BASE_URL",
-    "model": "env:PKPIPE_MODEL_NAME",
+    "base_url": "env:PKPIPE_MODEL_BASE_URL|http://127.0.0.1:1234/v1",
+    "model": "env:PKPIPE_MODEL_NAME|qwen3.5-9b-mlx",
     "temperature": 0.2,
-    "context": 32768
+    "max_tokens": 4096,
+    "context": 32768,
+    "timeout_s": 180
   },
   "judge": {
-    "base_url": "env:PKPIPE_MODEL_BASE_URL",
-    "model": "env:PKPIPE_JUDGE_MODEL",
-    "temperature": 0.0
+    "base_url": "env:PKPIPE_MODEL_BASE_URL|http://127.0.0.1:1234/v1",
+    "model": "env:PKPIPE_JUDGE_MODEL|env:PKPIPE_MODEL_NAME|qwen3.5-9b-mlx",
+    "temperature": 0.0,
+    "max_tokens": 4096,
+    "timeout_s": 180
   }
 }

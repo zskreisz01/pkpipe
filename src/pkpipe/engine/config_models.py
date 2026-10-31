@@ -33,7 +33,11 @@ class ModelProfile(_Strict):
     base_url: str
     model: str
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    max_tokens: int | None = Field(default=None, gt=0)
     context: int | None = Field(default=None, gt=0)
+    timeout_s: int = Field(default=120, gt=0)
+    schema_retries: int = Field(default=1, ge=0, le=5)
+    api_key: str | None = None
     fallback: str | None = None
 
 
@@ -43,6 +47,12 @@ class ModelsConfig(RootModel[dict[str, ModelProfile]]):
         for name, profile in self.root.items():
             if profile.fallback is not None and profile.fallback not in self.root:
                 raise ValueError(f"model profile '{name}': unknown fallback '{profile.fallback}'")
+            seen, cur = {name}, profile.fallback
+            while cur is not None:
+                if cur in seen:
+                    raise ValueError(f"model profile '{name}': fallback cycle through '{cur}'")
+                seen.add(cur)
+                cur = self.root[cur].fallback
         return self
 
 

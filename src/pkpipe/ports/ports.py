@@ -3,10 +3,37 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 
+class ModelError(Exception):
+    """Base class of every typed ModelPort failure."""
+
+
+class SchemaError(ModelError):
+    """The model did not produce JSON valid against the requested schema (after any configured retries)."""
+
+    def __init__(self, message: str, raw: str | None = None):
+        super().__init__(message)
+        self.raw = raw
+
+
+class ModelUnavailable(ModelError):
+    """The model endpoint could not be reached or failed (connection, timeout, 5xx) and no fallback worked."""
+
+
+class ContextOverflow(ModelError):
+    """The prompt does not fit the model context window. Never truncated silently."""
+
+
 @runtime_checkable
 class ModelPort(Protocol):
+    """Structured completions. ``json_schema=None`` returns ``{"text": <reply>}``; otherwise the validated
+    JSON object. ``profile`` names an entry of models.json. Raises :class:`ModelError` subclasses."""
+
     def complete(
-        self, system: str, user: str, json_schema: dict[str, Any] | None = None
+        self,
+        system: str,
+        user: str,
+        json_schema: dict[str, Any] | None = None,
+        profile: str = "default",
     ) -> dict[str, Any]: ...
 
 

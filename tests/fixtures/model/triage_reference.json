@@ -1,0 +1,45 @@
+{
+  "request": {
+    "system": "You classify inbox notes. Reply only with JSON matching the schema.",
+    "user": "Note: Synthetic reference table of HTTP status codes and their meanings.",
+    "json_schema": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "enum": [
+            "tool",
+            "learning",
+            "reference",
+            "other"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "confidence",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "profile": "default"
+  },
+  "raw_content": "{\"category\": \"reference\", \"confidence\": 0.95, \"reason\": \"The note describes a table of HTTP status codes and their meanings, which is clearly a reference document.\"}",
+  "data": {
+    "category": "reference",
+    "confidence": 0.95,
+    "reason": "The note describes a table of HTTP status codes and their meanings, which is clearly a reference document."
+  },
+  "usage": {
+    "prompt_tokens": 41,
+    "completion_tokens": 41
+  },
+  "model": "qwen3.5-9b-mlx"
+}

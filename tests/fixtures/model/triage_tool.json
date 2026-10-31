@@ -1,0 +1,45 @@
+{
+  "request": {
+    "system": "You classify inbox notes. Reply only with JSON matching the schema.",
+    "user": "Note: A synthetic command line tool 'fooctl' that formats YAML files.",
+    "json_schema": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "enum": [
+            "tool",
+            "learning",
+            "reference",
+            "other"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "confidence",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "profile": "default"
+  },
+  "raw_content": "{\"category\": \"tool\", \"confidence\": 0.95, \"reason\": \"The note describes a command line tool named 'fooctl' with a specific function (formatting YAML files), which matches the definition of a software tool.\"}",
+  "data": {
+    "category": "tool",
+    "confidence": 0.95,
+    "reason": "The note describes a command line tool named 'fooctl' with a specific function (formatting YAML files), which matches the definition of a software tool."
+  },
+  "usage": {
+    "prompt_tokens": 44,
+    "completion_tokens": 52
+  },
+  "model": "qwen3.5-9b-mlx"
+}

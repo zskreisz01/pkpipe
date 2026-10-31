@@ -92,3 +92,22 @@ def test_validate_on_a_synthetic_vault_layout_does_not_touch_the_vault(synthetic
     before = {p: p.read_bytes() for p in synthetic_vault.rglob("*") if p.is_file()}
     assert pkpipe("validate", env_extra={"PKPIPE_VAULT_DIR": str(synthetic_vault)}).returncode == 0
     assert before == {p: p.read_bytes() for p in synthetic_vault.rglob("*") if p.is_file()}
+
+
+def test_validate_models_overlay_profiles_and_fallback_cycle(overlay_dir, write_json):
+    """Spec 002 FR-003 / US2: new profile fields validate; a fallback cycle exits 1."""
+    good = {
+        "judge": {
+            "base_url": "env:PKPIPE_MODEL_BASE_URL",
+            "model": "m",
+            "max_tokens": 512,
+            "timeout_s": 30,
+            "schema_retries": 2,
+            "fallback": "default",
+        },
+    }
+    write_json(overlay_dir, "models.json", good)
+    assert pkpipe("validate", "--overlay", str(overlay_dir)).returncode == 0
+    write_json(overlay_dir, "models.json", {"default": {"fallback": "judge"}, **good})
+    r = pkpipe("validate", "--overlay", str(overlay_dir))
+    assert r.returncode == 1 and "cycle" in r.stderr and "models" in r.stderr

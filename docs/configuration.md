@@ -32,6 +32,26 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `contexts/*.md` | Context packs (`system.md` public; `personal.md`, `enterprise.md` private) |
 | `schemas/*.json` | Structured-output schemas |
 
+## Model profiles
+
+Steps name a profile (`default`, `judge`), never an endpoint. `models.json` maps profile names to settings:
+
+| Field | Meaning | Default |
+| --- | --- | --- |
+| `base_url` | OpenAI-compatible endpoint (LM Studio, Ollama, vLLM), may be `env:NAME` | required |
+| `model` | Model name, may be `env:NAME` | required |
+| `temperature` | Sampling temperature (0 to 2) | 0.2 |
+| `max_tokens` | Output cap | server default |
+| `context` | Context window (informational; overflow is a typed `ContextOverflow` error, never truncated) | none |
+| `timeout_s` | Request timeout | 120 |
+| `schema_retries` | Extra attempts after invalid JSON, then `SchemaError` | 1 |
+| `api_key` | Optional bearer token, may be `env:NAME` | none |
+| `fallback` | Another profile used when the endpoint is down (connection, timeout, 5xx); recorded as a `model.fallback` span event. Cycles are rejected | none |
+
+`env:NAME` reads an environment variable and fails with a clear error when unset; `env:NAME|other` falls back to `other` (another `env:` reference or a literal). The public pack uses `env:PKPIPE_MODEL_BASE_URL|http://127.0.0.1:1234/v1` and `env:PKPIPE_MODEL_NAME|qwen3.5-9b-mlx`, so LM Studio works out of the box and Ollama is a `models.json` or environment change only.
+
+With a JSON schema the adapter sends `response_format: json_schema`, strips `<think>` blocks, extracts the first JSON object and validates it locally. Every call emits a span (`llm.model_name`, token counts, latency).
+
 ## Sessions instead of skills
 
 Session references (`system`, `instruction`, `context`, `output_schema`) are relative paths inside a layer; absolute paths and `..` are rejected. A session is one step with a fresh message list: a short fixed system prompt, the category instruction in the user prompt (about 800 tokens at most), at most one context pack, and only the declared inputs. This works better for small local models than long, bundled skill documents.
