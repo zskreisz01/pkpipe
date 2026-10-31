@@ -22,6 +22,7 @@ It runs on one machine with a local model (LM Studio, Ollama or any OpenAI-compa
 | [Evaluation](evaluation.md) | Five eval levels, datasets, gates, feedback loop |
 | [Operations](operations.md) | Scheduling, release ladder, observability, runbook |
 | [Glossary](glossary.md) | Terms used across docs, specs and code |
+| [Specifications](specs.md) | The spec-driven implementation plan and where to find each spec |
 
 The implementation is spec-driven: see `specs/README.md` and the constitution in `.specify/memory/constitution.md`.
 

@@ -1,7 +1,7 @@
 ---
 spec_id: 001-foundation-and-docs
 title: Repository foundation and documentation site
-status: Active
+status: Completed
 description: Repository skeleton, layered config loader, CLI, CI and the Docusaurus documentation site with the final process model and C4 views. The base every other spec builds on.
 relevant_when:
   - repository layout
@@ -18,7 +18,7 @@ updated: 2026-10-31
 
 **Feature Branch**: `spec/001-foundation-and-docs`
 **Created**: 2026-10-31
-**Status**: Active
+**Status**: Completed
 **Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
 
 ## User Scenarios & Testing *(mandatory)*

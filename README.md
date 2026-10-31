@@ -1,5 +1,8 @@
 # pkpipe – Personal Knowledge Pipeline
 
+[![CI](https://github.com/zskreisz01/pkpipe/actions/workflows/ci.yml/badge.svg)](https://github.com/zskreisz01/pkpipe/actions/workflows/ci.yml)
+[![Pages](https://github.com/zskreisz01/pkpipe/actions/workflows/pages.yml/badge.svg)](https://zskreisz01.github.io/pkpipe/)
+
 > Local-first agent pipeline that turns an Obsidian INBOX into learning material, tool evaluations and curated notes.
 
 **Status: pre-alpha.** The design is stable, the code is a skeleton.
