@@ -261,3 +261,66 @@ def test_non_strict_returns_config_with_errors_unraised(pack_copy):
 def test_missing_pack_directory_is_an_error(tmp_path):
     with pytest.raises(ConfigError, match="pack directory"):
         load_effective(tmp_path / "nope")
+
+
+# --- FR-002 core defaults layer ---------------------------------------------------------------------------
+def test_core_defaults_are_the_first_layer_and_the_pack_overrides_them(tmp_path, write_json):
+    """FR-002: core defaults -> pack -> overlay. A pack security.json with only the guards still gets the
+    safe defaults (private networks blocked, per-run canary, quarantine dir); a pack value wins."""
+    pack = tmp_path / "pack"
+    write_json(
+        pack,
+        "security.json",
+        {
+            "prompt_guard": {"model": "pg", "threshold": 0.5, "chunk_tokens": 512},
+            "output_guard": {"model": "og", "block_on": ["Unsafe"]},
+            "url_filter": {"max_bytes": 1000},
+        },
+    )
+    cfg = load_effective(pack)
+    sec = cfg.data["security"]
+    assert sec["url_filter"] == {"block_private_networks": True, "max_bytes": 1000}
+    assert sec["canary"] == {"rotate": "per_run"} and sec["quarantine_dir"] == "0-INBOX/_quarantine"
+    assert cfg.data["channels"] == {"channels": {}, "routes": {}}
+
+
+def test_core_defaults_are_not_mutated_by_loading(tmp_path, write_json):
+    from pkpipe.engine.registry import CORE_DEFAULTS
+
+    before = json.dumps(CORE_DEFAULTS, sort_keys=True)
+    pack = tmp_path / "pack"
+    write_json(pack, "security.json", {"url_filter": {"block_private_networks": False, "max_bytes": 5}})
+    cfg = load_config(pack)
+    cfg["security"]["canary"]["rotate"] = "never"
+    assert json.dumps(CORE_DEFAULTS, sort_keys=True) == before
+
+
+def test_overlay_can_override_a_core_default(pack_dir, overlay_dir, write_json):
+    write_json(overlay_dir, "security.json", {"canary": {"rotate": "daily"}})
+    assert load_effective(pack_dir, overlay_dir).data["security"]["canary"] == {"rotate": "daily"}
+
+
+# --- references cannot escape their layer -----------------------------------------------------------------
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("instruction", "../../secrets/notes.md"),
+        ("instruction", "/etc/passwd"),
+        ("system", "../analyst"),
+        ("context", "../../personal"),
+        ("output_schema", "C:\\\\x"),
+    ],
+)
+def test_session_references_outside_the_layer_are_rejected(pack_dir, overlay_dir, write_json, field, value):
+    """Public/private separation (constitution VII): a session can only reference files inside a layer."""
+    session = {"id": "s", "system": "analyst", "instruction": "tool/fit.md", field: value}
+    write_json(overlay_dir, "categories.json", [{**CAT, "sessions": [session]}])
+    with pytest.raises(ConfigError, match="relative path inside the pack"):
+        load_effective(pack_dir, overlay_dir)
+
+
+def test_find_file_never_resolves_outside_the_layer(pack_dir, overlay_dir, tmp_path):
+    (tmp_path / "outside.md").write_text("x", encoding="utf-8")
+    cfg = load_effective(pack_dir, overlay_dir)
+    assert cfg.find_file("../outside.md") is None
+    assert cfg.find_file(str(tmp_path / "outside.md")) is None

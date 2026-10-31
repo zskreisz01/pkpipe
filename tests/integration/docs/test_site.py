@@ -73,10 +73,18 @@ def test_specs_page_is_part_of_the_docs():
     reason="website/node_modules missing: run `npm ci` in website/",
 )
 def test_site_builds_and_contains_process_pages_with_images():
-    """SC-002 (build level): `npm run build` succeeds, process pages and their images are emitted."""
+    """SC-002 / US3.2 (build level): every process page is built with image and theme-mermaid diagram."""
     result = subprocess.run(["npm", "run", "build"], cwd=WEBSITE, capture_output=True, text=True, timeout=600)
     assert result.returncode == 0, result.stdout[-2000:] + result.stderr[-2000:]
     build = WEBSITE / "build"
-    page = build / "process" / "global-process-overview" / "index.html"
-    assert page.is_file()
-    assert "global-process-overview" in page.read_text() and list((build / "assets" / "images").glob("*.png"))
+    bundle = "\n".join(p.read_text(encoding="utf-8") for p in (build / "assets" / "js").glob("*.js"))
+    assert "docusaurus-mermaid-container" in bundle, "theme-mermaid renderer missing from the bundle"
+    pages = sorted((REPO / "docs" / "process").glob("*.md"))
+    assert len(pages) >= 10
+    for md in pages:
+        html = build / "process" / md.stem / "index.html"
+        assert html.is_file(), f"{md.stem}: page not built"
+        imgs = re.findall(r'<img[^>]*src=(?:"|)/pkpipe/(assets/images/[^" >]+\.png)', html.read_text())
+        assert imgs and all((build / i).is_file() for i in imgs), f"{md.stem}: process image missing"
+        first = md.read_text(encoding="utf-8").split("```mermaid\n", 1)[1].splitlines()[0]
+        assert f'.mermaid,{{value:"{first}' in bundle, f"{md.stem}: Mermaid block not rendered by theme"

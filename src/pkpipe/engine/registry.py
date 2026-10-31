@@ -13,6 +13,7 @@ The effective config carries a sha256 version hash of its canonical JSON; flows 
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -28,6 +29,17 @@ OVERLAY_ENV = "PKPIPE_OVERLAY_DIR"
 PACK_ENV = "PKPIPE_PACK_DIR"
 #: config files whose top level is a list of keyed objects
 LIST_FILES = {"categories": "id", "schedules": "flow"}
+
+#: Core defaults: the first layer under every pack. Safe-by-default security values (constitution IV) and
+#: empty routing, so a pack only has to state what it changes. Packs and overlays override key by key.
+CORE_DEFAULTS: dict[str, Any] = {
+    "security": {
+        "canary": {"rotate": "per_run"},
+        "url_filter": {"block_private_networks": True, "max_bytes": 2_000_000},
+        "quarantine_dir": "0-INBOX/_quarantine",
+    },
+    "channels": {"channels": {}, "routes": {}},
+}
 
 
 class ConfigError(Exception):
@@ -149,16 +161,26 @@ class EffectiveConfig:
     warnings: list[str] = field(default_factory=list)
 
     def find_file(self, relative: str) -> Path | None:
-        """Resolve a Markdown/JSON asset (prompt, instruction, context, schema): overlay first, then pack."""
+        """Resolve a Markdown/JSON asset (prompt, instruction, context, schema): overlay first, then pack.
+
+        Paths that are absolute or escape their layer directory (``..``) never resolve.
+        """
+        if Path(relative).is_absolute():
+            return None
         for base in (self.overlay_dir, self.pack_dir):
-            if base and (base / relative).is_file():
-                return base / relative
+            if not base:
+                continue
+            candidate = base / relative
+            if candidate.resolve().is_relative_to(base.resolve()) and candidate.is_file():
+                return candidate
         return None
 
 
 def load_config(pack_dir: Path, overlay_dir: Path | None = None) -> dict[str, Any]:
-    """Merged effective config as a dict (no validation against the models, see :func:`load_effective`)."""
-    return merge_layers(load_layer(pack_dir), load_layer(overlay_dir) if overlay_dir else {})
+    """Core defaults -> pack -> overlay, merged (no model validation, see :func:`load_effective`)."""
+    return merge_layers(
+        copy.deepcopy(CORE_DEFAULTS), load_layer(pack_dir), load_layer(overlay_dir) if overlay_dir else {}
+    )
 
 
 def check_references(cfg: EffectiveConfig) -> tuple[list[str], list[str]]:

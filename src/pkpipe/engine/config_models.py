@@ -134,6 +134,17 @@ class Session(_Strict):
     context: str | None = None
     output_schema: str | None = None
 
+    @field_validator("system", "instruction", "context", "output_schema")
+    @classmethod
+    def _relative_reference(cls, v: str | None) -> str | None:
+        """References stay inside their layer: no absolute paths, no '..', no backslashes."""
+        if v is None:
+            return v
+        parts = v.split("/")
+        if not v or v.startswith("/") or "\\" in v or ":" in v or any(p in ("", ".", "..") for p in parts):
+            raise ValueError(f"'{v}' must be a relative path inside the pack (no '..', no absolute path)")
+        return v
+
     @field_validator("tools")
     @classmethod
     def _tool_format(cls, v: list[str]) -> list[str]:

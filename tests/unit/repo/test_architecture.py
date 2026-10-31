@@ -15,14 +15,32 @@ CORE_THIRD_PARTY = {"langgraph", "pydantic", "langchain_core"}  # allowed beside
 STDLIB = __import__("sys").stdlib_module_names
 
 
+def _package_of(path: Path) -> list[str]:
+    """Dotted package of a module file below src/ (``src/pkpipe/engine/x.py`` -> ['pkpipe', 'engine'])."""
+    try:
+        return list(path.relative_to(SRC.parent).parent.parts)
+    except ValueError:
+        return ["pkpipe", "engine"]  # files outside src (checker self-test) are treated as core modules
+
+
 def _imports(path: Path) -> set[str]:
+    """Absolute module names imported by a file; relative imports are resolved against its package."""
     tree = ast.parse(path.read_text(encoding="utf-8"))
     mods: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             mods.update(a.name for a in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            mods.add(node.module)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0:
+                if node.module:
+                    mods.add(node.module)
+                continue
+            pkg = _package_of(path)
+            base = pkg[: len(pkg) - (node.level - 1)] if node.level > 1 else pkg
+            if node.module:
+                mods.add(".".join([*base, node.module]))
+            else:
+                mods.update(".".join([*base, a.name]) for a in node.names)
     return mods
 
 
@@ -52,6 +70,14 @@ def test_the_import_checker_would_catch_a_violation(tmp_path):
     bad = tmp_path / "bad.py"
     bad.write_text("import httpx\nfrom pkpipe.adapters.x import y\n")
     assert {"httpx", "pkpipe.adapters.x"} <= _imports(bad)
+
+
+def test_the_import_checker_resolves_relative_imports(tmp_path):
+    """A core module must not reach adapters through a relative import (``from ..adapters import x``)."""
+    bad = tmp_path / "bad.py"
+    bad.write_text("from ..adapters.model import openai\nfrom .. import adapters\nfrom .registry import x\n")
+    mods = _imports(bad)
+    assert {"pkpipe.adapters.model", "pkpipe.adapters", "pkpipe.engine.registry"} <= mods
 
 
 @pytest.mark.parametrize(
