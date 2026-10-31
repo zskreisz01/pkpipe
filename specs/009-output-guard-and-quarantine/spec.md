@@ -1,0 +1,89 @@
+---
+spec_id: 009-output-guard-and-quarantine
+title: Output guard and quarantine
+status: Draft
+description: Checks every output derived from external content before it is written (Qwen3Guard, Prompt Guard 2, canary) and handles security flags: malicious URL log, deny-list, inert quarantine, alert, owner release.
+relevant_when:
+  - output guard
+  - Qwen3Guard
+  - quarantine
+  - malicious_urls
+  - deny-list
+  - security flag
+related: [008-secure-fetch]
+updated: 2026-10-31
+---
+
+# Feature Specification: Output guard and quarantine
+
+**Feature Branch**: `spec/009-output-guard-and-quarantine`
+**Created**: 2026-10-31
+**Status**: Draft
+**Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
+**Companions**: [research.md](research.md) · [data-model.md](data-model.md)
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - Nothing harmful lands in the vault (Priority: P1)
+
+A synthesized note with harmful content or embedded instructions is stopped.
+
+**Independent Test**: Security eval on outputs.
+
+**Acceptance Scenarios**:
+
+1. **Given** an output with an injected instruction, **When** guarded, **Then** it is flagged and not written to PARA
+
+### User Story 2 - Flagged items are handled consistently (Priority: P1)
+
+Every flag logs the URL, deny-lists the domain, quarantines inertly and alerts.
+
+**Independent Test**: Flow test of `handle_security_flag`.
+
+**Acceptance Scenarios**:
+
+1. **Given** a flag, **When** handled, **Then** a row is appended to `malicious_urls.jsonl` and the item state is quarantined
+2. **Given** quarantined content, **When** stored, **Then** it is inside a code block with `security_flag` front matter
+
+### User Story 3 - Owner releases false positives (Priority: P2)
+
+The owner releases an item; it re-enters processing and becomes an eval entry.
+
+**Independent Test**: UI/app-MCP test.
+
+**Acceptance Scenarios**:
+
+1. **Given** a release, **When** confirmed, **Then** the item is re-queued and added to the security dataset candidates
+
+### Edge Cases
+
+- Same domain flagged repeatedly → single deny-list entry, counter incremented.
+
+## Requirements *(mandatory)*
+
+### Functional Requirements
+
+- **FR-001**: Output guard runs on every session output from external content before vault writes.
+- **FR-002**: Flags: `malicious_content`, `injection_or_jailbreak`, `canary_leak`.
+- **FR-003**: Security flag is an error end event per item; other items continue.
+
+### Key Entities
+
+- **SecurityFlag**
+- **MaliciousUrlEntry**
+- **QuarantineNote**
+
+## Success Criteria *(mandatory)*
+
+- **SC-001**: 0 flagged outputs written to PARA in tests.
+- **SC-002**: Every flag produces log row, deny-list entry, quarantine note and alert.
+
+## Clarifications
+
+### Session 2026-10-31
+
+- Q: Is this spec part of the public engine? → A: Yes; private categories, contexts and datasets stay in the overlay.
+
+## Out of Scope
+
+- Automatic unblocking of domains.

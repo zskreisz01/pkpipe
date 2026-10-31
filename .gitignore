@@ -12,3 +12,4 @@ contexts/
 node_modules/
 website/build/
 website/.docusaurus/
+pkpipe-docs-specs.tgz

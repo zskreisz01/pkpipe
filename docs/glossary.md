@@ -9,7 +9,7 @@ title: Glossary
 | INBOX | `0-INBOX` in the Obsidian vault; where captured resources land |
 | Triage | The 20:00 categorization; the AI suggests, the owner confirms or overrides |
 | Release | At 06:00, confirmed or overridden items move on; the rest stays pending |
-| Category | Learning material, Tool, Marketing, Misc (public) plus overlay categories |
+| Category | A kind of INBOX item the owner wants handled in a specific way. Categories are configuration, not code: each entry in `categories.json` couples the category id with its triage hint, target PARA path, subflow, session plan, session instructions and optional context pack. The public pack ships Learning material, Tool, Marketing and Misc as examples; an owner adds, changes or disables categories in the private overlay. |
 | Session | One isolated LLM step: fixed system prompt, category instruction, declared inputs |
 | Session plan | Ordered list of sessions per category, in `categories.json` |
 | Context pack | Compact Markdown context: system, personal, enterprise |

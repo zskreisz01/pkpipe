@@ -10,7 +10,7 @@ pkpipe is a single Python application that orchestrates flows with LangGraph, pl
 
 The binding rules are in the constitution (`.specify/memory/constitution.md`). In short:
 
-1. **Local-first, model-agnostic.** One machine, any OpenAI-compatible model server.
+1. **Local-first, model-agnostic, deployable anywhere.** The reference deployment is one machine with a local model; the same engine runs in the cloud (for example Microsoft Foundry) by swapping configuration and adapters.
 2. **Hexagonal core.** The core depends only on ports; integrations are adapters.
 3. **Configuration over code.** Flows, categories, session plans and instructions are JSON + Markdown, layered (public pack → private overlay) and versioned in git.
 4. **Untrusted content isolation.** Raw web text only reaches sessions without tools.

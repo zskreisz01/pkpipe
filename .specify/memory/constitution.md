@@ -3,14 +3,18 @@
 > Spec-kit constitution for the `pkpipe` repository. Every spec's `plan.md` "Constitution Check" refers to these
 > principles. Source: the design documentation in `docs/` and the process model `docs/design/pkpipe-process-model.drawio`.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-31 | **Last Amended**: 2026-10-31
+**Version**: 1.1.0 | **Ratified**: 2026-10-31 | **Last Amended**: 2026-10-31
 
 ## Core Principles
 
-### I. Local-first and model-agnostic
-pkpipe runs on one machine. The model is reached only through an OpenAI-compatible API (LM Studio, Ollama, vLLM or a
-cloud endpoint); no code depends on a specific vendor SDK or model family. External services (search, learning backend,
-notification channels, trace backend) are optional and replaceable by configuration.
+### I. Local-first, model-agnostic, deployable anywhere
+pkpipe is a blueprint for personal knowledge and novelty pipelines, not a single installation. The reference deployment
+is local-first: data stays on the owner's machine and the agents use a local model. The same engine must also run in a
+cloud deployment (for example Microsoft Foundry with Azure-hosted models, storage and monitoring) by changing
+configuration and adapters only. The model is reached only through an OpenAI-compatible API (LM Studio, Ollama, vLLM,
+Microsoft Foundry or another cloud endpoint); no core code depends on a specific vendor SDK, model family or hosting
+environment. External services (search, learning backend, notification channels, trace backend, storage) are optional
+and replaceable by configuration. A choice that only works locally, or only in one cloud, belongs in an adapter.
 
 ### II. Hexagonal core (NON-NEGOTIABLE)
 The core (`pkpipe.engine`, `pkpipe.domain`, `pkpipe.steps`) imports only `pkpipe.ports` and the standard library,

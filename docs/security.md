@@ -15,6 +15,8 @@ All external content is untrusted data and never reaches a session that has tool
 | Notebook agent | Only the URL and a prompt template | `learning:create`, `status`, `link` | `nb_id`, status, link |
 | Synthesizer | The research output | None | Markdown note (JSON) |
 
+"Without tools" refers to the LLM session, not to the step. The inputs of a tool-less session are loaded by deterministic code through a port (vault, fetch, state) and passed in as datamarked text; the model cannot ask for more, read other files or write anywhere. This is how the triage session reads INBOX items and the improvement extraction reads the journal.
+
 Process-level isolation: Lightpanda runs in a container without volumes or secrets, with private networks blocked and JavaScript `evaluate` disabled. MCP servers only get their own secrets.
 
 ## Canary and authenticated instructions

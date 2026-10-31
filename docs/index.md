@@ -13,6 +13,8 @@ It runs on one machine with a local model (LM Studio, Ollama or any OpenAI-compa
 
 | Page | What it answers |
 | --- | --- |
+| [Installation checklist](installation.md) | What to install and configure before the first run |
+| [Owner manual](owner-manual.md) | The manual tasks: what, when, how |
 | [Architecture](architecture.md) | Principles, technology, C4 context / container / component views |
 | [Process model](bpmn.md) | The BPMN process model: every process as an image and as Mermaid |
 | [Configuration](configuration.md) | Layers, files, categories, session plans, context packs |

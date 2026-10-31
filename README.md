@@ -19,6 +19,12 @@ LangGraph + FastAPI (Python), any OpenAI-compatible model server (LM Studio, Oll
 
 See the [documentation site](https://zskreisz01.github.io/pkpipe/) for C4 diagrams, the BPMN process model, the security model and the eval strategy.
 
+## Design and specs
+
+- [Documentation](docs/index.md): [installation checklist](docs/installation.md), [owner manual](docs/owner-manual.md), [architecture (C4)](docs/architecture.md), [process model](docs/bpmn.md), [security](docs/security.md), [evaluation](docs/evaluation.md)
+- [Constitution](.specify/memory/constitution.md): the non-negotiable rules every spec is checked against
+- [Specs](specs/README.md): the implementation broken into 16 features, in implementation order
+
 ## Quickstart
 
 ```bash
@@ -36,7 +42,10 @@ src/pkpipe/   engine, ports, adapters, domain, security, api, mcp, telemetry
 packs/           public config packs (categories, sessions, instructions, schemas)
 mcp_servers/     obsidian-vault, learning-gateway, web-fetch (MCP)
 evals/           synthetic datasets and rubrics
-website/         documentation site (Docusaurus, published via GitHub Pages)
+docs/            design docs: C4, process model (drawio + PNG + Mermaid), security, evals
+specs/           spec-kit feature specs (spec, plan, tasks, research, data-model)
+.specify/        constitution and spec templates
+website/         Docusaurus site that publishes docs/ via GitHub Pages
 deploy/          docker-compose and launchd examples
 ```
 
