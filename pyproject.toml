@@ -6,11 +6,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
+    "fastmcp>=4.1.4",
     # Added as the corresponding modules are implemented:
     # "langgraph", "langgraph-checkpoint-sqlite", "langchain-openai",
     # "langchain-mcp-adapters", "fastmcp", "fastapi", "apscheduler",
     # "opentelemetry-sdk", "openinference-instrumentation-langchain", "apprise",
     "pydantic>=2",
+    "python-frontmatter>=1.3.0",
 ]
 
 [project.scripts]
