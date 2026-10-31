@@ -9,6 +9,7 @@ services:
     ports: ["127.0.0.1:6006:6006", "127.0.0.1:4317:4317"]
     environment:
       PHOENIX_WORKING_DIR: /mnt/data   # SQLite database lives here
+      PHOENIX_ENABLE_AUTH: "false"     # local-only (127.0.0.1) dev backend; enable auth before exposing it
     volumes:
       - phoenix-data:/mnt/data
   # open-notebook: see the Open Notebook docs for the current image and env vars
