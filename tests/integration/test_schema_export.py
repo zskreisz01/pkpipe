@@ -15,6 +15,9 @@ def test_exported_schema_files_validate_the_pack_and_reject_a_broken_overlay(tmp
     for schema_file in out.glob("*.schema.json"):
         schema = json.loads(schema_file.read_text())
         stem = schema_file.name.removesuffix(".schema.json")
+        if not (pack_dir / f"{stem}.json").exists():
+            assert stem in {"triage-row", "processing-list-row"}  # vault row schemas (spec 004)
+            continue
         jsonschema.validate(json.loads((pack_dir / f"{stem}.json").read_text()), schema)
     schedules = json.loads((out / "schedules.schema.json").read_text())
     bad = [{"flow": "triage", "cron": "0 6 * * *", "surprise": True}]

@@ -82,5 +82,20 @@ def test_schema_command_writes_one_schema_per_config_file(tmp_path, capsys):
     assert names == {
         f"{n}.schema.json"
         for n in ("models", "mcp_servers", "channels", "schedules", "categories", "security", "telemetry")
-    }
+    } | {"triage-row.schema.json", "processing-list-row.schema.json"}
     json.loads((tmp_path / "s" / "models.schema.json").read_text())
+
+
+def test_schema_command_exports_triage_and_processing_row_schemas(tmp_path):
+    """Spec 004 data-model.md: row schemas are exported and match the models (required fields, state enum)."""
+    from pkpipe.domain.triage import ItemState
+    from pkpipe.obsidian.models import ProcessingListRow, ProcessingStatus, TriageRow
+
+    assert main(["schema", "--out", str(tmp_path)]) == 0
+    triage = json.loads((tmp_path / "triage-row.schema.json").read_text())
+    proc = json.loads((tmp_path / "processing-list-row.schema.json").read_text())
+    assert triage == TriageRow.model_json_schema() and proc == ProcessingListRow.model_json_schema()
+    assert set(triage["required"]) == {"item_id", "resource", "ai_suggested_category"}
+    assert set(proc["required"]) == {"item_id", "category", "obsidian_link"}
+    assert set(triage["$defs"]["ItemState"]["enum"]) == {s.value for s in ItemState}
+    assert set(proc["$defs"]["ProcessingStatus"]["enum"]) == {s.value for s in ProcessingStatus}

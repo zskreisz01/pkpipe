@@ -109,3 +109,11 @@ class ProcessingListRow(BaseModel):
             link=cells["link"],
             status=cells["status"].strip().lower() or ProcessingStatus.UNPROCESSED,
         )
+
+
+def vault_json_schemas() -> dict[str, dict]:
+    """JSON Schemas of the triage and processing-list rows (spec 004 data-model.md), keyed by file stem."""
+    return {
+        "triage-row": TriageRow.model_json_schema(),
+        "processing-list-row": ProcessingListRow.model_json_schema(),
+    }
