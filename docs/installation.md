@@ -65,7 +65,7 @@ Without these, triage still works (it only sees URL, title and note), but no web
 - [ ] Run the tests: `uv run pytest`
 - [ ] Start the app: `uv run pkpipe serve` and open the UI.
 - [ ] Do a first manual run: `uv run pkpipe run triage` with one or two test items in `0-INBOX`, and confirm the notification arrives.
-- [ ] Install a `launchd` agent that runs `uv run pkpipe serve`, so the app restarts on login and after crashes (an example plist is planned for `deploy/`).
+- [ ] Install a `launchd` agent that runs `uv run pkpipe serve`, so the app restarts on login and after crashes (an example for the vault server is in `deploy/launchd/`).
 - [ ] Calibrate the LLM judge once (see the [owner manual](owner-manual.md#calibrate-the-llm-judge)).
 
 ## 6. Cloud variant (blueprint)

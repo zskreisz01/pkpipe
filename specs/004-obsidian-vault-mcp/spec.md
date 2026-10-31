@@ -1,7 +1,7 @@
 ---
 spec_id: 004-obsidian-vault-mcp
 title: obsidian-vault MCP server
-status: Draft
+status: Completed
 description: A FastMCP server over the vault folder for reading the INBOX, writing notes to PARA paths and maintaining the triage file and processing list, with path allowlists per tool.
 relevant_when:
   - Obsidian
@@ -18,7 +18,7 @@ updated: 2026-10-31
 
 **Feature Branch**: `spec/004-obsidian-vault-mcp`
 **Created**: 2026-10-31
-**Status**: Draft
+**Status**: Completed
 **Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
 **Companions**: [research.md](research.md) · [data-model.md](data-model.md)
 
