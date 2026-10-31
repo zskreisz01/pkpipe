@@ -333,3 +333,90 @@ def test_extract_json_object_picks_first_object_and_skips_broken_braces():
     assert extract_json_object('x { not json } {"a": {"b": 1}} {"c": 2}') == {"a": {"b": 1}}
     with pytest.raises(ValueError):
         extract_json_object('<think>only {"a": 1} thinking')  # an unterminated think block hides everything
+
+
+def test_lone_closing_think_tag_hides_the_reasoning_before_it():
+    """Edge case (text around JSON): templates that put <think> into the prompt emit only </think>; a draft
+    object inside that reasoning must not be taken as the answer."""
+    content = 'Maybe {"category": "other"}? No, it is a CLI.</think>\n{"category": "tool"}'
+    out = make(lambda r: httpx.Response(200, json=reply(content))).complete("s", "u", SCHEMA)
+    assert out == {"category": "tool"}
+
+
+def test_reasoning_prose_is_never_mined_for_a_draft_answer():
+    """US1.2: empty content plus free reasoning that quotes a schema-valid draft is not an answer -> retried,
+    then SchemaError (never the draft)."""
+    resp = reply("", reasoning_content='The user example is {"category": "other"}. Let me think more...')
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return httpx.Response(200, json=resp)
+
+    with pytest.raises(SchemaError, match="no JSON object"):
+        make(handler).complete("s", "u", SCHEMA)
+    assert len(calls) == 2
+
+
+def test_reasoning_cut_by_max_tokens_is_a_truncation_error():
+    resp = reply("", finish="length", reasoning_content='{"category": "tool"}')
+    with pytest.raises(SchemaError, match="truncated"):
+        make(lambda r: httpx.Response(200, json=resp)).complete("s", "u", SCHEMA)
+
+
+@pytest.mark.parametrize(
+    "resp, fragment",
+    [
+        (reply("", reasoning_content="thinking about pong"), "no answer"),
+        (reply("Once upon a ti", finish="length"), "truncated"),
+    ],
+)
+def test_text_mode_never_returns_reasoning_or_truncated_text(resp, fragment):
+    """Edge case 'no silent truncation': text replies cut by max_tokens or without an answer are errors."""
+    from pkpipe.ports import ModelError
+
+    with pytest.raises(ModelError, match=fragment) as exc:
+        make(lambda r: httpx.Response(200, json=resp)).complete("s", "u")
+    assert not isinstance(exc.value, ModelUnavailable)
+
+
+def test_prompt_that_cannot_fit_the_profile_context_is_refused_before_sending():
+    """Edge case: context overflow -> typed ContextOverflow, no request (the server could truncate it
+    silently), no fallback; a prompt that fits is sent."""
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    models = {
+        "default": {"base_url": "http://x.invalid/v1", "model": "m", "context": 100, "fallback": "big"},
+        "big": {"base_url": "http://big.invalid/v1", "model": "b"},
+    }
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.host)
+        return httpx.Response(200, json=reply('{"category": "tool"}'))
+
+    model = make(handler, models, tracer=provider.get_tracer("t"))
+    with pytest.raises(ContextOverflow, match="100-token context"):
+        model.complete("s", "x" * 700, SCHEMA)
+    assert calls == []
+    (span,) = exporter.get_finished_spans()
+    assert span.attributes["pkpipe.model.error"] == "ContextOverflow"
+    assert model.complete("s", "x" * 200, SCHEMA) == {"category": "tool"} and calls == ["x.invalid"]
+
+
+def test_fallback_event_is_recorded_even_without_a_caller_span():
+    """US2.2: the switch to the fallback profile is a span event on the fallback's own model span."""
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+    def handler(request):
+        if request.url.host == "primary.invalid":
+            raise httpx.ConnectTimeout("timed out")
+        return httpx.Response(200, json=reply("{}"))
+
+    make(handler, tracer=provider.get_tracer("t")).complete("s", "u", {"type": "object"})
+    backup = next(s for s in exporter.get_finished_spans() if s.name == "model.complete backup")
+    (event,) = [e for e in backup.events if e.name == "model.fallback"]
+    assert dict(event.attributes) == {"from": "default", "to": "backup"}

@@ -24,6 +24,9 @@ from pkpipe.engine.config_models import ModelProfile, ModelsConfig
 from pkpipe.ports import ContextOverflow, ModelError, ModelUnavailable, SchemaError
 
 THINK = re.compile(r"<think>.*?(?:</think>|\Z)", re.DOTALL)
+# A prompt longer than this many characters per context token certainly overflows the context window, whatever
+# the tokenizer (real tokenizers average ~3-4 characters per token for English, fewer for other languages).
+_MAX_CHARS_PER_TOKEN = 6
 _CONTEXT_HINTS = (
     "context length",
     "context_length",
@@ -100,9 +103,18 @@ def resolve_profile(name: str, models: ModelsConfig, environ: Mapping[str, str])
         raise ProfileError(f"model profile '{name}': {exc}") from exc
 
 
+def strip_reasoning(text: str) -> str:
+    """Remove ``<think>...</think>`` blocks, an unterminated ``<think>`` tail, and anything before a lone
+    ``</think>`` (chat templates that put the opening tag into the prompt emit only the closing one)."""
+    text = THINK.sub("", text)
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[1]
+    return text.strip()
+
+
 def extract_json_object(text: str) -> Any:
-    """Strip ``<think>`` blocks, then parse the first JSON object in the text (also inside prose/fences)."""
-    text = THINK.sub("", text).strip()
+    """Strip reasoning, then parse the first JSON object in the text (also inside prose/fences)."""
+    text = strip_reasoning(text)
     decoder = json.JSONDecoder()
     start = text.find("{")
     while start != -1:
@@ -159,7 +171,9 @@ class OpenAIModel:
             seen.append(current)
             resolved = resolve_profile(current, self.models, self.environ)
             try:
-                result = self._call_profile(resolved, system, user, json_schema, used_fallback=len(seen) > 1)
+                result = self._call_profile(
+                    resolved, system, user, json_schema, fallback_from=seen[-2] if len(seen) > 1 else None
+                )
             except ModelUnavailable as exc:
                 last_error = exc
                 if resolved.fallback is not None:
@@ -179,9 +193,18 @@ class OpenAIModel:
             span.add_event(name, attrs)
 
     def _call_profile(
-        self, p: ResolvedProfile, system: str, user: str, schema: dict[str, Any] | None, used_fallback: bool
+        self,
+        p: ResolvedProfile,
+        system: str,
+        user: str,
+        schema: dict[str, Any] | None,
+        fallback_from: str | None,
     ) -> Completion:
+        used_fallback = fallback_from is not None
         with self._tracer.start_as_current_span(f"model.complete {p.name}") as span:
+            if fallback_from is not None:
+                # Also on the fallback's own span, so the switch is recorded even without a caller span.
+                span.add_event("model.fallback", {"from": fallback_from, "to": p.name})
             span.set_attribute("openinference.span.kind", "LLM")
             span.set_attribute("llm.model_name", p.model)
             span.set_attribute("llm.provider", "openai-compatible")
@@ -189,6 +212,7 @@ class OpenAIModel:
             span.set_attribute("pkpipe.model.used_fallback", used_fallback)
             started = time.monotonic()
             try:
+                self._check_context(p, system, user, schema)
                 result = self._attempts(p, system, user, schema, span, started, used_fallback)
             except ModelError as exc:
                 span.set_status(StatusCode.ERROR, str(exc))
@@ -203,6 +227,18 @@ class OpenAIModel:
             )
             span.set_attribute("pkpipe.model.attempts", result.attempts)
             return result
+
+    @staticmethod
+    def _check_context(p: ResolvedProfile, system: str, user: str, schema: dict[str, Any] | None) -> None:
+        """Refuse a prompt that cannot fit ``context`` instead of letting the server truncate it silently."""
+        if not p.context:
+            return
+        chars = len(system) + len(user) + (len(json.dumps(schema)) if schema is not None else 0)
+        if chars > p.context * _MAX_CHARS_PER_TOKEN:
+            raise ContextOverflow(
+                f"prompt of {chars} characters cannot fit the {p.context}-token context of profile "
+                f"'{p.name}' ('{p.model}'); split or shorten the input"
+            )
 
     def _attempts(
         self,
@@ -236,7 +272,7 @@ class OpenAIModel:
                 span.add_event("model.schema_error", {"attempt": attempt, "error": last_err})
                 messages = [
                     *messages[:2],
-                    {"role": "assistant", "content": THINK.sub("", content).strip()[:4000]},
+                    {"role": "assistant", "content": strip_reasoning(content)[:4000]},
                     {
                         "role": "user",
                         "content": f"Your previous reply was invalid ({last_err}). "
@@ -262,7 +298,12 @@ class OpenAIModel:
     @staticmethod
     def _parse(content: str, schema: dict[str, Any] | None, finish: str | None) -> dict[str, Any]:
         if schema is None:
-            return {"text": THINK.sub("", content).strip()}
+            if finish == "length":
+                raise ModelError("output truncated by max_tokens; raise max_tokens of the profile")
+            text = strip_reasoning(content)
+            if not text:
+                raise ModelError("model returned no answer (empty content, reasoning only)")
+            return {"text": text}
         try:
             obj = extract_json_object(content)
         except ValueError as exc:
@@ -307,7 +348,22 @@ class OpenAIModel:
         except (ValueError, KeyError, IndexError, TypeError) as exc:
             raise ModelUnavailable(f"{p.base_url}: malformed chat completion response") from exc
         content = message.get("content") or ""
-        if not THINK.sub("", content).strip():
-            # Qwen3.x on LM Studio may put the whole answer into reasoning_content with an empty content.
-            content = message.get("reasoning_content") or message.get("reasoning") or content
-        return content, payload.get("usage") or {}, choice.get("finish_reason")
+        finish = choice.get("finish_reason")
+        reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
+        if not strip_reasoning(content) and reasoning and finish != "length":
+            # Qwen3.x on LM Studio with response_format json_schema puts the (constrained) answer into
+            # reasoning_content and leaves content empty. Only a reply that is entirely one JSON object is an
+            # answer; free reasoning prose (drafts, quoted examples) is never mined for JSON.
+            if schema is not None and _is_single_json_object(reasoning):
+                content = reasoning
+        return content, payload.get("usage") or {}, finish
+
+
+def _is_single_json_object(text: str) -> bool:
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.strip("`").removeprefix("json").strip()
+    try:
+        return isinstance(json.loads(text), dict)
+    except ValueError:
+        return False

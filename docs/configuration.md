@@ -42,7 +42,7 @@ Steps name a profile (`default`, `judge`), never an endpoint. `models.json` maps
 | `model` | Model name, may be `env:NAME` | required |
 | `temperature` | Sampling temperature (0 to 2) | 0.2 |
 | `max_tokens` | Output cap | server default |
-| `context` | Context window (informational; overflow is a typed `ContextOverflow` error, never truncated) | none |
+| `context` | Context window in tokens. A prompt that certainly cannot fit (more than 6 characters per token) is refused with `ContextOverflow` before sending; a server-reported overflow raises the same error. Never truncated silently | none |
 | `timeout_s` | Request timeout | 120 |
 | `schema_retries` | Extra attempts after invalid JSON, then `SchemaError` | 1 |
 | `api_key` | Optional bearer token, may be `env:NAME` | none |
@@ -50,7 +50,7 @@ Steps name a profile (`default`, `judge`), never an endpoint. `models.json` maps
 
 `env:NAME` reads an environment variable and fails with a clear error when unset; `env:NAME|other` falls back to `other` (another `env:` reference or a literal). The public pack uses `env:PKPIPE_MODEL_BASE_URL|http://127.0.0.1:1234/v1` and `env:PKPIPE_MODEL_NAME|qwen3.5-9b-mlx`, so LM Studio works out of the box and Ollama is a `models.json` or environment change only.
 
-With a JSON schema the adapter sends `response_format: json_schema`, strips `<think>` blocks, extracts the first JSON object and validates it locally. Every call emits a span (`llm.model_name`, token counts, latency).
+With a JSON schema the adapter sends `response_format: json_schema`, strips `<think>` blocks (and anything before a lone `</think>`), extracts the first JSON object and validates it locally. When `content` is empty (Qwen on LM Studio puts schema-constrained answers into `reasoning_content`), the reasoning is used only if it is exactly one JSON object; reasoning prose is never mined for drafts. Output cut by `max_tokens` is an error in both JSON and text mode. Every call emits a span (`llm.model_name`, token counts, latency).
 
 ## Sessions instead of skills
 
