@@ -134,3 +134,51 @@ def test_resume_fails_clearly_when_the_snapshot_is_gone():
     )
     with pytest.raises(LookupError, match="snapshot"):
         make_service(make_snapshot(_flow("v1")), make_ports(), store=store).resume("r")
+
+
+def _orphan(store: InMemoryRunStore, run_id: str, version: str, status: str = "running") -> None:
+    store.create_run(
+        {
+            "run_id": run_id,
+            "flow_id": "pinned",
+            "config_version": version,
+            "trigger": "schedule",
+            "status": status,
+            "started_at": "2026-01-01T00:00:00+00:00",
+        }
+    )
+
+
+def test_run_recorded_without_a_checkpoint_fails_clearly_and_runs_nothing():
+    """A process that died between recording the run and its first checkpoint: there is nothing to resume
+    (the inputs were never checkpointed), so the run is failed with a clear reason and no step executes."""
+    snap = make_snapshot(_flow("v1"))
+    store = InMemoryRunStore()
+    store.save_snapshot(snap.version, snap.data, snap.assets)
+    _orphan(store, "orphan", snap.version)
+    tools = FakeTools({"t:read": lambda tag: {"tag": tag}, "t:done": lambda tag: tag})
+    svc = make_service(snap, make_ports(tools=tools), store=store)
+    [outcome] = svc.resume_incomplete()
+    assert outcome.run.status is RunStatus.FAILED and "no checkpoint" in outcome.run.error
+    assert store.get_run("orphan")["status"] == "failed" and tools.calls == []
+
+
+def test_resume_incomplete_keeps_going_when_one_snapshot_is_missing():
+    """One broken run (its pinned snapshot is gone) is recorded as failed; the other runs still resume."""
+    snap = make_snapshot(_flow("v1"))
+    store, saver = InMemoryRunStore(), InMemorySaver()
+    tools = FakeTools({"t:read": lambda tag: {"tag": tag}, "t:done": lambda tag: tag})
+    svc = make_service(
+        snap,
+        make_ports(tools=tools, model=FakeModel(lambda s, u: {"text": "a"})),
+        store=store,
+        checkpointer=saver,
+    )
+    _orphan(store, "lost", "0" * 64, status="waiting")
+    CRASH["armed"] = True
+    with pytest.raises(Crash):
+        svc.start("pinned", run_id="ok")
+    outcomes = {o.run.run_id: o for o in svc.resume_incomplete()}
+    assert outcomes["ok"].ok
+    assert outcomes["lost"].run.status is RunStatus.FAILED and "snapshot" in outcomes["lost"].run.error
+    assert store.get_run("lost")["status"] == "failed"

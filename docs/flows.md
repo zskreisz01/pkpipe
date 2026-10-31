@@ -69,7 +69,7 @@ An overlay can change one node of a pack flow by id (`{"nodes": [{"id": "notify"
 | Type | Does | Config |
 | --- | --- | --- |
 | `llm` | One isolated session: system prompt, instruction, at most one context pack, declared inputs only, optional JSON-schema output | `system`, `instruction`, `context`, `output_schema`, `profile` |
-| `llm_tools` | Session that may call tools: the model proposes a call, code checks the allow list and calls it. Never receives raw item text (`item`, `item.body`, `item.content`, `item.raw`, `item.text`, `*`) | as `llm` + `tools`, `max_turns` |
+| `llm_tools` | Session that may call tools: the model proposes a call, code checks the allow list and calls it. Sees only validated JSON: never raw item text (`item`, `item.body`, `item.content`, `item.raw`, `item.text`, `*`) and never the output of a `tool`, `wait` or `llm_tools` node or of an `llm` node without `output_schema` | as `llm` + `tools`, `max_turns` |
 | `tool` | One tool call, no model | `tool` (`server:tool`), `arguments` |
 | `code` | A registered deterministic function (gates, state changes, row building) | `function`, `args` |
 | `notify` | Message to the channels routed for an event in `channels.json` | `event`, `message`, `channels` |
@@ -127,7 +127,7 @@ A `for_each` step takes only plain edges: route items inside a subflow, and use 
 | `status` | `running`, `waiting` (inside a wait step), `done`, `failed` |
 | `started_at`, `ended_at`, `error` | Times; error type and message of a failed run |
 
-When a run starts, the config snapshot (JSON and assets) is stored in the app DB under its version. A run always executes against that snapshot: a config published while it waits, or a restart, does not change what it sees, and the model and tool adapters are built from the same version. Every step is checkpointed in SQLite; after a crash `pkpipe run --resume-all` (or `--resume <run id>`) continues from the last checkpoint, and finished steps and finished items are not executed again.
+When a run starts, the config snapshot (JSON and assets) is stored in the app DB under its version. A run always executes against that snapshot: a config published while it waits, or a restart, does not change what it sees, and the model and tool adapters are built from the same version. Every step is checkpointed in SQLite; after a crash `pkpipe run --resume-all` (or `--resume <run id>`) continues from the last checkpoint, and finished steps and finished items are not executed again. A run that stopped before its first checkpoint has nothing to continue and is marked failed (`no checkpoint`); a run whose stored snapshot is missing is marked failed without stopping the other resumes.
 
 ```bash
 pkpipe run triage                    # start now (trigger manual)
@@ -138,7 +138,7 @@ pkpipe runs --status waiting         # list run records
 
 ## Telemetry
 
-Every flow, step, LLM call and tool call is a span. Step spans carry `flow.id`, `step.id`, `bpmn.element`, `item.id`, `item.category`, `config.version` and `run.trigger`; items processed in parallel stay in the run's trace. Prompt and response text is attached only for flows listed in `telemetry.json` (see [Operations](operations.md)).
+Every flow, step, LLM call and tool call is a span. Step spans carry `flow.id`, `step.id`, `bpmn.element`, `item.id`, `item.category`, `config.version` and `run.trigger`; LLM and tool spans inherit `flow.id`, `step.id`, `bpmn.element`, `item.id`, `item.category` and `config.version` from the step that made the call; items processed in parallel stay in the run's trace. Prompt and response text is attached only for flows listed in `telemetry.json` (see [Operations](operations.md)).
 
 ## Adding a step type
 

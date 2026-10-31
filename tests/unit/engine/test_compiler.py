@@ -87,6 +87,40 @@ def test_tool_sessions_never_receive_raw_untrusted_input():
     assert any("raw untrusted input ['item.body']" in e for e in errors)
 
 
+def test_tool_sessions_never_receive_unvalidated_step_outputs():
+    """Constitution IV: sessions with tools see only validated JSON. A tool result (for example a note body
+    read from the INBOX) or a free-text session is refused; a code result or a schema-validated session is
+    accepted."""
+    nodes = [
+        {"id": "read", "type": "tool", "config": {"tool": "t:read"}},
+        {"id": "free", "type": "llm", "inputs": ["read.body"], "config": {"system": "analyst"}},
+        {
+            "id": "extract",
+            "type": "llm",
+            "inputs": ["read.body"],
+            "config": {"system": "analyst", "output_schema": "verdict"},
+        },
+        {"id": "gate", "type": "code", "config": {"function": "item.set"}},
+        {
+            "id": "research",
+            "type": "llm_tools",
+            "inputs": ["read.body", "free.text", "extract.verdict", "gate.ok", "input.topic"],
+            "config": {"system": "analyst", "tools": ["t:read"]},
+        },
+    ]
+    edges = [
+        {"from": "read", "to": "free"},
+        {"from": "free", "to": "extract"},
+        {"from": "extract", "to": "gate"},
+        {"from": "gate", "to": "research"},
+    ]
+    flow = {"id": "f", "start": "read", "nodes": nodes, "edges": edges}
+    errors, _ = validate_config_flows(make_snapshot(flow))
+    [error] = [e for e in errors if "raw untrusted input" in e]
+    assert "['free.text', 'read.body']" in error
+    assert "extract.verdict" not in error and "gate.ok" not in error and "input.topic" not in error
+
+
 def test_wait_cannot_be_a_fan_out_target_and_fan_out_takes_plain_edges():
     flow = {
         "id": "f",

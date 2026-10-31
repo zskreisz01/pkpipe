@@ -68,6 +68,25 @@ def test_step_spans_carry_every_required_attribute(otel):
     assert spans["tool t:read"].attributes["config.version"] == snap.version
 
 
+def test_llm_and_tool_spans_carry_the_step_attributes(otel):
+    """Constitution X: every LLM call and tool call span has flow.id, step.id, bpmn.element, item.id,
+    item.category and config.version, taken from the step that made the call."""
+    snap = _run()
+    spans = {s.name: s for s in otel.spans()}
+    llm, tool = spans["llm default"], spans["tool t:read"]
+    expected_llm = {
+        "flow.id": "otel_flow",
+        "step.id": "judge",
+        "bpmn.element": "Categorize each item",
+        "item.id": "i1",
+        "item.category": "tool",
+        "config.version": snap.version,
+    }
+    assert {k: llm.attributes.get(k) for k in expected_llm} == expected_llm
+    assert tool.attributes["step.id"] == "read" and tool.attributes["bpmn.element"] == "Read new INBOX items"
+    assert tool.attributes["flow.id"] == "otel_flow" and tool.attributes["config.version"] == snap.version
+
+
 def test_handled_step_failure_is_marked_and_counted_without_private_text(otel):
     """Edge case: the failed code step is marked failed even though the error edge handled it."""
     _run()

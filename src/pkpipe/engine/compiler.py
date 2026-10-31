@@ -160,6 +160,9 @@ def validate_flow(
                 errors.append(f"{where}: node '{node.id}' references unknown '{ref}'")
         if executor.uses_tools:
             raw = sorted(set(node.inputs) & RAW_UNTRUSTED_INPUTS)
+            raw += sorted(
+                ref for ref in node.inputs if ref not in raw and _unvalidated_source(flow, ref, registry)
+            )
             if raw:
                 errors.append(
                     f"{where}: node '{node.id}' uses tools and must not receive raw untrusted input {raw} "
@@ -184,6 +187,23 @@ def validate_flow(
                     f"{where}: condition on edge {edge.source}->{edge.to} references unknown '{path}'"
                 )
     return errors, warnings
+
+
+#: Step types whose output is external data that no schema has validated (tool results, wait poll results,
+#: tool-using sessions that saw such results).
+UNVALIDATED_OUTPUT_TYPES = frozenset({"tool", "wait", "llm_tools"})
+
+
+def _unvalidated_source(flow: Flow, ref: str, registry: StepRegistry) -> bool:
+    """Whether ``ref`` reads the raw output of another node (constitution IV: sessions with tools see only
+    validated JSON). Validated: ``code`` results and ``llm`` sessions with an ``output_schema``."""
+    root = ref.split(".", 1)[0]
+    source = next((n for n in flow.nodes if n.id == root), None)
+    if source is None or source.type not in registry:
+        return False
+    if source.type in UNVALIDATED_OUTPUT_TYPES:
+        return True
+    return source.type == "llm" and not source.config.get("output_schema")
 
 
 def _subflow_targets(flow: Flow) -> list[str]:

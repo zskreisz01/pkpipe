@@ -142,6 +142,10 @@ class RunService:
             raise LookupError(f"config snapshot {run.config_version[:12]} of run '{run_id}' is missing")
         data, assets = stored
         snapshot = ConfigSnapshot(run.config_version, data, assets)
+        if self.checkpointer.get_tuple({"configurable": {"thread_id": run.run_id}}) is None:
+            # the process stopped between recording the run and its first checkpoint: nothing ran yet and
+            # the inputs are gone, so the run cannot continue; the next trigger starts a new one
+            return self._fail(run, LookupError("no checkpoint: the run stopped before its first step"))
         self._set_status(run.run_id, RunStatus.RUNNING)
         return self._execute(run, snapshot, None)
 
@@ -151,13 +155,27 @@ class RunService:
         for status in ACTIVE:
             for run in self.list(status=status.value):
                 log.info("resuming run %s (%s)", run.run_id, run.flow_id)
-                outcomes.append(self.resume(run.run_id))
+                try:
+                    outcomes.append(self.resume(run.run_id))
+                except LookupError as exc:  # snapshot gone: record it, keep resuming the others
+                    outcomes.append(self._fail(run, exc))
         return outcomes
 
     # -- internals ------------------------------------------------------------------------------------------
     def _set_status(self, run_id: str, status: RunStatus | str) -> None:
         with self._lock:
             self.store.update_run(run_id, status=RunStatus(status).value)
+
+    def _fail(self, run: Run, exc: BaseException) -> RunOutcome:
+        ended = _now()
+        message = f"{type(exc).__name__}: {exc}"[:2000]
+        with self._lock:
+            self.store.update_run(
+                run.run_id, status=RunStatus.FAILED.value, ended_at=ended.isoformat(), error=message
+            )
+        log.info("run %s (%s) failed: %s", run.run_id, run.flow_id, message)
+        failed = run.model_copy(update={"status": RunStatus.FAILED, "ended_at": ended, "error": message})
+        return RunOutcome(failed, None, exc)
 
     def _execute(self, run: Run, snapshot: ConfigSnapshot, graph_input: dict[str, Any] | None) -> RunOutcome:
         flow = snapshot.flow(run.flow_id)
@@ -183,15 +201,7 @@ class RunService:
             ):
                 state = graph.invoke(graph_input, config)
         except Exception as exc:  # noqa: BLE001 - recorded on the run, returned to the caller
-            ended = _now()
-            message = f"{type(exc).__name__}: {exc}"[:2000]
-            with self._lock:
-                self.store.update_run(
-                    run.run_id, status=RunStatus.FAILED.value, ended_at=ended.isoformat(), error=message
-                )
-            log.info("run %s (%s) failed: %s", run.run_id, run.flow_id, message)
-            failed = run.model_copy(update={"status": RunStatus.FAILED, "ended_at": ended, "error": message})
-            return RunOutcome(failed, None, exc)
+            return self._fail(run, exc)
         ended = _now()
         with self._lock:
             self.store.update_run(
