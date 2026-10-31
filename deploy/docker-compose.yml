@@ -1,0 +1,10 @@
+# Optional helper services. The app itself runs with `uv run pkpipe serve`.
+services:
+  searxng:
+    image: searxng/searxng:latest
+    ports: ["127.0.0.1:8080:8080"]
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports: ["127.0.0.1:6006:6006", "127.0.0.1:4317:4317"]
+  # open-notebook: see the Open Notebook docs for the current image and env vars
+  # lightpanda: see the Lightpanda docs for the current image

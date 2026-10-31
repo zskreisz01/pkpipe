@@ -1,0 +1,30 @@
+[project]
+name = "pkpipe"
+version = "0.0.1"
+description = "Personal Knowledge Pipeline – local-first agent pipeline: Obsidian INBOX -> triage -> guarded LLM sessions -> curated notes"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    # Added as the corresponding modules are implemented:
+    # "langgraph", "langgraph-checkpoint-sqlite", "langchain-openai",
+    # "langchain-mcp-adapters", "fastmcp", "fastapi", "apscheduler",
+    # "opentelemetry-sdk", "openinference-instrumentation-langchain", "apprise",
+    "pydantic>=2",
+]
+
+[project.scripts]
+pkpipe = "pkpipe.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 110
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

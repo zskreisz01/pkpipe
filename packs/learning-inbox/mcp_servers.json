@@ -1,0 +1,35 @@
+{
+  "obsidian": {
+    "transport": "streamable_http",
+    "url": "http://127.0.0.1:8701/mcp",
+    "allow": [
+      "read_note",
+      "write_note",
+      "list_folder"
+    ]
+  },
+  "websearch": {
+    "transport": "streamable_http",
+    "url": "http://127.0.0.1:8702/mcp",
+    "allow": [
+      "search"
+    ]
+  },
+  "webfetch": {
+    "transport": "streamable_http",
+    "url": "http://127.0.0.1:8704/mcp",
+    "allow": [
+      "fetch_markdown"
+    ]
+  },
+  "learning": {
+    "transport": "streamable_http",
+    "url": "http://127.0.0.1:8703/mcp",
+    "backend": "open_notebook",
+    "allow": [
+      "create",
+      "status",
+      "link"
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "required": [
+    "summary",
+    "alternatives",
+    "fit_personal",
+    "recommendation"
+  ],
+  "properties": {
+    "summary": {
+      "type": "string"
+    },
+    "alternatives": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "fit_personal": {
+      "type": "string"
+    },
+    "recommendation": {
+      "enum": [
+        "adopt",
+        "trial",
+        "assess",
+        "hold"
+      ]
+    }
+  }
+}

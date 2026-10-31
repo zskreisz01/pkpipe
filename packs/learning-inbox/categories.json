@@ -1,0 +1,122 @@
+[
+  {
+    "id": "learning-material",
+    "label": "Learning material",
+    "subflow": "learning_material",
+    "para_path": "3-Resources/Learning",
+    "triage_hint": "Video, podcast, article or course worth turning into a notebook.",
+    "sessions": [
+      {
+        "id": "notebook",
+        "system": "notebook_agent",
+        "instruction": "learning-material/notebook.md",
+        "tools": [
+          "learning:create",
+          "learning:status",
+          "learning:link"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tool",
+    "label": "Tools",
+    "subflow": "other_resource",
+    "para_path": "3-Resources/Tools",
+    "triage_hint": "Software, library or service that could become part of my ecosystem.",
+    "sessions": [
+      {
+        "id": "research",
+        "system": "researcher",
+        "instruction": "tool/research.md",
+        "tools": [
+          "websearch:search"
+        ],
+        "inputs": [
+          "item.extract"
+        ]
+      },
+      {
+        "id": "compare",
+        "system": "analyst",
+        "instruction": "tool/compare.md",
+        "tools": [
+          "websearch:search"
+        ],
+        "inputs": [
+          "research"
+        ]
+      },
+      {
+        "id": "fit_personal",
+        "system": "analyst",
+        "instruction": "tool/fit.md",
+        "context": "personal",
+        "inputs": [
+          "research",
+          "compare"
+        ]
+      },
+      {
+        "id": "synthesize",
+        "system": "synthesizer",
+        "instruction": "tool/synthesize.md",
+        "inputs": [
+          "*"
+        ],
+        "output_schema": "tool_evaluation"
+      },
+      {
+        "id": "system_relevance",
+        "system": "analyst",
+        "instruction": "tool/system_relevance.md",
+        "context": "system",
+        "inputs": [
+          "synthesize"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "marketing",
+    "label": "Marketing",
+    "subflow": "other_resource",
+    "para_path": "3-Resources/Marketing",
+    "triage_hint": "Catchy marketing idea, campaign or copy.",
+    "sessions": [
+      {
+        "id": "extract",
+        "system": "analyst",
+        "instruction": "marketing/extract.md",
+        "inputs": [
+          "item.extract"
+        ]
+      },
+      {
+        "id": "synthesize",
+        "system": "synthesizer",
+        "instruction": "marketing/synthesize.md",
+        "inputs": [
+          "extract"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "misc",
+    "label": "Misc",
+    "subflow": "other_resource",
+    "para_path": "3-Resources/Misc",
+    "triage_hint": "Anything that fits nowhere else.",
+    "sessions": [
+      {
+        "id": "evaluate",
+        "system": "analyst",
+        "instruction": "misc/evaluate.md",
+        "inputs": [
+          "item"
+        ]
+      }
+    ]
+  }
+]

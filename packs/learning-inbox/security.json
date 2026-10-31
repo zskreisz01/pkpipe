@@ -1,0 +1,22 @@
+{
+  "prompt_guard": {
+    "model": "meta-llama/Llama-Prompt-Guard-2-86M",
+    "threshold": 0.5,
+    "chunk_tokens": 512
+  },
+  "output_guard": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B",
+    "block_on": [
+      "Unsafe"
+    ]
+  },
+  "canary": {
+    "rotate": "per_run"
+  },
+  "url_filter": {
+    "block_private_networks": true,
+    "max_bytes": 2000000,
+    "deny_list": "security/deny_list.txt"
+  },
+  "quarantine_dir": "0-INBOX/_quarantine"
+}

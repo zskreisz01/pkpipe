@@ -1,0 +1,13 @@
+{
+  "default": {
+    "base_url": "env:PKPIPE_MODEL_BASE_URL",
+    "model": "env:PKPIPE_MODEL_NAME",
+    "temperature": 0.2,
+    "context": 32768
+  },
+  "judge": {
+    "base_url": "env:PKPIPE_MODEL_BASE_URL",
+    "model": "env:PKPIPE_JUDGE_MODEL",
+    "temperature": 0.0
+  }
+}

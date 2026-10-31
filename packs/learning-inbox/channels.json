@@ -1,0 +1,19 @@
+{
+  "channels": {
+    "discord_main": {
+      "type": "discord_webhook",
+      "url": "env:DISCORD_WEBHOOK_URL"
+    }
+  },
+  "routes": {
+    "triage_ready": [
+      "discord_main"
+    ],
+    "daily_summary": [
+      "discord_main"
+    ],
+    "security_flag": [
+      "discord_main"
+    ]
+  }
+}

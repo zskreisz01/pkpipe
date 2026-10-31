@@ -1,0 +1,1 @@
+Using the system context (components and stack of this system), decide whether the tool could replace or improve one component. Output relevance (none | candidate), component, expected benefit, effort.

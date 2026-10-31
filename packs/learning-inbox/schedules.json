@@ -1,0 +1,14 @@
+[
+  {
+    "cron": "0 20 * * *",
+    "flow": "triage"
+  },
+  {
+    "cron": "0 6 * * *",
+    "flow": "process_released"
+  },
+  {
+    "cron": "0 19 * * 0",
+    "flow": "context_refresh"
+  }
+]
