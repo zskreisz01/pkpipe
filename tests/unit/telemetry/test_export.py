@@ -101,3 +101,29 @@ def test_resilient_exporter_counts_failure_results_too():
     with tracer.start_as_current_span("a"):
         pass
     assert dropped == [1]
+
+
+def test_scrubbing_covers_retrieval_reranker_and_tool_payloads():
+    """SC-002: every OpenInference payload family is removed, structural attributes are kept."""
+    inner = InMemorySpanExporter()
+    tp, tracer = _provider(ScrubbingExporter(inner))
+    payload = {
+        "output.value": CANARY,
+        "retrieval.documents.0.document.content": CANARY,
+        "reranker.query": CANARY,
+        "reranker.input_documents.0.document.content": CANARY,
+        "tool.parameters": CANARY,
+        "llm.prompt_template.variables": CANARY,
+        "metadata": CANARY,
+        "pkpipe.content.prompt": CANARY,
+    }
+    with tracer.start_as_current_span("chain") as span:
+        for k, v in payload.items():
+            span.set_attribute(k, v)
+        span.set_attribute("openinference.span.kind", "RERANKER")
+        span.set_attribute("tool.name", "fetch_url")
+    out = inner.get_finished_spans()[0]
+    assert CANARY not in repr(out.attributes)
+    assert out.attributes["openinference.span.kind"] == "RERANKER"
+    assert out.attributes["tool.name"] == "fetch_url"
+    tp.shutdown()

@@ -135,3 +135,26 @@ def test_metrics_none_exports_traces_only(receiver):
         reset()
         tel.shutdown()
     assert receiver.trace_bodies and not receiver.metric_bodies
+
+
+def test_traces_endpoint_only_and_url_encoded_headers(receiver, caplog):
+    """FR-001: per-signal endpoint without a base URL exports traces and does not invent a metrics URL;
+    URL-encoded OTEL_EXPORTER_OTLP_HEADERS (Langfuse basic auth) arrive decoded."""
+    cfg = TelemetryConfig.from_env(
+        {
+            "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": f"{receiver.url}/v1/traces",
+            "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Basic%20cGs6c2s=",
+        }
+    )
+    tel = configure(Telemetry.create(cfg))
+    try:
+        with caplog.at_level("WARNING"):
+            with flow_span("f", trigger="manual", config_version="v"):
+                tel.metrics.item_processed("tool")
+            tel.flush()
+    finally:
+        reset()
+        tel.shutdown()
+    assert receiver.trace_bodies and not receiver.metric_bodies
+    assert receiver.headers[0]["authorization"] == "Basic cGs6c2s="
+    assert not [r for r in caplog.records if r.levelname in ("WARNING", "ERROR")], caplog.text

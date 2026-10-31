@@ -61,3 +61,37 @@ def test_metrics_exporter_can_be_disabled_for_backends_without_otlp_metrics():
     """Phoenix accepts OTLP traces only; OTEL_METRICS_EXPORTER=none keeps the app quiet there."""
     assert TelemetryConfig.from_env({}).metrics_enabled
     assert not TelemetryConfig.from_env({"OTEL_METRICS_EXPORTER": "none"}).metrics_enabled
+
+
+def test_content_policy_rejects_malformed_config_instead_of_guessing():
+    """FR-004: a string instead of a list must not turn into a set of single letters."""
+    with pytest.raises(ValueError, match="list of flow ids"):
+        ContentPolicy.from_config({"capture_content": {"flows": "learning"}})
+    with pytest.raises(ValueError, match="object"):
+        ContentPolicy.from_config({"capture_content": ["learning"]})
+
+
+def test_otlp_headers_are_url_decoded_like_the_otel_spec_says():
+    """FR-001: ``Authorization=Basic%20<b64>`` (Langfuse) becomes the header value ``Basic <b64>``."""
+    from pkpipe.telemetry.runtime import _parse_headers
+
+    assert _parse_headers("Authorization=Basic%20cGs6c2s=,x-team=a") == {
+        "authorization": "Basic cGs6c2s=",
+        "x-team": "a",
+    }
+    assert _parse_headers("Authorization=Basic cGs6c2s=") == {"authorization": "Basic cGs6c2s="}
+    assert _parse_headers(None) is None
+
+
+def test_telemetry_json_is_a_validated_config_file_that_feeds_the_policy(pack_dir, overlay_dir, write_json):
+    """FR-004 'configurable per flow': telemetry.json is layered and validated like every config file."""
+    from pkpipe.engine.config_models import TelemetrySettings, validate_effective
+    from pkpipe.engine.registry import load_effective
+
+    write_json(overlay_dir, "telemetry.json", {"capture_content": {"flows": ["learning"]}})
+    cfg = load_effective(pack_dir, overlay_dir)
+    policy = ContentPolicy.from_config(cfg.data["telemetry"])
+    assert policy.capture_for("learning") and not policy.capture_for("learning", ("journal",))
+    assert ContentPolicy.from_config(TelemetrySettings().model_dump()).capture_flows == frozenset()
+    errors = validate_effective({"telemetry": {"capture_content": {"flows": "learning", "extra": 1}}})
+    assert errors and all(e.startswith("telemetry.json") for e in errors)

@@ -56,6 +56,7 @@ class OtlpReceiver:
     server: ThreadingHTTPServer
     trace_bodies: list[bytes] = field(default_factory=list)
     metric_bodies: list[bytes] = field(default_factory=list)
+    headers: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def url(self) -> str:
@@ -104,6 +105,7 @@ def start_otlp_receiver() -> OtlpReceiver:
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):  # noqa: N802
             body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            box["r"].headers.append({k.lower(): v for k, v in self.headers.items()})
             if self.path.endswith("/v1/traces"):
                 box["r"].trace_bodies.append(body)
             elif self.path.endswith("/v1/metrics"):

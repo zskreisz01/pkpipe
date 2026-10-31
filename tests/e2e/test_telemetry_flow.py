@@ -64,11 +64,8 @@ def test_triage_run_exports_one_step_span_per_step_with_required_attributes_and_
     assert sorted(s.name for s in steps) == ["step classify", "step classify", "step release"]
     for s in steps:
         a = OtlpReceiver.attrs(s)
-        assert all(
-            k in a
-            for k in REQUIRED_STEP_ATTRIBUTES[:2]
-            + ("bpmn.element", "flow.id", "config.version", "run.trigger")
-        ), a
+        assert set(REQUIRED_STEP_ATTRIBUTES) <= set(a), a
+        assert a["flow.id"] == "triage" and a["config.version"] == "cfg-1" and a["run.trigger"] == "schedule"
     classify = [OtlpReceiver.attrs(s) for s in steps if s.name == "step classify"]
     assert {a["item.category"] for a in classify} == {"tool", "video"}
     assert {a["item.id"] for a in classify} == {"example-tool", "example-video"}

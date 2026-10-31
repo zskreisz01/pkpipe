@@ -170,3 +170,44 @@ def test_triage_metrics_items_per_category_and_backlog(otel):
     assert otel.metric_value("pkpipe.learning_timeouts_total") == 1
     m.set_backlog(3)
     assert otel.metric_value("pkpipe.backlog_size") == 3
+
+
+def test_run_level_step_without_item_still_carries_all_seven_attributes(otel):
+    """SC-001: a step outside any item (e.g. release over the whole batch) has every required key."""
+    with flow_span("triage", trigger="schedule", config_version="c7"), step_span("release", "Task_Release"):
+        pass
+    with step_span("orphan", "Task_Orphan"):
+        pass
+    for s in otel.spans("step "):
+        assert set(REQUIRED_STEP_ATTRIBUTES) <= set(s.attributes), s.name
+    by = {s.attributes["step.id"]: s.attributes for s in otel.spans("step ")}
+    assert by["release"]["flow.id"] == "triage" and by["release"]["item.id"] == ""
+    assert by["orphan"]["flow.id"] == "" and by["orphan"]["run.trigger"] == ""
+
+
+def test_spans_are_stamped_with_the_flow_capture_decision(otel_factory):
+    """FR-004: every span (flow, step, child) carries pkpipe.content_capture; outside a flow it is False."""
+    o = otel_factory(ContentPolicy(frozenset({"learning"})))
+    with flow_span("learning", trigger="manual", config_version="c"), step_span("s", "T"), llm_span("m"):
+        pass
+    with flow_span("other", trigger="manual", config_version="c"), step_span("s", "T"):
+        pass
+    with o.telemetry.tracer.start_as_current_span("loose"):
+        pass
+    stamp = {(s.name, s.attributes.get("flow.id")): s.attributes["pkpipe.content_capture"] for s in o.spans()}
+    assert stamp[("flow learning", "learning")] and stamp[("llm m", "learning")]
+    assert stamp[("step s", "learning")] is True and stamp[("step s", "other")] is False
+    assert stamp[("loose", None)] is False
+
+
+def test_generation_metrics_tokens_per_second_and_learning_seconds(otel):
+    """US2 / docs/operations.md: tokens per second per model and learning generation time."""
+    m = otel.telemetry.metrics
+    m.generation("qwen", completion_tokens=100, seconds=4.0)
+    m.generation("qwen", completion_tokens=0, seconds=1.0)  # nothing generated: no point
+    m.generation("qwen", completion_tokens=10, seconds=0.0)  # clock glitch: no division by zero
+    m.learning_generation(42.0)
+    (tps,) = otel.metric_points("pkpipe.tokens_per_second")
+    assert tps.count == 1 and tps.sum == 25.0 and tps.attributes["llm.model_name"] == "qwen"
+    (learn,) = otel.metric_points("pkpipe.learning_generation_seconds")
+    assert learn.count == 1 and learn.sum == 42.0
