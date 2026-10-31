@@ -1,6 +1,7 @@
 """NotifyPort implementation: event -> channels (``channels.json`` routes) -> template -> channel adapter.
 
-Spec 006 FR-001..FR-003. Per delivery a ``notify.send`` span records channel id, channel type and event; a
+Spec 006 FR-001..FR-003. Per delivery a ``notify.send`` span records channel id, channel type and event plus
+the flow / step / item attributes of the step that sent it (constitution X); a
 failure marks the span as an error and never stops the other channels. Webhook URLs are resolved from their
 ``env:NAME`` reference at send time and appear in no message, span or error text.
 """
@@ -107,16 +108,14 @@ class ChannelNotifier:
     def _send_one(self, event: str, name: str, payload: dict[str, Any]) -> Delivery:
         cfg = self._channels.get(name)
         ctype = str(cfg.get("type")) if cfg else "unknown"
-        with telemetry.get_telemetry().tracer.start_as_current_span(
-            "notify.send",
-            attributes={"notify.event": event, "notify.channel": name, "notify.channel_type": ctype},
-        ) as span:
+        with telemetry.notify_span(event, name, ctype) as span:
             try:
                 if cfg is None or ctype not in self._factories:
                     raise ValueError(f"unknown channel '{name}'")
                 rendered = render_event(event, ctype, payload, self._assets, self._ui_url)
                 if rendered.warning:
                     span.add_event("notify.template_fallback", {"reason": rendered.warning})
+                _without_http_spans(self._client)  # again per send: instrumentation may start after __init__
                 self._factories[ctype](cfg).deliver(rendered, event=event)
             except Exception as exc:  # noqa: BLE001 - one channel must never stop the others
                 error = describe_error(exc)

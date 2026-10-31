@@ -1,7 +1,7 @@
 """OpenTelemetry tracing and metrics (spec 003): OTLP only, pkpipe attributes, content capture gated per flow.
 
 Other specs use: ``flow_span``, ``item_context``, ``step_span`` / ``traced_step``, ``llm_span``,
-``tool_span``,
+``tool_span``, ``notify_span``,
 ``set_span_attributes``, ``set_item_category``, ``capture_content``, ``record_security_flag`` and
 ``get_telemetry().metrics``. Bootstrap once with ``configure()``; see docs/operations.md.
 """
@@ -16,6 +16,7 @@ from .spans import (
     flow_span,
     item_context,
     llm_span,
+    notify_span,
     record_security_flag,
     set_item_category,
     set_span_attributes,
@@ -39,6 +40,7 @@ __all__ = [
     "get_telemetry",
     "item_context",
     "llm_span",
+    "notify_span",
     "record_security_flag",
     "reset",
     "set_item_category",

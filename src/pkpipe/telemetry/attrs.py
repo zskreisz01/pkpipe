@@ -10,7 +10,7 @@ ITEM_CATEGORY = "item.category"
 CONFIG_VERSION = "config.version"
 RUN_TRIGGER = "run.trigger"
 CONTENT_CAPTURE = "pkpipe.content_capture"
-SPAN_KIND = "pkpipe.span.kind"  # flow | step | llm | tool
+SPAN_KIND = "pkpipe.span.kind"  # flow | step | llm | tool | notify
 
 REQUIRED_STEP_ATTRIBUTES = (
     FLOW_ID,

@@ -190,3 +190,37 @@ def test_webhook_secret_never_reaches_http_client_spans(server, pack_dir):
     finally:
         telemetry.reset()
         o.telemetry.shutdown()
+
+
+def test_notify_span_carries_the_step_attributes_of_its_sender(server, pack_dir, otel):
+    """Constitution X: the delivery span (an HTTP call) has flow.id, step.id, bpmn.element, item.id,
+    item.category and config.version like every LLM / tool span below a step."""
+    notifier = _notifier(server, pack_dir)
+    with telemetry.flow_span("triage", trigger="manual", config_version="cfg-1"):
+        with telemetry.step_span("notify", "Task_NotifyTriageReady", item_id="it-1", item_category="tool"):
+            notifier.send("triage_ready", {"message": "m"})
+    spans = otel.spans("notify.send")
+    assert len(spans) == 2
+    for span in spans:
+        a = span.attributes
+        assert (a["flow.id"], a["step.id"]) == ("triage", "notify")
+        assert a["bpmn.element"] == "Task_NotifyTriageReady"
+        assert (a["item.id"], a["item.category"], a["config.version"]) == ("it-1", "tool", "cfg-1")
+        assert a["pkpipe.span.kind"] == "notify"
+
+
+def test_secret_stays_out_of_http_spans_when_instrumentation_starts_after_the_notifier(server, pack_dir):
+    """Security: a long-lived notifier built before ``instrument()`` must still keep its client opted out."""
+    from tests.support.otel import make_in_memory
+
+    o = make_in_memory()
+    telemetry.configure(o.telemetry)
+    notifier = _notifier(server, pack_dir)
+    o.telemetry.instrument(langchain=False, httpx=True)
+    try:
+        assert notifier.send("daily_summary", {"message": "m"})[0].ok
+        text = repr([(s.name, dict(s.attributes)) for s in o.spans()])
+        assert "TOPSECRETTOKEN" not in text and "notify.send" in text
+    finally:
+        telemetry.reset()
+        o.telemetry.shutdown()
