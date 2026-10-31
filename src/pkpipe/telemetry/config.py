@@ -67,7 +67,11 @@ class ContentPolicy:
     def from_config(cls, config: Mapping[str, object] | None) -> ContentPolicy:
         """``{"capture_content": {"flows": ["flow-id", ...]}}`` (``telemetry`` section of pack/overlay)."""
         section = (config or {}).get("capture_content") or {}
-        flows = section.get("flows", []) if isinstance(section, Mapping) else []
+        if not isinstance(section, Mapping):
+            raise ValueError("telemetry.capture_content must be an object with a 'flows' list")
+        flows = section.get("flows", [])
+        if isinstance(flows, str) or not all(isinstance(f, str) for f in flows):
+            raise ValueError("telemetry.capture_content.flows must be a list of flow ids")
         return cls(frozenset(flows))
 
     def capture_for(self, flow_id: str, data_classes: tuple[str, ...] | frozenset[str] = ()) -> bool:

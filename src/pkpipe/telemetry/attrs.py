@@ -36,6 +36,7 @@ CONTENT_PREFIXES = (
     "llm.invocation_parameters",  # can embed prompts/stop strings with some providers
     "llm.choices",
     "retrieval.documents",
+    "reranker.",  # query and input/output documents
     "embedding.",
     "tool.parameters",
     "tool_call.function.arguments",

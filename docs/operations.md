@@ -50,21 +50,25 @@ Telemetry is configured only from standard `OTEL_*` variables and exports OTLP h
 
 **Langfuse:** Langfuse ingests OTLP traces at `<host>/api/public/otel`. Set
 `OTEL_EXPORTER_OTLP_ENDPOINT=https://<langfuse-host>/api/public/otel`,
-`OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic <base64(public_key:secret_key)>"` and `OTEL_METRICS_EXPORTER=none`.
+`OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic%20<base64(public_key:secret_key)>"` (values are URL-decoded as the OTel spec requires; a literal space also works) and `OTEL_METRICS_EXPORTER=none`.
 No core change is needed (constitution I, X).
 
-**Content capture:** off by default. A flow opts in through the `telemetry` config section
-`{"capture_content": {"flows": ["<flow-id>"]}}`; flows handling the `journal` or `context` data class are forced off.
+**Content capture:** off by default. A flow opts in through
+`telemetry.json` (`{"capture_content": {"flows": ["<flow-id>"]}}`, validated by `pkpipe validate`); flows handling the `journal` or `context` data class are forced off.
 A scrubbing exporter strips prompt/response attributes (OpenInference `input.*`, `output.*`, `llm.*_messages`, ...),
 exception messages and status descriptions from every span of a flow with capture off, so a backend never sees them.
 Security flags are recorded as `security.flag` span events with detector, action and reason code only.
+Every step span carries all seven attributes; one that does not apply (a run-level step without an item) is the
+empty string.
 
 **Backend down:** the exporter never raises into the app; failed batches are dropped, a warning is logged and
 `pkpipe.telemetry_export_failures_total` counts the dropped spans.
 
 Metric names: `pkpipe.items_total{category}`, `pkpipe.backlog_size`, `pkpipe.flags_total{detector}`,
 `pkpipe.learning_timeouts_total`, `pkpipe.learning_generation_seconds`, `pkpipe.step_errors_total{step.id,error.type}`,
-`pkpipe.tokens_per_second`, `pkpipe.telemetry_export_failures_total`.
+`pkpipe.tokens_per_second{llm.model_name}`, `pkpipe.telemetry_export_failures_total`
+(recorders: `Metrics.item_processed`, `set_backlog`, `flag`, `learning_timeout`, `learning_generation`, `step_error`,
+`generation`).
 
 ### Where traces are stored
 

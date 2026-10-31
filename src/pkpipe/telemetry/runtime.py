@@ -75,6 +75,15 @@ class Metrics:
     def step_error(self, step_id: str, error_type: str) -> None:
         self.step_errors.add(1, {attrs.STEP_ID: step_id, "error.type": error_type})
 
+    def generation(self, model: str, completion_tokens: int, seconds: float) -> None:
+        """``pkpipe.tokens_per_second{llm.model_name}`` of one model call; ignored for empty or 0 s calls."""
+        if seconds > 0 and completion_tokens > 0:
+            self.tokens_per_second.record(completion_tokens / seconds, {"llm.model_name": model})
+
+    def learning_generation(self, seconds: float) -> None:
+        """``pkpipe.learning_generation_seconds``: wall time of one learning-material generation."""
+        self.learning_seconds.record(seconds)
+
 
 @dataclass
 class Telemetry:
@@ -127,14 +136,16 @@ class Telemetry:
                         timeout=5,
                     )
                 )
-                if not metric_readers and config.metrics_enabled:
+                metrics_url = config.metrics_endpoint or (
+                    f"{config.endpoint.rstrip('/')}/v1/metrics" if config.endpoint else None
+                )
+                if not metric_readers and config.metrics_enabled and metrics_url:
                     from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 
                     readers.append(
                         PeriodicExportingMetricReader(
                             OTLPMetricExporter(
-                                endpoint=config.metrics_endpoint
-                                or f"{(config.endpoint or '').rstrip('/')}/v1/metrics",
+                                endpoint=metrics_url,
                                 headers=_parse_headers(config.headers),
                                 timeout=5,
                             ),
@@ -193,10 +204,15 @@ class Telemetry:
 
 
 def _parse_headers(raw: str | None) -> dict[str, str] | None:
+    """``OTEL_EXPORTER_OTLP_HEADERS`` per the OTel spec: ``k=v,k2=v2`` with URL-encoded values.
+
+    ``Authorization=Basic%20<b64>`` (the spec form) and ``Authorization=Basic <b64>`` both work.
+    """
     if not raw:
         return None
-    pairs = (p.split("=", 1) for p in raw.split(",") if "=" in p)
-    return {k.strip(): v.strip() for k, v in pairs}
+    from opentelemetry.util.re import parse_env_headers
+
+    return parse_env_headers(raw, liberal=True) or None
 
 
 _active: Telemetry | None = None

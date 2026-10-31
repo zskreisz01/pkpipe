@@ -25,6 +25,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `schedules.json` | Cron expression → flow |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
 | `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir |
+| `telemetry.json` | Prompt/response content capture per flow (`capture_content.flows`); journal and context flows are always off. Exporters come from `OTEL_*` env ([operations](operations.md)) |
 | `flows/*.json` | Graph: nodes, edges, conditions, subflow calls |
 | `steps/*.json` | Defaults per step type: model profile, output schema, retry |
 | `prompts/system/*.md` | Short fixed role prompts per session type |

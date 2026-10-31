@@ -14,9 +14,8 @@ dependencies = [
     "opentelemetry-instrumentation-httpx>=0.66b2",
     "opentelemetry-sdk>=1.45.2",
     # Added as the corresponding modules are implemented:
-    # "langgraph", "langgraph-checkpoint-sqlite", "langchain-openai",
-    # "langchain-mcp-adapters", "fastmcp", "fastapi", "apscheduler",
-    # "opentelemetry-sdk", "openinference-instrumentation-langchain", "apprise",
+    # "langgraph-checkpoint-sqlite", "langchain-openai", "langchain-mcp-adapters", "fastmcp",
+    # "apscheduler", "apprise",
     "pydantic>=2",
 ]
 

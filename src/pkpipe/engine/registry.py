@@ -39,6 +39,7 @@ CORE_DEFAULTS: dict[str, Any] = {
         "quarantine_dir": "0-INBOX/_quarantine",
     },
     "channels": {"channels": {}, "routes": {}},
+    "telemetry": {"capture_content": {"flows": []}},
 }
 
 

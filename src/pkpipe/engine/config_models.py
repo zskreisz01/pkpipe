@@ -206,6 +206,20 @@ class SecurityConfig(_Strict):
     quarantine_dir: str
 
 
+# telemetry.json --------------------------------------------------------------------------------------------
+class CaptureContent(_Strict):
+    flows: list[str] = Field(default_factory=list)
+
+
+class TelemetrySettings(_Strict):
+    """Content capture per flow (spec 003 FR-004). Exporters come from ``OTEL_*`` env, never from config.
+
+    Flows handling journal or context data are forced off at runtime whatever is listed here.
+    """
+
+    capture_content: CaptureContent = Field(default_factory=CaptureContent)
+
+
 # registry --------------------------------------------------------------------------------------------------
 #: config file stem -> model. Order is the order used by the CLI.
 CONFIG_MODELS: dict[str, type[BaseModel]] = {
@@ -215,6 +229,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "schedules": SchedulesConfig,
     "categories": CategoriesConfig,
     "security": SecurityConfig,
+    "telemetry": TelemetrySettings,
 }
 
 

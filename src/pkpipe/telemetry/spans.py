@@ -129,7 +129,11 @@ def step_span(
     item_id: str | None = None,
     item_category: str | None = None,
 ) -> Iterator[Span]:
-    """One span per executed step with all required attributes (SC-001)."""
+    """One span per executed step with all required attributes (SC-001).
+
+    Every one of the seven attributes is always present so a backend can filter on them; a value that does not
+    apply (a run-level step without an item, an item not yet triaged) is the empty string.
+    """
     tel = get_telemetry()
     run, item = _run.get(), _item.get()
     with tel.tracer.start_as_current_span(
@@ -138,13 +142,13 @@ def step_span(
         span.set_attribute(attrs.SPAN_KIND, "step")
         set_span_attributes(
             span,
-            flow_id=run.flow_id if run else None,
+            flow_id=run.flow_id if run else "",
             step_id=step_id,
             bpmn_element=bpmn_element,
-            item_id=item_id or (item.item_id if item else None),
-            item_category=item_category or (item.category if item else None),
-            config_version=run.config_version if run else None,
-            run_trigger=run.trigger if run else None,
+            item_id=item_id or (item.item_id if item else "") or "",
+            item_category=item_category or (item.category if item else "") or "",
+            config_version=run.config_version if run else "",
+            run_trigger=run.trigger if run else "",
         )
         try:
             yield span
