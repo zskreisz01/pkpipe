@@ -18,7 +18,7 @@ from pkpipe.engine.registry import load_effective
 from pkpipe.obsidian import lists
 from tests.fakes import FakeClock, FakeNotify, RecordingTracer
 from tests.support.flows import make_ports, make_service
-from tests.support.pack_runtime import TRIAGE_FILE, owner_decides, vault_tools
+from tests.support.pack_runtime import PACK_ROUTES, TRIAGE_FILE, owner_decides, vault_tools
 
 TOOL = item_id_for("0-INBOX/example-tool.md")
 
@@ -31,7 +31,7 @@ def test_live_triage_then_process_released_with_the_local_model(
     monkeypatch.setenv("PKPIPE_MODEL_NAME", lmstudio["model"])
     snap = load_effective(pack_dir, None).snapshot()
     categories = {c["id"] for c in snap.data["categories"]}
-    tracer, notify = RecordingTracer(), FakeNotify()
+    tracer, notify = RecordingTracer(), FakeNotify(routes=PACK_ROUTES)
     ports = make_ports(
         model=app.make_model(snap),
         tools=vault_tools(synthetic_vault),

@@ -141,7 +141,7 @@ def test_llm_tools_executes_only_allowed_tools_and_datamarks_results():
 # -- tool / notify / code ------------------------------------------------------------------------------------
 def test_tool_arguments_are_rendered_and_notify_follows_routes():
     tools = FakeTools({"t:read": lambda path: {"body": f"text of {path}"}})
-    notify = FakeNotify()
+    notify = FakeNotify(routes={"ready": ["main"]})
     flow = {
         "id": "tn",
         "start": "read",
@@ -161,7 +161,9 @@ def test_tool_arguments_are_rendered_and_notify_follows_routes():
     )
     assert outcome.ok
     assert tools.calls == [("t:read", {"path": "0-INBOX/note.md"})]
-    assert [(s.channel, s.message) for s in notify.sent] == [("main", "got: text of 0-INBOX/note.md")]
+    assert [(s.event, s.channel, s.message) for s in notify.sent] == [
+        ("ready", "main", "got: text of 0-INBOX/note.md")
+    ]
     assert outcome.outputs["quiet"] == {"event": "unrouted", "sent": [], "skipped": "no route"}
 
 
@@ -289,3 +291,42 @@ def test_wait_deadline_is_absolute_and_takes_the_error_edge():
     ).start("w", inputs={"job": "nb1"})
     assert outcome.ok and outcome.outputs["timeout"] == {"err": "WaitDeadline"}
     assert clock.sleeps == [60, 60, 30]  # the last pause is cut to the deadline
+
+
+def _notify_flow(**config):
+    return {
+        "id": "n",
+        "start": "tell",
+        "nodes": [{"id": "tell", "type": "notify", "config": {"event": "ready", **config}}],
+        "edges": [],
+    }
+
+
+def test_notify_passes_rendered_payload_and_message_to_the_port():
+    """Spec 006 FR-001: the step hands (event, payload) to the port; templates see the payload."""
+    notify = FakeNotify(routes={"ready": ["main"]})
+    flow = _notify_flow(message="hi ${input.who}", payload={"count": "${input.n}", "detector": "canary"})
+    out = make_service(make_snapshot(flow), make_ports(notify=notify)).start(
+        "n", inputs={"who": "me", "n": 3}
+    )
+    assert out.ok
+    assert notify.sent[0].payload == {"count": 3, "detector": "canary", "message": "hi me"}
+
+
+def test_notify_failure_is_reported_in_the_output_and_does_not_fail_the_flow():
+    """Spec 006 US1-AS2: one channel down, the flow continues and the output names it."""
+    notify = FakeNotify(routes={"ready": ["a", "b"]}, fail={"a"})
+    out = make_service(make_snapshot(_notify_flow(message="m")), make_ports(notify=notify)).start("n")
+    assert out.ok
+    assert out.outputs["tell"] == {
+        "event": "ready",
+        "sent": ["b"],
+        "failed": [{"channel": "a", "error": "simulated failure"}],
+    }
+
+
+def test_notify_explicit_channels_bypass_the_route():
+    notify = FakeNotify(routes={"ready": ["elsewhere"]})
+    flow = _notify_flow(message="m", channels=["main"])
+    make_service(make_snapshot(flow), make_ports(notify=notify)).start("n")
+    assert [s.channel for s in notify.sent] == ["main"]

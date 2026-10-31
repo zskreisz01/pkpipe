@@ -33,6 +33,32 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `contexts/*.md` | Context packs (`system.md` public; `personal.md`, `enterprise.md` private) |
 | `schemas/*.json` | Structured-output schemas |
 
+## Notifications
+`channels.json` defines channels and routes events to them; `NotifyPort.send(event, payload)` delivers to every channel routed for the event (a `notify` step, or `channels` to override the route). One failing channel never stops the others; the failure is a `notify.send` span with error status and is listed in the step output.
+
+```json
+{
+  "channels": {
+    "discord_main": {"type": "discord_webhook", "url": "env:DISCORD_WEBHOOK_URL"},
+    "teams_main":   {"type": "teams_webhook",   "url": "env:TEAMS_WEBHOOK_URL"},
+    "phone":        {"type": "apprise",         "urls": ["env:NTFY_URL"]}
+  },
+  "routes": {"triage_ready": ["discord_main", "teams_main"], "security_flag": ["discord_main", "phone"]},
+  "ui_url": "http://127.0.0.1:8787"
+}
+```
+
+| Type | Delivers | Needs |
+| --- | --- | --- |
+| `discord_webhook` | `content` (or JSON template, e.g. embeds); `allowed_mentions` is always empty so untrusted text never pings | `url` |
+| `teams_webhook` | Adaptive Card message to a Teams Workflows webhook | `url` |
+| `apprise` | Any [Apprise](https://github.com/caronc/apprise) service, so a new channel is configuration only | `urls` (each an `env:` reference holding an Apprise URL) |
+| `log` | Writes to the log (development) | none |
+
+Webhook and Apprise URLs contain secrets, so the config accepts only `env:NAME` references; they are resolved when sending, never logged, and the notifier's HTTP client is excluded from httpx auto-instrumentation so tokens do not reach traces. Redirects are not followed.
+
+**Templates** are Jinja2 files `templates/<event>.<channel type>.md|json` in the pack or overlay (an overlay file replaces the pack file). The step payload is the template context: `message` plus the step's `payload` keys. A `.json` template is the channel-native body and must write values as `{{ value | tojson }}`. Without a template the `message` is sent; a broken template falls back to plain text with a span event. Text beyond the channel limit (Discord 2000, others 4000 characters) is truncated and ends with `ui_url`. The pack ships `triage_ready`, `daily_summary`, `security_flag` and `weekly_review` for Discord, Teams and Apprise.
+
 ## Model profiles
 
 Steps name a profile (`default`, `judge`), never an endpoint. `models.json` maps profile names to settings:

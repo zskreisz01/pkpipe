@@ -79,9 +79,19 @@ class McpServersConfig(RootModel[dict[str, McpServer]]):
 
 
 # channels.json ---------------------------------------------------------------------------------------------
+CHANNEL_TYPES = ("discord_webhook", "teams_webhook", "apprise", "log")
+
+
 class Channel(_Strict):
-    type: str
-    url: str | None = None
+    """One notification target. Secrets (webhook URLs, Apprise URLs) are ``env:NAME`` references."""
+
+    type: str = Field(description="discord_webhook | teams_webhook | apprise | log")
+    url: str | None = Field(
+        default=None, description="Webhook URL (discord_webhook, teams_webhook): env:NAME"
+    )
+    urls: list[str] = Field(
+        default_factory=list, description="Apprise service URLs (apprise): each an env:NAME reference"
+    )
 
     @field_validator("url")
     @classmethod
@@ -95,10 +105,29 @@ class Channel(_Strict):
             raise ValueError("credentials must not be inlined in a URL; use env:NAME")
         return v
 
+    @model_validator(mode="after")
+    def _type_requirements(self) -> Channel:
+        if self.type not in CHANNEL_TYPES:
+            raise ValueError(f"unknown channel type '{self.type}' (known: {', '.join(CHANNEL_TYPES)})")
+        if self.type in ("discord_webhook", "teams_webhook"):
+            if not self.url:
+                raise ValueError(f"channel type '{self.type}' needs 'url' (an env:NAME reference)")
+            if not ENV_REF.match(self.url):
+                raise ValueError("webhook URLs are secrets; use an env:NAME reference, not the URL itself")
+        if self.type == "apprise":
+            if not self.urls:
+                raise ValueError("channel type 'apprise' needs 'urls' (env:NAME references)")
+            if not all(ENV_REF.match(u) for u in self.urls):
+                raise ValueError("Apprise URLs contain credentials; use env:NAME references")
+        return self
+
 
 class ChannelsConfig(_Strict):
     channels: dict[str, Channel] = Field(default_factory=dict)
     routes: dict[str, list[str]] = Field(default_factory=dict)
+    ui_url: str | None = Field(
+        default=None, description="Link appended to a message that had to be truncated for its channel"
+    )
 
     @model_validator(mode="after")
     def _routes_reference_channels(self) -> ChannelsConfig:

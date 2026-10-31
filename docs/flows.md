@@ -72,7 +72,7 @@ An overlay can change one node of a pack flow by id (`{"nodes": [{"id": "notify"
 | `llm_tools` | Session that may call tools: the model proposes a call, code checks the allow list and calls it. Sees only validated JSON: never raw item text (`item`, `item.body`, `item.content`, `item.raw`, `item.text`, `*`) and never the output of a `tool`, `wait` or `llm_tools` node or of an `llm` node without `output_schema` | as `llm` + `tools`, `max_turns` |
 | `tool` | One tool call, no model | `tool` (`server:tool`), `arguments` |
 | `code` | A registered deterministic function (gates, state changes, row building) | `function`, `args` |
-| `notify` | Message to the channels routed for an event in `channels.json` | `event`, `message`, `channels` |
+| `notify` | Event to the channels routed in `channels.json` through the NotifyPort; a failing channel is listed in `failed` and never fails the flow ([Notifications](configuration.md#notifications)) | `event`, `message`, `payload`, `channels` |
 | `subflow` | Runs another flow for the current item; its checkpoints nest under the run | `flow` (id or `${item.subflow}`) |
 | `wait` | Polls a status tool until a condition holds; each poll is a checkpoint, the deadline is absolute | `tool`, `arguments`, `until`, `poll_s`, `deadline_s` |
 | `guard` | Flags from regular expressions and classifier scores (code decides); sets `item.flagged` | `input`, `patterns`, `checks` |

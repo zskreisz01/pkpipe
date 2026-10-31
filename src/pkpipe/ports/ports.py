@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 
@@ -44,9 +45,26 @@ class ToolPort(Protocol):
     def call(self, tool: str, arguments: dict[str, Any]) -> Any: ...
 
 
+@dataclass(frozen=True)
+class Delivery:
+    """Outcome of one event to one channel. ``error`` never contains a webhook URL or other secret."""
+
+    event: str
+    channel: str
+    ok: bool
+    error: str | None = None
+    truncated: bool = False
+
+
 @runtime_checkable
 class NotifyPort(Protocol):
-    def send(self, channel: str, message: str, actions: list[dict[str, str]] | None = None) -> None: ...
+    """Route ``event`` to its channels (``channels.json`` routes, or the explicit ``channels``) and deliver
+    the rendered message. One failing channel never stops the others; failures are returned, not raised.
+    An event without a route returns an empty list."""
+
+    def send(
+        self, event: str, payload: dict[str, Any], channels: list[str] | None = None
+    ) -> list[Delivery]: ...
 
 
 @runtime_checkable

@@ -1,16 +1,16 @@
-"""NotifyPort that writes to the log; the default until channel adapters (spec 006) are configured."""
+"""``log`` channel: writes the message to the log; for development and as the zero-config default."""
 
 from __future__ import annotations
 
 import logging
 
+from pkpipe.adapters.notify_templates import Rendered
+
 log = logging.getLogger("pkpipe.notify")
 
 
-class LogNotify:
-    def __init__(self) -> None:
-        self.sent: list[tuple[str, str]] = []
+class LogChannel:
+    type = "log"
 
-    def send(self, channel: str, message: str, actions: list[dict[str, str]] | None = None) -> None:
-        self.sent.append((channel, message))
-        log.info("notify %s: %s", channel, message)
+    def deliver(self, rendered: Rendered, *, event: str) -> None:
+        log.info("notify %s: %s", event, rendered.plain())

@@ -12,6 +12,7 @@ from pkpipe.obsidian.vault import Vault
 from tests.fakes import FakeTools
 
 TRIAGE_FILE = "0-INBOX/Inbox-Triage.md"
+PACK_ROUTES = {e: ["discord_main"] for e in ("triage_ready", "daily_summary", "security_flag")}
 PROCESSING_LIST = "0-INBOX/Manual-Resource-Processing-List.md"
 
 

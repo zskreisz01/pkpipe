@@ -11,7 +11,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [003-observability](003-observability/spec.md) | OpenTelemetry tracing and metrics | Completed | research |
 | [004-obsidian-vault-mcp](004-obsidian-vault-mcp/spec.md) | obsidian-vault MCP server | Completed | research · data-model |
 | [005-flow-engine](005-flow-engine/spec.md) | Flow engine: compiler, step executors, run service, scheduler | Completed | research · data-model |
-| [006-notifications](006-notifications/spec.md) | Notification port and channels | Draft |  |
+| [006-notifications](006-notifications/spec.md) | Notification port and channels | Completed |  |
 | [007-triage-and-release](007-triage-and-release/spec.md) | Daily triage and morning release | Draft |  |
 | [008-secure-fetch](008-secure-fetch/spec.md) | Secure fetch | Draft | research · data-model |
 | [009-output-guard-and-quarantine](009-output-guard-and-quarantine/spec.md) | Output guard and quarantine | Draft | research · data-model |

@@ -1,7 +1,7 @@
 ---
 spec_id: 006-notifications
 title: Notification port and channels
-status: Draft
+status: Completed
 description: NotifyPort with Discord webhook, Teams workflow webhook and Apprise adapters, event-to-channel routing and message templates per channel type.
 relevant_when:
   - notifications
@@ -10,14 +10,14 @@ relevant_when:
   - Apprise
   - channels.json
 related: [007-triage-and-release]
-updated: 2026-10-31
+updated: 2026-11-01
 ---
 
 # Feature Specification: Notification port and channels
 
 **Feature Branch**: `spec/006-notifications`
 **Created**: 2026-10-31
-**Status**: Draft
+**Status**: Completed
 **Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
 
 ## User Scenarios & Testing *(mandatory)*
@@ -60,6 +60,11 @@ Triage-ready, daily summary, weekly review and security alerts reach the configu
 ### Session 2026-10-31
 
 - Q: Is this spec part of the public engine? → A: Yes; private categories, contexts and datasets stay in the overlay.
+
+### Session 2026-11-01
+
+- Q: Shape of `NotifyPort`? → A: `send(event, payload, channels=None) -> list[Delivery]`; routing, templates and channel selection live in the adapter side (`ChannelNotifier`), the core only passes the event. Failures are returned, never raised.
+- Q: Where may secrets live? → A: Webhook and Apprise URLs only as `env:NAME`; the notifier's HTTP client is excluded from httpx tracing.
 
 ## Out of Scope
 
