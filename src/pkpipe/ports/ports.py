@@ -61,3 +61,71 @@ class ConfigPort(Protocol):
     def load_layers(self) -> list[dict[str, Any]]: ...
 
     def version(self) -> str: ...
+
+
+@runtime_checkable
+class ClockPort(Protocol):
+    """Wall clock for wait steps and deadlines. ``now`` is epoch seconds; fakes advance time on ``sleep``."""
+
+    def now(self) -> float: ...
+
+    def sleep(self, seconds: float) -> None: ...
+
+
+@runtime_checkable
+class SpanPort(Protocol):
+    """Handle of an open span: attributes, events and an explicit failure mark (handled step errors)."""
+
+    def set(self, key: str, value: Any) -> None: ...
+
+    def event(self, name: str, attributes: dict[str, Any] | None = None) -> None: ...
+
+    def fail(self, error_type: str) -> None: ...
+
+
+@runtime_checkable
+class TracerPort(Protocol):
+    """Spans for flows, steps, LLM and tool calls (constitution X). The core only knows this protocol;
+    ``pkpipe.adapters.tracer_otel`` maps it onto ``pkpipe.telemetry`` (OpenTelemetry, OTLP).
+
+    Every method except ``capture`` and ``security_flag`` returns a context manager yielding a
+    :class:`SpanPort`; an exception leaving it marks the span as failed.
+    """
+
+    def flow(
+        self, flow_id: str, *, trigger: str, config_version: str, data_classes: tuple[str, ...] = ()
+    ): ...
+
+    def item(self, item_id: str, category: str | None = None): ...
+
+    def step(self, step_id: str, bpmn_element: str, *, item_id: str | None, item_category: str | None): ...
+
+    def llm(self, model: str): ...
+
+    def tool(self, tool: str): ...
+
+    def capture(self, **content: str) -> bool: ...
+
+    def security_flag(
+        self, detector: str, *, action: str = "flag", reason_code: str | None = None
+    ) -> None: ...
+
+
+@runtime_checkable
+class RunStorePort(Protocol):
+    """Run records (spec 005 FR-004) and pinned config snapshots, keyed by config version.
+
+    Records are plain dicts with the fields of ``pkpipe.engine.runs.Run``.
+    """
+
+    def create_run(self, record: dict[str, Any]) -> None: ...
+
+    def update_run(self, run_id: str, **fields: Any) -> None: ...
+
+    def get_run(self, run_id: str) -> dict[str, Any] | None: ...
+
+    def list_runs(self, *, status: str | None = None, flow_id: str | None = None) -> list[dict[str, Any]]: ...
+
+    def save_snapshot(self, version: str, data: dict[str, Any], assets: dict[str, str]) -> None: ...
+
+    def load_snapshot(self, version: str) -> tuple[dict[str, Any], dict[str, str]] | None: ...
