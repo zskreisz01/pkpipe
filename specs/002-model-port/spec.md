@@ -1,7 +1,7 @@
 ---
 spec_id: 002-model-port
 title: ModelPort and OpenAI-compatible model adapter
-status: Draft
+status: Completed
 description: A ModelPort with structured (JSON-schema) completions and an adapter for any OpenAI-compatible server, configured by model profiles. Default target: LM Studio with a ~9B instruct model.
 relevant_when:
   - ModelPort
@@ -17,7 +17,7 @@ updated: 2026-10-31
 
 **Feature Branch**: `spec/002-model-port`
 **Created**: 2026-10-31
-**Status**: Draft
+**Status**: Completed
 **Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
 **Companions**: [research.md](research.md) · [data-model.md](data-model.md)
 

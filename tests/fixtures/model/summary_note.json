@@ -1,0 +1,42 @@
+{
+  "request": {
+    "system": "You summarize notes into a title and short bullets. Reply only with JSON.",
+    "user": "Note: Fictional article about keeping a weekly review habit: pick a fixed time, list open loops, decide next actions, archive finished items.",
+    "json_schema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "bullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "title",
+        "bullets"
+      ],
+      "additionalProperties": false
+    },
+    "profile": "default"
+  },
+  "raw_content": "{\"title\": \"Weekly Review Habit Guide\", \"bullets\": [\"Set a fixed time for review\", \"List all open loops\", \"Decide next actions\", \"Archive finished items\"]}",
+  "data": {
+    "title": "Weekly Review Habit Guide",
+    "bullets": [
+      "Set a fixed time for review",
+      "List all open loops",
+      "Decide next actions",
+      "Archive finished items"
+    ]
+  },
+  "usage": {
+    "prompt_tokens": 59,
+    "completion_tokens": 39
+  },
+  "model": "qwen3.5-9b-mlx"
+}

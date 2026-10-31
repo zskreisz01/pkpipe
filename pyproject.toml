@@ -6,10 +6,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
+    "httpx>=0.28.1",
     # Added as the corresponding modules are implemented:
     # "langgraph", "langgraph-checkpoint-sqlite", "langchain-openai",
     # "langchain-mcp-adapters", "fastmcp", "fastapi", "apscheduler",
     # "opentelemetry-sdk", "openinference-instrumentation-langchain", "apprise",
+    "jsonschema>=4.26.0",
+    "opentelemetry-api>=1.45.2",
     "pydantic>=2",
 ]
 
@@ -19,6 +22,7 @@ pkpipe = "pkpipe.cli:main"
 [dependency-groups]
 dev = [
     "jsonschema>=4.26.0",
+    "opentelemetry-sdk>=1.45.2",
     "pytest>=8",
     "ruff>=0.6",
 ]

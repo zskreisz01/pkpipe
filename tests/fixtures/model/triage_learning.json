@@ -1,0 +1,45 @@
+{
+  "request": {
+    "system": "You classify inbox notes. Reply only with JSON matching the schema.",
+    "user": "Note: A fictional video course about learning the basics of music theory.",
+    "json_schema": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "enum": [
+            "tool",
+            "learning",
+            "reference",
+            "other"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "confidence",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "profile": "default"
+  },
+  "raw_content": "{\"category\": \"learning\", \"confidence\": 0.95, \"reason\": \"The note describes a fictional video course about learning music theory basics, which is clearly educational in nature.\"}",
+  "data": {
+    "category": "learning",
+    "confidence": 0.95,
+    "reason": "The note describes a fictional video course about learning music theory basics, which is clearly educational in nature."
+  },
+  "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 41
+  },
+  "model": "qwen3.5-9b-mlx"
+}

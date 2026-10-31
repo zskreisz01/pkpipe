@@ -81,3 +81,17 @@ def test_in_memory_config_version_follows_effective_content():
     assert a.version() == config_version({"schedules": [{"flow": "t", "cron": "0 1 * * *"}]})
     assert a.version() != b.version()
     assert len(b.load_layers()) == 2
+
+
+def test_fake_model_accepts_profile_raises_scripted_errors_and_can_check_schema():
+    from pkpipe.ports import ModelUnavailable, SchemaError
+
+    schema = {"type": "object", "properties": {"n": {"type": "integer"}}, "required": ["n"]}
+    m = FakeModel([ModelUnavailable("down"), {"n": 1}, {"n": "x"}], schema_check=True)
+    with pytest.raises(ModelUnavailable):
+        m.complete("s", "u", schema, profile="judge")
+    assert m.complete("s", "u", schema) == {"n": 1}
+    with pytest.raises(SchemaError):
+        m.complete("s", "u", schema)
+    assert [c["profile"] for c in m.calls] == ["judge", "default", "default"]
+    assert FakeModel([SchemaError("x")]).calls == []
