@@ -15,6 +15,8 @@ def test_exported_schema_files_validate_the_pack_and_reject_a_broken_overlay(tmp
     for schema_file in out.glob("*.schema.json"):
         schema = json.loads(schema_file.read_text())
         stem = schema_file.name.removesuffix(".schema.json")
+        if stem in {"triage-row", "processing-list-row"}:  # vault row schemas (spec 004)
+            continue
         files = sorted((pack_dir / "flows").glob("*.json")) if stem == "flow" else [pack_dir / f"{stem}.json"]
         for f in files:
             jsonschema.validate(json.loads(f.read_text()), schema)

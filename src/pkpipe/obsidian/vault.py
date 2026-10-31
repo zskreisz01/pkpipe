@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import contextlib
+import functools
 import os
 import unicodedata
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+from pkpipe.telemetry import set_span_attributes, tool_span
 
 from . import lists
 from .atomic import dir_lock, update_text
@@ -15,12 +19,35 @@ from .notes import append_text, jsonable, parse_note, render_note
 from .policy import VaultPolicy, is_conflict_name
 
 
+def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Constitution X: one ``tool <name>`` span per vault operation (the MCP tools call these methods).
+
+    Only the tool name, the item id of a single-row upsert, and a row count are recorded. Paths, bodies,
+    front matter and row values are never attached, so note content cannot reach a trace.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(self: Vault, *args: Any, **kwargs: Any) -> Any:
+        with tool_span(fn.__name__) as span:
+            span.set_attribute("tool.server", "obsidian-vault")
+            rows = kwargs.get("rows", args[0] if args else None)
+            if fn.__name__ in ("update_triage", "upsert_processing_list") and isinstance(rows, list):
+                span.set_attribute("pkpipe.vault.rows", len(rows))
+                ids = [r.get("item_id") for r in rows if isinstance(r, dict)]
+                if len(ids) == 1 and isinstance(ids[0], str):
+                    set_span_attributes(span, item_id=ids[0])
+            return fn(self, *args, **kwargs)
+
+    return wrapper
+
+
 class Vault:
     def __init__(self, policy: VaultPolicy):
         self.policy = policy
 
     # -- notes -----------------------------------------------------------------------------------------------
 
+    @_traced
     def list_folder(self, path: str) -> dict[str, Any]:
         folder = self.policy.resolve(path, "list_folder", kind="folder")
         if not folder.is_dir():
@@ -35,6 +62,7 @@ class Vault:
                 (conflicts if is_conflict_name(entry.name) else notes).append(entry.name)
         return {"path": path.rstrip("/"), "notes": notes, "folders": folders, "conflicts": conflicts}
 
+    @_traced
     def read_note(self, path: str) -> dict[str, Any]:
         target = self.policy.resolve(path, "read_note")
         if not target.is_file():
@@ -48,6 +76,7 @@ class Vault:
             "conflict": is_conflict_name(target.name),
         }
 
+    @_traced
     def write_note(
         self, path: str, body: str, front_matter: dict[str, Any] | None = None, overwrite: bool = False
     ) -> dict[str, Any]:
@@ -62,6 +91,7 @@ class Vault:
         update_text(target, transform)
         return {"path": path, "created": True}
 
+    @_traced
     def append_note(self, path: str, text: str) -> dict[str, Any]:
         target = self._writable(path, "append_note")
 
@@ -73,6 +103,7 @@ class Vault:
         update_text(target, transform)
         return {"path": path}
 
+    @_traced
     def move_note(self, src: str, dst: str) -> dict[str, Any]:
         source = self._writable(src, "move_note")
         dest = self._writable(dst, "move_note")
@@ -118,14 +149,17 @@ class Vault:
 
     # -- lists -----------------------------------------------------------------------------------------------
 
+    @_traced
     def read_triage(self) -> dict[str, Any]:
         path = self.policy.resolve(self.policy.triage_file, "read_triage")
         return lists.read_triage(path)
 
+    @_traced
     def update_triage(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         path = self.policy.resolve(self.policy.triage_file, "update_triage")
         return lists.update_triage(path, rows)
 
+    @_traced
     def upsert_processing_list(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         path = self.policy.resolve(self.policy.processing_list, "upsert_processing_list")
         return lists.upsert_processing_list(path, rows)
