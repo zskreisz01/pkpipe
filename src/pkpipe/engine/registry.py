@@ -8,7 +8,10 @@ Merge rules
 * ``enabled: false`` on a merged category or schedule removes it from the effective config;
 * any other value (scalars, plain lists, lists of objects without a key) is replaced by the later layer.
 
-The effective config carries a sha256 version hash of its canonical JSON; flows record it in run state.
+Flows live in ``flows/<id>.json`` and are merged per flow id like any other dict (nodes merge by ``id``).
+
+The effective config carries a sha256 version hash over its canonical JSON and its text assets (prompts,
+instructions, context packs, schemas); runs pin it (spec 005) and every trace records it.
 """
 
 from __future__ import annotations
@@ -105,19 +108,58 @@ def _check_layer_shape(path: Path, stem: str, content: Any) -> None:
             seen.add(entry[key])
 
 
+def _read_json(p: Path) -> Any:
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ConfigError([f"{p}: invalid JSON ({exc.msg} at line {exc.lineno})"]) from exc
+
+
 def load_layer(directory: Path) -> dict[str, Any]:
-    """Load every *.json file of a config directory into {stem: content}. A missing directory is empty."""
+    """Load every *.json file of a config directory into {stem: content}, plus ``flows/*.json`` into
+    ``{"flows": {stem: flow}}``. A missing directory is empty."""
     if not directory or not directory.is_dir():
         return {}
     out: dict[str, Any] = {}
     for p in sorted(directory.glob("*.json")):
-        try:
-            content = json.loads(p.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            raise ConfigError([f"{p}: invalid JSON ({exc.msg} at line {exc.lineno})"]) from exc
+        content = _read_json(p)
         _check_layer_shape(p, p.stem, content)
         out[p.stem] = content
+    flows_dir = directory / "flows"
+    if flows_dir.is_dir():
+        flows: dict[str, Any] = {}
+        for p in sorted(flows_dir.glob("*.json")):
+            content = _read_json(p)
+            if not isinstance(content, dict):
+                raise ConfigError([f"{p}: expected a JSON object"])
+            flows[p.stem] = content
+        if flows:
+            out["flows"] = flows
     return out
+
+
+def load_assets(*directories: Path | None) -> dict[str, str]:
+    """Text assets (prompts, instructions, contexts, schemas) of the layers; later layers win per path."""
+    from pkpipe.engine.snapshot import ASSET_DIRS, ASSET_SUFFIXES
+
+    assets: dict[str, str] = {}
+    for base in directories:
+        if not base or not base.is_dir():
+            continue
+        root = base.resolve()
+        for sub in ASSET_DIRS:
+            folder = base / sub
+            if not folder.is_dir():
+                continue
+            for p in sorted(folder.rglob("*")):
+                if p.is_file() and p.suffix in ASSET_SUFFIXES and p.resolve().is_relative_to(root):
+                    assets[p.relative_to(base).as_posix()] = p.read_text(encoding="utf-8")
+    return assets
+
+
+def snapshot_version(data: Mapping[str, Any], assets: Mapping[str, str]) -> str:
+    """Version of config + assets; equals :func:`config_version` of the data when there are no assets."""
+    return config_version({"config": data, "assets": dict(assets)}) if assets else config_version(data)
 
 
 def merge_layers(*layers: Mapping[str, Any]) -> dict[str, Any]:
@@ -160,6 +202,13 @@ class EffectiveConfig:
     pack_dir: Path
     overlay_dir: Path | None = None
     warnings: list[str] = field(default_factory=list)
+    assets: dict[str, str] = field(default_factory=dict)
+
+    def snapshot(self):
+        """The pinned, in-memory form a run executes against (spec 005)."""
+        from pkpipe.engine.snapshot import ConfigSnapshot
+
+        return ConfigSnapshot(self.version, copy.deepcopy(self.data), dict(self.assets))
 
     def find_file(self, relative: str) -> Path | None:
         """Resolve a Markdown/JSON asset (prompt, instruction, context, schema): overlay first, then pack.
@@ -211,6 +260,11 @@ def check_references(cfg: EffectiveConfig) -> tuple[list[str], list[str]]:
     deny = cfg.data.get("security", {}).get("url_filter", {}).get("deny_list")
     if deny and cfg.find_file(deny) is None:
         warnings.append(f"security.url_filter.deny_list '{deny}' not found")
+    from pkpipe.engine.compiler import validate_config_flows
+
+    flow_errors, flow_warnings = validate_config_flows(cfg.snapshot())
+    errors += flow_errors
+    warnings += flow_warnings
     return errors, warnings
 
 
@@ -230,7 +284,8 @@ def load_effective(
     if not pack_dir.is_dir():
         raise ConfigError([f"pack directory '{pack_dir}' does not exist"])
     data = load_config(pack_dir, overlay_dir)
-    cfg = EffectiveConfig(data, config_version(data), pack_dir, overlay_dir, warnings)
+    assets = load_assets(pack_dir, overlay_dir)
+    cfg = EffectiveConfig(data, snapshot_version(data, assets), pack_dir, overlay_dir, warnings, assets)
     errors = validate_effective(data)
     ref_errors, ref_warnings = check_references(cfg) if not errors else ([], [])
     cfg.warnings.extend(ref_warnings)
