@@ -1,0 +1,104 @@
+{
+  "id": "learning_material",
+  "description": "Create a notebook from the URL only, wait for the generation result (poll + deadline), link it. Spec 012 adds the URL check and output guard.",
+  "bpmn": "process-learning-material",
+  "start": "create",
+  "nodes": [
+    {
+      "id": "create",
+      "type": "tool",
+      "bpmn_element": "Create notebook + source",
+      "config": {
+        "tool": "learning:create",
+        "arguments": {
+          "resource": "${item.resource}",
+          "item_id": "${item.id}"
+        }
+      }
+    },
+    {
+      "id": "wait_generation",
+      "type": "wait",
+      "bpmn_element": "Wait for generation result",
+      "config": {
+        "tool": "learning:status",
+        "arguments": {
+          "nb_id": "${create.nb_id}"
+        },
+        "until": {
+          "path": "result.status",
+          "in": [
+            "ready",
+            "failed"
+          ]
+        },
+        "poll_s": 60,
+        "deadline_s": 7200
+      }
+    },
+    {
+      "id": "link",
+      "type": "tool",
+      "bpmn_element": "Get audio + link",
+      "config": {
+        "tool": "learning:link",
+        "arguments": {
+          "nb_id": "${create.nb_id}"
+        }
+      }
+    },
+    {
+      "id": "ready",
+      "type": "code",
+      "bpmn_element": "Update list: status ready",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "nb_id": "${create.nb_id}",
+          "link": "${link.url}",
+          "processing_status": "ready"
+        }
+      }
+    },
+    {
+      "id": "failed",
+      "type": "code",
+      "bpmn_element": "Update list: status failed",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "nb_id": "${create.nb_id}",
+          "processing_status": "failed"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "create",
+      "to": "wait_generation"
+    },
+    {
+      "from": "wait_generation",
+      "to": "link",
+      "when": {
+        "path": "wait_generation.status",
+        "eq": "ready"
+      }
+    },
+    {
+      "from": "wait_generation",
+      "to": "failed",
+      "default": true
+    },
+    {
+      "from": "wait_generation",
+      "to": "failed",
+      "on": "error"
+    },
+    {
+      "from": "link",
+      "to": "ready"
+    }
+  ]
+}

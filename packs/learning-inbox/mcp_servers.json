@@ -5,7 +5,10 @@
     "allow": [
       "read_note",
       "write_note",
-      "list_folder"
+      "list_folder",
+      "read_triage",
+      "update_triage",
+      "upsert_processing_list"
     ]
   },
   "websearch": {

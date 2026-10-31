@@ -1,0 +1,68 @@
+{
+  "id": "categorize_item",
+  "description": "One INBOX item: read it (code), suggest a category (isolated session, no tools, datamarked input), accept only a configured category (code).",
+  "bpmn": "process-inbox-items",
+  "start": "read",
+  "nodes": [
+    {
+      "id": "read",
+      "type": "tool",
+      "bpmn_element": "Read new INBOX items",
+      "config": {
+        "tool": "obsidian:read_note",
+        "arguments": {
+          "path": "${item.path}"
+        }
+      }
+    },
+    {
+      "id": "menu",
+      "type": "code",
+      "bpmn_element": "Categorize each item",
+      "config": {
+        "function": "triage.category_menu"
+      }
+    },
+    {
+      "id": "suggest",
+      "type": "llm",
+      "bpmn_element": "Categorize each item",
+      "inputs": [
+        "menu.categories",
+        "item.resource",
+        "read.front_matter",
+        "read.body"
+      ],
+      "config": {
+        "system": "triage",
+        "instruction": "triage/categorize.md",
+        "output_schema": "triage_result"
+      }
+    },
+    {
+      "id": "check",
+      "type": "code",
+      "bpmn_element": "Categorize each item",
+      "config": {
+        "function": "triage.check_category",
+        "args": {
+          "suggestion": "${suggest}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "read",
+      "to": "menu"
+    },
+    {
+      "from": "menu",
+      "to": "suggest"
+    },
+    {
+      "from": "suggest",
+      "to": "check"
+    }
+  ]
+}

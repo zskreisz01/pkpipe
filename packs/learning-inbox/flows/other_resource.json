@@ -1,0 +1,113 @@
+{
+  "id": "other_resource",
+  "description": "Summarize the item in an isolated session without tools, pass the output guard, write the note into its PARA folder or quarantine the item. Spec 010 replaces the single session with the category's session plan.",
+  "bpmn": "process-other-resource",
+  "start": "read",
+  "nodes": [
+    {
+      "id": "read",
+      "type": "tool",
+      "bpmn_element": "Read item",
+      "config": {
+        "tool": "obsidian:read_note",
+        "arguments": {
+          "path": "${item.path}"
+        }
+      }
+    },
+    {
+      "id": "summarize",
+      "type": "llm",
+      "bpmn_element": "Run category sessions",
+      "inputs": [
+        "item.category",
+        "read.body"
+      ],
+      "config": {
+        "system": "synthesizer",
+        "instruction": "other/summarize.md",
+        "output_schema": "resource_note"
+      }
+    },
+    {
+      "id": "guard",
+      "type": "guard",
+      "bpmn_element": "Output guard",
+      "config": {
+        "input": "summarize.note",
+        "patterns": [
+          "ignore (all )?(previous|prior) instructions",
+          "<\\s*script"
+        ]
+      }
+    },
+    {
+      "id": "quarantine",
+      "type": "code",
+      "bpmn_element": "Handle security flag",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "state": "quarantined"
+        }
+      }
+    },
+    {
+      "id": "write",
+      "type": "tool",
+      "bpmn_element": "Write note",
+      "config": {
+        "tool": "obsidian:write_note",
+        "arguments": {
+          "path": "${item.para_path}/${item.id}.md",
+          "body": "# ${summarize.title}\n\n${summarize.note}\n",
+          "front_matter": {
+            "source": "${item.resource}",
+            "category": "${item.category}",
+            "pkpipe_item": "${item.id}"
+          },
+          "overwrite": true
+        }
+      }
+    },
+    {
+      "id": "record",
+      "type": "code",
+      "bpmn_element": "Write note",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "note": "${item.para_path}/${item.id}.md",
+          "processing_status": "done"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "read",
+      "to": "summarize"
+    },
+    {
+      "from": "summarize",
+      "to": "guard"
+    },
+    {
+      "from": "guard",
+      "to": "quarantine",
+      "when": {
+        "path": "guard.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "guard",
+      "to": "write",
+      "default": true
+    },
+    {
+      "from": "write",
+      "to": "record"
+    }
+  ]
+}
