@@ -1,0 +1,38 @@
+{
+  "id": "process_item",
+  "description": "One released item: route by the category's subflow.",
+  "bpmn": "process-inbox-items",
+  "nodes": [
+    {
+      "id": "learning",
+      "type": "subflow",
+      "bpmn_element": "Process learning material",
+      "config": {
+        "flow": "learning_material"
+      }
+    },
+    {
+      "id": "other",
+      "type": "subflow",
+      "bpmn_element": "Process other resource",
+      "config": {
+        "flow": "other_resource"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "START",
+      "to": "learning",
+      "when": {
+        "path": "item.subflow",
+        "eq": "learning_material"
+      }
+    },
+    {
+      "from": "START",
+      "to": "other",
+      "default": true
+    }
+  ]
+}

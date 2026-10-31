@@ -36,6 +36,18 @@ _run: contextvars.ContextVar[RunContext | None] = contextvars.ContextVar("pkpipe
 _item: contextvars.ContextVar[ItemContext | None] = contextvars.ContextVar("pkpipe_item", default=None)
 
 
+@dataclass
+class StepContext:
+    step_id: str
+    bpmn_element: str
+    item_id: str
+    item_category: str
+
+
+#: The step being executed: LLM and tool spans below it inherit its attributes (constitution X).
+_step: contextvars.ContextVar[StepContext | None] = contextvars.ContextVar("pkpipe_step", default=None)
+
+
 def current_run() -> RunContext | None:
     return _run.get()
 
@@ -112,6 +124,9 @@ def set_item_category(category: str) -> None:
     item = _item.get()
     if item is not None:
         item.category = category
+    step = _step.get()
+    if step is not None:
+        step.item_category = category
     trace.get_current_span().set_attribute(attrs.ITEM_CATEGORY, category)
 
 
@@ -140,22 +155,31 @@ def step_span(
         f"step {step_id}", record_exception=False, set_status_on_exception=False
     ) as span:
         span.set_attribute(attrs.SPAN_KIND, "step")
+        step = StepContext(
+            step_id,
+            bpmn_element,
+            item_id or (item.item_id if item else "") or "",
+            item_category or (item.category if item else "") or "",
+        )
         set_span_attributes(
             span,
             flow_id=run.flow_id if run else "",
             step_id=step_id,
             bpmn_element=bpmn_element,
-            item_id=item_id or (item.item_id if item else "") or "",
-            item_category=item_category or (item.category if item else "") or "",
+            item_id=step.item_id,
+            item_category=step.item_category,
             config_version=run.config_version if run else "",
             run_trigger=run.trigger if run else "",
         )
+        token = _step.set(step)
         try:
             yield span
         except BaseException as exc:
             _mark_error(span, exc)
             tel.metrics.step_error(step_id, type(exc).__qualname__)
             raise
+        finally:
+            _step.reset(token)
 
 
 def traced_step(step_id: str, bpmn_element: str) -> Callable:
@@ -209,10 +233,14 @@ def _child(kind: str, name: str, extra: dict[str, str]) -> Iterator[Span]:
         span.set_attribute(attrs.SPAN_KIND, kind)
         for k, v in extra.items():
             span.set_attribute(k, v)
+        step = _step.get()
         set_span_attributes(
             span,
             flow_id=run.flow_id if run else None,
-            item_id=item.item_id if item else None,
+            step_id=step.step_id if step else None,
+            bpmn_element=step.bpmn_element if step else None,
+            item_id=(step.item_id if step else None) or (item.item_id if item else None),
+            item_category=(step.item_category if step else None) or (item.category if item else None),
             config_version=run.config_version if run else None,
         )
         try:

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-import hashlib
 from enum import StrEnum
 
 from pydantic import BaseModel, field_validator
 
-from pkpipe.domain.triage import ItemState
+from pkpipe.domain.triage import ItemState, item_id_for
+
+__all__ = ["ItemState", "ProcessingListRow", "ProcessingStatus", "TriageRow", "item_id_for"]
 
 
 class ProcessingStatus(StrEnum):
@@ -17,11 +18,6 @@ class ProcessingStatus(StrEnum):
     FAILED = "failed"
     DONE = "done"
     MANUAL = "manual"
-
-
-def item_id_for(resource: str) -> str:
-    """Stable triage item id: hash of the resource."""
-    return hashlib.sha256(resource.strip().encode("utf-8")).hexdigest()[:12]
 
 
 class TriageRow(BaseModel):

@@ -8,9 +8,23 @@ import pytest
 
 from pkpipe import ports
 from pkpipe.engine.registry import config_version
-from tests.fakes import FakeModel, FakeNotify, FakeTools, InMemoryConfig, InMemoryState
+from tests.fakes import (
+    FakeClock,
+    FakeModel,
+    FakeNotify,
+    FakeTools,
+    InMemoryConfig,
+    InMemoryRunStore,
+    InMemoryState,
+    RecordedSpan,
+    RecordingTracer,
+)
 
 FAKES = {
+    "ClockPort": FakeClock(),
+    "TracerPort": RecordingTracer(),
+    "SpanPort": RecordedSpan("step", "x"),
+    "RunStorePort": InMemoryRunStore(),
     "ModelPort": FakeModel(),
     "ToolPort": FakeTools(),
     "NotifyPort": FakeNotify(),
@@ -95,3 +109,34 @@ def test_fake_model_accepts_profile_raises_scripted_errors_and_can_check_schema(
         m.complete("s", "u", schema)
     assert [c["profile"] for c in m.calls] == ["judge", "default", "default"]
     assert FakeModel([SchemaError("x")]).calls == []
+
+
+def test_fake_clock_moves_only_on_sleep():
+    c = FakeClock(100.0)
+    assert c.now() == 100.0
+    c.sleep(60)
+    c.advance(5)
+    assert c.now() == 165.0 and c.sleeps == [60]
+
+
+def test_in_memory_run_store_round_trip_and_immutable_fields():
+    s = InMemoryRunStore()
+    s.create_run({"run_id": "r1", "flow_id": "f", "status": "running"})
+    s.update_run("r1", status="done")
+    assert s.get_run("r1")["status"] == "done"
+    assert [r["run_id"] for r in s.list_runs(status="done")] == ["r1"] and s.list_runs(status="failed") == []
+    with pytest.raises(ValueError):
+        s.update_run("r1", flow_id="other")
+    s.save_snapshot("v1", {"a": 1}, {"x.md": "x"})
+    s.save_snapshot("v1", {"a": 2}, {})  # first snapshot of a version wins (pinned)
+    assert s.load_snapshot("v1") == ({"a": 1}, {"x.md": "x"}) and s.load_snapshot("v2") is None
+
+
+def test_recording_tracer_marks_failed_spans_and_carries_flow_attributes():
+    t = RecordingTracer()
+    with t.flow("f", trigger="manual", config_version="v"), t.item("i1", "tool"):
+        with pytest.raises(RuntimeError), t.step("s", "Task", item_id=None, item_category=None):
+            raise RuntimeError("x")
+    step = t.of("step")[0]
+    assert step.failed == "RuntimeError"
+    assert step.attributes["flow.id"] == "f" and step.attributes["item.id"] == "i1"

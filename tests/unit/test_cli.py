@@ -1,4 +1,4 @@
-"""Spec 001 FR-003: CLI surface; `validate` is real, other commands are registered stubs."""
+"""Spec 001 FR-003: CLI surface; validate, schema and (spec 005) run/runs are real, the rest stubs."""
 
 from __future__ import annotations
 
@@ -22,8 +22,12 @@ def test_run_takes_a_flow_and_eval_a_suite():
     assert p.parse_args(["run", "triage"]).flow == "triage"
     assert p.parse_args(["eval", "--suite", "triage"]).suite == "triage"
     assert p.parse_args(["eval"]).suite == "all"
-    with pytest.raises(SystemExit):
-        p.parse_args(["run"])
+    assert p.parse_args(["run", "--resume", "abc"]).resume == "abc"
+
+
+def test_run_without_flow_or_resume_is_a_usage_error(capsys):
+    assert main(["run"]) == 2
+    assert "name a flow" in capsys.readouterr().err
 
 
 def test_version_flag(capsys):
@@ -37,7 +41,7 @@ def test_no_command_prints_help(capsys):
     assert "usage: pkpipe" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("argv", [["serve"], ["run", "triage"], ["eval"]])
+@pytest.mark.parametrize("argv", [["serve"], ["eval"]])
 def test_unwired_commands_fail_loudly_not_silently(argv, capsys):
     assert main(argv) == 1
     assert "not implemented" in capsys.readouterr().err
@@ -81,6 +85,15 @@ def test_schema_command_writes_one_schema_per_config_file(tmp_path, capsys):
     names = {p.name for p in (tmp_path / "s").iterdir()}
     assert names == {
         f"{n}.schema.json"
-        for n in ("models", "mcp_servers", "channels", "schedules", "categories", "security", "telemetry")
+        for n in (
+            "models",
+            "mcp_servers",
+            "channels",
+            "schedules",
+            "categories",
+            "security",
+            "telemetry",
+            "flow",
+        )
     }
     json.loads((tmp_path / "s" / "models.schema.json").read_text())

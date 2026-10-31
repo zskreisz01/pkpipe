@@ -22,11 +22,11 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `models.json` | Model profiles: endpoint, model, temperature, context, fallback (`default`, `judge`) |
 | `mcp_servers.json` | MCP registration: transport, URL, allowed tools, backend |
 | `channels.json` | Notification channels and routing per event type |
-| `schedules.json` | Cron expression → flow |
+| `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
 | `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir |
 | `telemetry.json` | Prompt/response content capture per flow (`capture_content.flows`); journal and context flows are always off. Exporters come from `OTEL_*` env ([operations](operations.md)) |
-| `flows/*.json` | Graph: nodes, edges, conditions, subflow calls |
+| `flows/*.json` | Graph: nodes, edges, conditions, subflow calls ([Flows](flows.md)) |
 | `steps/*.json` | Defaults per step type: model profile, output schema, retry |
 | `prompts/system/*.md` | Short fixed role prompts per session type |
 | `instructions/<category>/<session>.md` | Session instructions, injected into the user prompt |
@@ -86,3 +86,5 @@ A session receives at most one pack. A session with the enterprise pack has no w
 ## Publishing a change
 
 Edits in the UI are drafts. Publish runs schema and reference validation and a smoke eval on the affected step's dataset, then commits to the config git repo. A running flow finishes on the config version it started with; the version hash is stored in the run state and on every trace.
+
+The version is a sha256 over the effective JSON (including flows) and the text assets (`prompts/`, `instructions/`, `contexts/`, `schemas/`), so editing a prompt is a new version too. When a run starts, the snapshot of that version is stored in the app DB and the run, including a resume after a restart, uses only that snapshot.

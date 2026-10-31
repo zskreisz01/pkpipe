@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from enum import StrEnum
+
+
+def item_id_for(resource: str) -> str:
+    """Stable triage item id: hash of the resource (the INBOX note path or URL)."""
+    return hashlib.sha256(resource.strip().encode("utf-8")).hexdigest()[:12]
 
 
 class ItemState(StrEnum):

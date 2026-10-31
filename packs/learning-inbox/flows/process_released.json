@@ -1,0 +1,148 @@
+{
+  "id": "process_released",
+  "description": "06:00: release confirmed or overridden items, process each released item in its own instance (parallel, limited), write states and the processing list, send the daily summary.",
+  "bpmn": "process-inbox-items",
+  "start": "read_triage",
+  "max_parallel": 2,
+  "nodes": [
+    {
+      "id": "read_triage",
+      "type": "tool",
+      "bpmn_element": "Select confirmed / overridden items",
+      "config": {
+        "tool": "obsidian:read_triage"
+      }
+    },
+    {
+      "id": "release",
+      "type": "code",
+      "bpmn_element": "Select confirmed / overridden items",
+      "config": {
+        "function": "triage.release",
+        "args": {
+          "triage": "${read_triage}"
+        }
+      }
+    },
+    {
+      "id": "mark_states",
+      "type": "tool",
+      "bpmn_element": "Select confirmed / overridden items",
+      "config": {
+        "tool": "obsidian:update_triage",
+        "arguments": {
+          "rows": "${release.rows}"
+        }
+      }
+    },
+    {
+      "id": "process_item",
+      "type": "subflow",
+      "bpmn_element": "Process each released item",
+      "for_each": "release.released",
+      "on_item_error": "continue",
+      "config": {
+        "flow": "process_item"
+      }
+    },
+    {
+      "id": "finalize",
+      "type": "code",
+      "bpmn_element": "Process each released item",
+      "config": {
+        "function": "triage.finalize",
+        "args": {
+          "results": "${process_item}"
+        }
+      }
+    },
+    {
+      "id": "write_states",
+      "type": "tool",
+      "bpmn_element": "Process each released item",
+      "config": {
+        "tool": "obsidian:update_triage",
+        "arguments": {
+          "rows": "${finalize.triage_rows}"
+        }
+      }
+    },
+    {
+      "id": "write_processing",
+      "type": "tool",
+      "bpmn_element": "Process each released item",
+      "config": {
+        "tool": "obsidian:upsert_processing_list",
+        "arguments": {
+          "rows": "${finalize.processing_rows}"
+        }
+      }
+    },
+    {
+      "id": "summary",
+      "type": "notify",
+      "bpmn_element": "Notify: daily summary",
+      "config": {
+        "event": "daily_summary",
+        "message": "Processed ${finalize.processed}, quarantined ${finalize.quarantined}, failed ${finalize.failed}; ${release.count_pending} item(s) still pending."
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "read_triage",
+      "to": "release"
+    },
+    {
+      "from": "release",
+      "to": "mark_states",
+      "when": {
+        "path": "release.rows.0",
+        "exists": true
+      }
+    },
+    {
+      "from": "release",
+      "to": "process_item",
+      "default": true
+    },
+    {
+      "from": "mark_states",
+      "to": "process_item"
+    },
+    {
+      "from": "process_item",
+      "to": "finalize"
+    },
+    {
+      "from": "finalize",
+      "to": "write_states",
+      "when": {
+        "path": "finalize.has_triage_rows",
+        "truthy": true
+      }
+    },
+    {
+      "from": "finalize",
+      "to": "summary",
+      "default": true
+    },
+    {
+      "from": "write_states",
+      "to": "write_processing",
+      "when": {
+        "path": "finalize.has_processing_rows",
+        "truthy": true
+      }
+    },
+    {
+      "from": "write_states",
+      "to": "summary",
+      "default": true
+    },
+    {
+      "from": "write_processing",
+      "to": "summary"
+    }
+  ]
+}

@@ -153,15 +153,17 @@ Dependencies point inwards: inbound adapters call the core, the core knows only 
 | REST + UI router | `pkpipe.api` | Run service, Config registry | UI only |
 | App MCP server | `pkpipe.mcp` | Run service, Triage domain | MCP clients only |
 | Scheduler | `pkpipe.scheduler` | Run service | Nothing |
-| Run service | `pkpipe.engine.runs` | Flow compiler, StatePort | – |
+| Run service | `pkpipe.engine.runs` | Flow compiler, RunStorePort, checkpointer | – |
 | Flow compiler | `pkpipe.engine.compiler` | Step executors, Config registry | – |
-| Step executors | `pkpipe.steps` | ModelPort, ToolPort, NotifyPort | New step type = new module |
+| Step executors | `pkpipe.steps` | ModelPort, ToolPort, NotifyPort, ClockPort, TracerPort | New step type = new module (`@register_step`) |
 | Triage domain | `pkpipe.domain.triage` | Nothing (pure Python) | – |
 | Config registry | `pkpipe.engine.registry` | ConfigPort | – |
 | OpenAI client | `pkpipe.adapters.model_openai` | `langchain-openai` | Model server: URL only |
-| MCP client | `pkpipe.adapters.tools_mcp` | `langchain-mcp-adapters` | Tool backend: `mcp_servers.json` only |
+| MCP client | `pkpipe.adapters.tools_mcp` | FastMCP client | Tool backend: `mcp_servers.json` only |
 | Notifiers | `pkpipe.adapters.notify_*` | `httpx`, `apprise` | New channel = new adapter |
 | SQLite repo | `pkpipe.adapters.state_sqlite` | `langgraph-checkpoint-sqlite` | Can move to Postgres |
+| Tracer | `pkpipe.adapters.tracer_otel` | `pkpipe.telemetry` (OpenTelemetry) | TracerPort; the core never imports OpenTelemetry |
+| Composition root | `pkpipe.app` | All adapters | Chooses the adapter per port |
 | Git store | `pkpipe.adapters.config_git` | `git` | Can move to plain files |
 
 Every port has an in-memory fake under `tests/fakes/`, so unit tests and evals run without a model server, MCP servers or network.

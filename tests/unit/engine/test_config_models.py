@@ -30,10 +30,13 @@ def test_every_pack_json_file_has_a_model_and_validates(pack_dir):
 
 def test_exported_json_schemas_are_valid_and_accept_the_pack(pack_dir):
     schemas = config_json_schemas()
-    assert set(schemas) == set(CONFIG_MODELS)
+    assert set(schemas) == set(CONFIG_MODELS) | {"flow"}
     for stem, schema in schemas.items():
         jsonschema.Draft202012Validator.check_schema(schema)
-        jsonschema.validate(json.loads((pack_dir / f"{stem}.json").read_text()), schema)
+        files = sorted((pack_dir / "flows").glob("*.json")) if stem == "flow" else [pack_dir / f"{stem}.json"]
+        assert files
+        for f in files:
+            jsonschema.validate(json.loads(f.read_text()), schema)
 
 
 def test_exported_json_schemas_reject_what_the_models_reject():

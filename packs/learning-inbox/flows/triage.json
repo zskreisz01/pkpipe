@@ -1,0 +1,117 @@
+{
+  "id": "triage",
+  "description": "20:00: read new INBOX items, suggest a category per item in an isolated session without tools, write the triage file and notify the owner.",
+  "bpmn": "process-inbox-items",
+  "start": "list_inbox",
+  "max_parallel": 2,
+  "nodes": [
+    {
+      "id": "list_inbox",
+      "type": "tool",
+      "bpmn_element": "Read new INBOX items",
+      "config": {
+        "tool": "obsidian:list_folder",
+        "arguments": {
+          "path": "0-INBOX"
+        }
+      }
+    },
+    {
+      "id": "read_triage",
+      "type": "tool",
+      "bpmn_element": "Read new INBOX items",
+      "config": {
+        "tool": "obsidian:read_triage"
+      }
+    },
+    {
+      "id": "select_new",
+      "type": "code",
+      "bpmn_element": "Read new INBOX items",
+      "config": {
+        "function": "inbox.select_new",
+        "args": {
+          "listing": "${list_inbox}",
+          "triage": "${read_triage}",
+          "folder": "0-INBOX"
+        }
+      }
+    },
+    {
+      "id": "categorize",
+      "type": "subflow",
+      "bpmn_element": "Categorize each item",
+      "for_each": "select_new.items",
+      "on_item_error": "continue",
+      "config": {
+        "flow": "categorize_item"
+      }
+    },
+    {
+      "id": "rows",
+      "type": "code",
+      "bpmn_element": "Categorize each item",
+      "config": {
+        "function": "triage.suggested_rows",
+        "args": {
+          "results": "${categorize}"
+        }
+      }
+    },
+    {
+      "id": "write_triage",
+      "type": "tool",
+      "bpmn_element": "Categorize each item",
+      "config": {
+        "tool": "obsidian:update_triage",
+        "arguments": {
+          "rows": "${rows.rows}"
+        }
+      }
+    },
+    {
+      "id": "notify",
+      "type": "notify",
+      "bpmn_element": "Notify: triage ready",
+      "config": {
+        "event": "triage_ready",
+        "message": "Triage ready: ${rows.count} new item(s) to confirm or override in 0-INBOX/Inbox-Triage.md."
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "list_inbox",
+      "to": "read_triage"
+    },
+    {
+      "from": "read_triage",
+      "to": "select_new"
+    },
+    {
+      "from": "select_new",
+      "to": "categorize"
+    },
+    {
+      "from": "categorize",
+      "to": "rows"
+    },
+    {
+      "from": "rows",
+      "to": "write_triage",
+      "when": {
+        "path": "rows.count",
+        "gt": 0
+      }
+    },
+    {
+      "from": "rows",
+      "to": "END",
+      "default": true
+    },
+    {
+      "from": "write_triage",
+      "to": "notify"
+    }
+  ]
+}

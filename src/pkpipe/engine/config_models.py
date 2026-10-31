@@ -114,6 +114,14 @@ class Schedule(_Strict):
     cron: str
     flow: str
     enabled: bool = True
+    misfire_grace_s: int = Field(
+        default=21600,
+        gt=0,
+        description="A run missed while asleep still starts once if woken within this time",
+    )
+    timezone: str | None = Field(
+        default=None, description="IANA zone for the cron; default: the machine's zone"
+    )
 
     @field_validator("cron")
     @classmethod
@@ -244,8 +252,15 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
 
 
 def config_json_schemas() -> dict[str, dict[str, Any]]:
-    """JSON Schema (draft 2020-12) per config file stem, generated from the Pydantic models."""
-    return {name: model.model_json_schema() for name, model in CONFIG_MODELS.items()}
+    """JSON Schema (draft 2020-12) per config file stem, generated from the Pydantic models.
+
+    ``flow`` is the schema of one ``flows/<id>.json`` file.
+    """
+    from pkpipe.engine.flow_models import Flow
+
+    schemas = {name: model.model_json_schema() for name, model in CONFIG_MODELS.items()}
+    schemas["flow"] = Flow.model_json_schema(by_alias=True)
+    return schemas
 
 
 def validate_effective(data: dict[str, Any]) -> list[str]:
@@ -260,4 +275,15 @@ def validate_effective(data: dict[str, Any]) -> list[str]:
             for err in exc.errors():
                 loc = ".".join(str(p) for p in err["loc"])
                 errors.append(f"{name}.json: {loc}: {err['msg']}" if loc else f"{name}.json: {err['msg']}")
+    if "flows" in data:
+        from pkpipe.engine.flow_models import FlowsConfig
+
+        try:
+            FlowsConfig.model_validate(data["flows"])
+        except ValidationError as exc:
+            for err in exc.errors():
+                loc = list(err["loc"])
+                where = f"flows/{loc[0]}.json" if loc else "flows"
+                rest = ".".join(str(p) for p in loc[1:])
+                errors.append(f"{where}: {rest}: {err['msg']}" if rest else f"{where}: {err['msg']}")
     return errors

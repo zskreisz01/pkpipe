@@ -17,6 +17,16 @@ REPO = Path(__file__).resolve().parent.parent
 PACK = REPO / "packs" / "learning-inbox"
 
 
+def pytest_configure(config: pytest.Config) -> None:
+    """No test (nor a CLI subprocess it starts) may use the real app DB: the data dir is a temp dir."""
+    if not os.environ.get("PKPIPE_TEST_DATA_DIR"):
+        import tempfile
+
+        os.environ["PKPIPE_TEST_DATA_DIR"] = tempfile.mkdtemp(prefix="pkpipe-test-data-")
+    os.environ["PKPIPE_DATA_DIR"] = os.environ["PKPIPE_TEST_DATA_DIR"]
+    os.environ.pop("PKPIPE_DB", None)
+
+
 def pytest_runtest_setup(item: pytest.Item) -> None:
     """Skip (or, with PKPIPE_REQUIRE_LIVE=1, fail) live tests whose local service is unreachable."""
     marker = item.get_closest_marker("live")
