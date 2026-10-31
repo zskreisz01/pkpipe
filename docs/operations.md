@@ -17,6 +17,21 @@ title: Operations
 
 APScheduler with a SQLite job store; missed runs (machine asleep) run once on wake (`misfire_grace_time` + `coalesce`). One instance per flow; item parallelism is configurable (default 2, because the local model serves requests sequentially). LangGraph checkpoints make long waits resumable after a restart.
 
+`pkpipe.scheduler.FlowScheduler` keeps one job `flow:<flow>` per entry of `schedules.json` (`max_instances=1`, `coalesce=True`, `misfire_grace_time` = `misfire_grace_s`, default 6 h). Syncing is idempotent: an unchanged schedule keeps its stored next fire time, so a run missed while the app was stopped still runs once when it starts again within the grace time. Schedules for flows that do not exist yet are skipped with a warning.
+
+## Runs and the app DB
+
+The app DB is one SQLite file: `$PKPIPE_DB`, else `$PKPIPE_DATA_DIR/pkpipe.db`, else `~/.local/share/pkpipe/pkpipe.db`. It holds the run table, the config snapshots runs are pinned to, the LangGraph checkpoints and the scheduler jobs.
+
+| Command | Effect |
+| --- | --- |
+| `pkpipe run <flow> [--input JSON] [--trigger manual]` | Start a run now; exit 1 if it fails |
+| `pkpipe run --resume <run id>` | Continue a `running` or `waiting` run from its last checkpoint |
+| `pkpipe run --resume-all` | Continue every interrupted run (after a crash or reboot) |
+| `pkpipe runs [--status S] [--flow F] [--json]` | List run records |
+
+A resumed run uses the config version it started with, even if a newer one was published. See [Flows](flows.md) for the flow format.
+
 ## Release ladder
 
 ```mermaid

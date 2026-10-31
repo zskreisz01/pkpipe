@@ -1,7 +1,7 @@
 ---
 spec_id: 005-flow-engine
 title: Flow engine: compiler, step executors, run service, scheduler
-status: Draft
+status: Completed
 description: Compiles flow JSON into LangGraph StateGraphs, executes typed steps through ports, persists runs with a SQLite checkpointer, pins the config version per run and triggers flows from schedules.
 relevant_when:
   - LangGraph
@@ -12,14 +12,14 @@ relevant_when:
   - APScheduler
   - run service
 related: [002-model-port, 003-observability]
-updated: 2026-10-31
+updated: 2026-11-01
 ---
 
 # Feature Specification: Flow engine: compiler, step executors, run service, scheduler
 
 **Feature Branch**: `spec/005-flow-engine`
 **Created**: 2026-10-31
-**Status**: Draft
+**Status**: Completed
 **Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
 **Companions**: [research.md](research.md) · [data-model.md](data-model.md)
 
@@ -91,6 +91,22 @@ Flows run at configured times; missed runs execute once on wake.
 ### Session 2026-10-31
 
 - Q: Is this spec part of the public engine? → A: Yes; private categories, contexts and datasets stay in the overlay.
+
+### Session 2026-11-01 (implementation)
+
+- Q: What does a run pin? → A: A config snapshot: the effective JSON (flows included) and the text assets (prompts,
+  instructions, contexts, schemas). The config version hash covers both and the snapshot is stored in the app DB, so a
+  resume compiles from it, never from disk. Adapters (model profiles, tool servers) are built per snapshot.
+- Q: How does the core emit spans without importing OpenTelemetry (constitution II)? → A: New `TracerPort`; the
+  adapter `pkpipe.adapters.tracer_otel` maps it onto `pkpipe.telemetry`. `ClockPort` and `RunStorePort` were added the
+  same way, each with a fake in `tests/fakes/`.
+- Q: How is a wait resumable? → A: Each poll is one checkpointed step that re-enters itself; the absolute deadline and
+  poll count live in the checkpoint. Subflows run inside the calling node, so LangGraph nests their checkpoints and a
+  resumed run continues each item's subflow where it stopped.
+- Q: How do later specs add step types? → A: `@register_step` on a `StepExecutor` subclass with its own Pydantic
+  config, listed in `pkpipe.steps.BUILTIN_MODULES` or exposed under the `pkpipe.steps` entry point group.
+- Q: Who starts the scheduler? → A: `pkpipe.scheduler.FlowScheduler` is ready; `pkpipe serve` (spec 014) starts it.
+  Eval gates for the LLM steps come with the eval framework (spec 013).
 
 ## Out of Scope
 

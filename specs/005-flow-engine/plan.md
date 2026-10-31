@@ -32,7 +32,10 @@ Compiles flow JSON into LangGraph StateGraphs, executes typed steps through port
 
 ## Project Structure
 
-`src/pkpipe/engine/{compiler.py,runs.py,registry.py}`, `src/pkpipe/steps/*`, `src/pkpipe/scheduler/`, `packs/learning-inbox/flows/*.json`.
+`src/pkpipe/engine/{flow_models.py,expr.py,snapshot.py,compiler.py,runs.py,registry.py,runtime_defaults.py}`,
+`src/pkpipe/steps/{base.py,llm.py,tool.py,flow_control.py,triage_code.py}`, `src/pkpipe/scheduler/`,
+`src/pkpipe/adapters/{state_sqlite.py,tools_mcp.py,tracer_otel.py,notify_log.py}`, `src/pkpipe/app.py`,
+`packs/learning-inbox/flows/*.json`, ports `ClockPort`, `TracerPort`/`SpanPort`, `RunStorePort`.
 
 ## Complexity Tracking
 
