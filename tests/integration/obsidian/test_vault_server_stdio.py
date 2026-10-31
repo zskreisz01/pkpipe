@@ -203,6 +203,32 @@ def test_triage_and_processing_list_over_mcp(config, synthetic_vault):
     assert "Manual-Resource-Processing-List.md" in os.listdir(synthetic_vault / "0-INBOX")
 
 
+def test_agent_cannot_confirm_override_or_release_over_mcp(config, synthetic_vault):
+    """Constitution VI over MCP: owner fields and unconfirmed releases are refused, file untouched."""
+    triage = synthetic_vault / "0-INBOX/Inbox-Triage.md"
+
+    async def go():
+        async with stdio_client(config) as c:
+            err, res = await call(
+                c,
+                "update_triage",
+                rows=[{"resource": "https://example.invalid/x", "ai_suggested_category": "tool"}],
+            )
+            assert not err
+            iid = res["inserted"][0]
+            before = triage.read_text()
+            results = [
+                await call(c, "update_triage", rows=[{"item_id": iid, "confirm": True}]),
+                await call(c, "update_triage", rows=[{"item_id": iid, "override": "learning"}]),
+                await call(c, "update_triage", rows=[{"item_id": iid, "state": "released"}]),
+            ]
+            return before, results
+
+    before, results = run(go())
+    assert all(err for err, _ in results)
+    assert triage.read_text() == before
+
+
 def test_generic_tools_cannot_touch_managed_files_over_mcp(config, synthetic_vault):
     async def go():
         async with stdio_client(config) as c:

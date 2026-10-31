@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
+import unicodedata
+from pathlib import Path
 from typing import Any
 
 from . import lists
@@ -49,8 +52,6 @@ class Vault:
         self, path: str, body: str, front_matter: dict[str, Any] | None = None, overwrite: bool = False
     ) -> dict[str, Any]:
         target = self._writable(path, "write_note")
-        if is_conflict_name(target.name):
-            raise PathRejected("refusing to write a sync conflict file name")
 
         def transform(existing_text: str | None) -> str:
             if existing_text is not None and not overwrite:
@@ -75,22 +76,45 @@ class Vault:
     def move_note(self, src: str, dst: str) -> dict[str, Any]:
         source = self._writable(src, "move_note")
         dest = self._writable(dst, "move_note")
-        if is_conflict_name(dest.name):
-            raise PathRejected("refusing to write a sync conflict file name")
         if not source.is_file():
             raise NoteNotFound(f"note not found: {src}")
         dest.parent.mkdir(parents=True, exist_ok=True)
         with dir_lock(dest.parent):
-            if dest.exists():
-                raise NoteExists(f"destination exists: {dst}")
-            os.rename(source, dest)
+            # link + unlink instead of rename: link fails if the destination appeared meanwhile (for example
+            # created in Obsidian, which does not honour our lock), so a move can never overwrite a note.
+            try:
+                os.link(source, dest, follow_symlinks=False)
+            except FileExistsError:
+                raise NoteExists(f"destination exists: {dst}") from None
+            except OSError:  # file system without hard links: best effort under the lock
+                if dest.exists():
+                    raise NoteExists(f"destination exists: {dst}") from None
+                os.rename(source, dest)
+                return {"from": src, "to": dst}
+            os.unlink(source)
         return {"from": src, "to": dst}
 
-    def _writable(self, path: str, tool: str):
+    def _writable(self, path: str, tool: str) -> Path:
         target = self.policy.resolve(path, tool)
-        if self.policy.is_managed(path) or self.policy.rel(target) in self.policy.managed_files:
+        if is_conflict_name(target.name):
+            raise PathRejected("refusing to write a sync conflict file")
+        if self._is_managed(path, target):
             raise PathRejected("this file is maintained by the triage/processing-list tools")
         return target
+
+    def _is_managed(self, path: str, target: Path) -> bool:
+        """Managed-file check that also holds on case-insensitive / normalising file systems (macOS APFS)."""
+        if self.policy.is_managed(path):
+            return True
+        key = _fold(self.policy.rel(target))
+        for managed in self.policy.managed_files:
+            if key == _fold(managed):
+                return True
+            managed_path = self.policy.root / managed
+            with contextlib.suppress(OSError):
+                if target.exists() and managed_path.exists() and os.path.samefile(target, managed_path):
+                    return True
+        return False
 
     # -- lists -----------------------------------------------------------------------------------------------
 
@@ -105,6 +129,10 @@ class Vault:
     def upsert_processing_list(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         path = self.policy.resolve(self.policy.processing_list, "upsert_processing_list")
         return lists.upsert_processing_list(path, rows)
+
+
+def _fold(rel: str) -> str:
+    return unicodedata.normalize("NFC", rel).casefold()
 
 
 __all__ = ["Vault", "VaultError"]

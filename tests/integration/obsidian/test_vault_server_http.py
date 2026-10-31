@@ -36,6 +36,41 @@ def test_http_server_serves_tools_on_loopback_only(tmp_path, synthetic_vault):
                 assert s.connect_ex((lan, port)) != 0
 
 
+def test_http_server_rejects_dns_rebinding_and_cross_origin_requests(tmp_path, synthetic_vault):
+    """FR-004 hardening: a browser page cannot reach the vault via a rebound host name or a foreign Origin."""
+    import http.client
+    import json
+
+    cfg = write_policy(tmp_path, synthetic_vault)
+    port = free_port()
+    body = json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {"name": "probe", "version": "0"},
+            },
+        }
+    )
+    headers = {"Content-Type": "application/json", "Accept": "application/json, text/event-stream"}
+
+    def post(extra):
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        try:
+            conn.request("POST", "/mcp", body=body, headers={**headers, **extra})
+            return conn.getresponse().status
+        finally:
+            conn.close()
+
+    with http_server(cfg, port):
+        assert post({"Host": f"127.0.0.1:{port}"}) == 200
+        assert post({"Host": f"attacker.example:{port}"}) == 421
+        assert post({"Host": f"127.0.0.1:{port}", "Origin": "http://attacker.example"}) == 403
+
+
 def test_server_refuses_non_loopback_host(tmp_path, synthetic_vault):
     """FR-004: --host 0.0.0.0 (or any public address) aborts instead of listening."""
     cfg = write_policy(tmp_path, synthetic_vault)

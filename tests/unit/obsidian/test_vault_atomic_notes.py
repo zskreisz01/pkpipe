@@ -138,6 +138,77 @@ def test_managed_files_cannot_be_written_or_moved_generically(vault, synthetic_v
             vault.move_note("0-INBOX/example-tool.md", managed)
 
 
+@pytest.mark.parametrize(
+    "variant",
+    ["0-INBOX/inbox-triage.md", "0-INBOX/INBOX-TRIAGE.md", "0-INBOX/Inbox-triage.md"],
+)
+def test_managed_files_protected_against_case_variants(vault, synthetic_vault, variant):
+    """FR-002 on case-insensitive file systems (macOS APFS): a case variant of the triage file name must not
+    bypass the managed-file rule and overwrite the owner's triage decisions."""
+    triage = synthetic_vault / "0-INBOX/Inbox-Triage.md"
+    triage.write_text("| owner data |\n")
+    with pytest.raises(PathRejected):
+        vault.write_note(variant, "wiped", overwrite=True)
+    with pytest.raises(PathRejected):
+        vault.append_note(variant, "junk")
+    with pytest.raises(PathRejected):
+        vault.move_note("0-INBOX/example-tool.md", variant)
+    assert triage.read_text() == "| owner data |\n"
+    assert (synthetic_vault / "0-INBOX/example-tool.md").exists()
+
+
+def test_managed_file_reached_through_a_symlink_is_protected(vault, synthetic_vault):
+    triage = synthetic_vault / "0-INBOX/Inbox-Triage.md"
+    triage.write_text("| owner data |\n")
+    (synthetic_vault / "3-Resources/alias.md").symlink_to(triage)
+    with pytest.raises(PathRejected):
+        vault.write_note("3-Resources/alias.md", "wiped", overwrite=True)
+    assert triage.read_text() == "| owner data |\n"
+
+
+def test_move_never_overwrites_a_destination_that_appears_during_the_move(
+    vault, synthetic_vault, monkeypatch
+):
+    """A note created in Obsidian (which ignores our lock) right after the last check survives the move."""
+    import contextlib
+
+    from pkpipe.obsidian import vault as vault_mod
+
+    dest = synthetic_vault / "3-Resources/Tools/race.md"
+    real_lock, real_exists = vault_mod.dir_lock, type(dest).exists
+    held = {"on": False}
+
+    @contextlib.contextmanager
+    def lock(directory):
+        with real_lock(directory):
+            held["on"] = True
+            try:
+                yield
+            finally:
+                held["on"] = False
+
+    def racing_exists(self, *a, **k):
+        if held["on"] and self == dest and not real_exists(self):
+            self.write_text("created in Obsidian")  # appears right after this check reports "free"
+            return False
+        return real_exists(self, *a, **k)
+
+    def racing_link(src, dst, **k):
+        if held["on"] and not real_exists(dest):
+            dest.write_text("created in Obsidian")
+        return real_link(src, dst, **k)
+
+    real_link = os.link
+    monkeypatch.setattr(vault_mod, "dir_lock", lock)
+    monkeypatch.setattr(type(dest), "exists", racing_exists)
+    monkeypatch.setattr(os, "link", racing_link)
+    with pytest.raises(NoteExists):
+        vault.move_note("0-INBOX/example-tool.md", "3-Resources/Tools/race.md")
+    monkeypatch.undo()
+    assert dest.read_text() == "created in Obsidian"
+    assert (synthetic_vault / "0-INBOX/example-tool.md").exists()
+
+
 def test_list_folder_reports_conflicts_and_hides_dotfiles(vault, synthetic_vault):
     """Edge case: Obsidian Sync conflict copies are ignored and reported."""
     inbox = synthetic_vault / "0-INBOX"
@@ -152,9 +223,17 @@ def test_list_folder_reports_conflicts_and_hides_dotfiles(vault, synthetic_vault
         vault.list_folder("3-Resources/Missing")
 
 
-def test_cannot_write_conflict_named_files(vault):
+def test_cannot_write_conflict_named_files(vault, synthetic_vault):
+    """Edge case: conflict copies are ignored - never written, appended to or moved."""
+    conflict = synthetic_vault / "0-INBOX/example-tool (conflict).md"
+    conflict.write_text("sync copy")
     with pytest.raises(PathRejected):
         vault.write_note("0-INBOX/a (conflict).md", "x")
+    with pytest.raises(PathRejected):
+        vault.append_note("0-INBOX/example-tool (conflict).md", "x")
+    with pytest.raises(PathRejected):
+        vault.move_note("0-INBOX/example-tool (conflict).md", "3-Resources/x.md")
+    assert conflict.read_text() == "sync copy"
     with pytest.raises(PathRejected):
         vault.move_note("0-INBOX/example-tool.md", "0-INBOX/a (conflict).md")
 

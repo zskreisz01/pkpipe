@@ -7,6 +7,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from pkpipe.domain.triage import ItemState, check_transition
+
 from .atomic import update_text
 from .errors import InvalidRows
 from .models import ProcessingListRow, TriageRow, item_id_for
@@ -55,22 +57,52 @@ def read_triage(path: Path) -> dict[str, Any]:
     }
 
 
+OWNER_FIELDS = ("confirm", "override")
+
+
 def _normalise_triage_update(update: dict[str, Any], existing: dict[str, str] | None) -> TriageRow:
-    if existing is not None:
-        merged = TriageRow.from_cells(existing).model_dump()
-        merged.update({k: v for k, v in update.items() if k in TriageRow.model_fields})
-        return TriageRow(**merged)
+    """Merge ``update`` into the file's row and enforce the rules the pipeline may not bypass.
+
+    Constitution VI: ``confirm`` and ``override`` are the owner's decisions, made in Obsidian; the pipeline
+    may repeat their current value but never change it, and new rows always start ``suggested``.
+    Constitution V: state changes follow :data:`pkpipe.domain.triage.TRANSITIONS`, so ``released`` needs a
+    confirm tick or an override.
+    """
     data = {k: v for k, v in update.items() if k in TriageRow.model_fields}
-    if "item_id" not in data and data.get("resource"):
-        data["item_id"] = item_id_for(data["resource"])
-    return TriageRow(**data)
+    if existing is None:
+        if data.get("confirm") or (isinstance(data.get("override"), str) and data["override"].strip()):
+            raise ValueError("confirm and override are set by the owner, not by the pipeline")
+        if "state" in data and str(data["state"]).strip().lower() != ItemState.SUGGESTED.value:
+            raise ValueError("new triage rows start in state 'suggested'")
+        if not data.get("resource"):
+            raise ValueError("resource is required for a new row")
+        expected = item_id_for(data["resource"])
+        if "item_id" in data and str(data["item_id"]).strip() != expected:
+            raise ValueError("item_id of a new row must be the hash of its resource")
+        data["item_id"] = expected
+        return TriageRow(**data)
+    current = TriageRow.from_cells(existing)
+    candidate = TriageRow(**{**current.model_dump(), **data})
+    for field in OWNER_FIELDS:
+        if field in data and getattr(candidate, field) != getattr(current, field):
+            raise ValueError(f"{field} is set by the owner, not by the pipeline")
+    if "resource" in data and candidate.resource != current.resource:
+        raise ValueError("the resource of an existing row cannot change (the item id is its hash)")
+    reason = check_transition(
+        current.state, candidate.state, owner_decided=current.confirm or current.override is not None
+    )
+    if reason:
+        raise ValueError(reason)
+    return candidate
 
 
 def update_triage(path: Path, updates: list[dict[str, Any]]) -> dict[str, Any]:
     """Upsert rows by item id.
 
-    Provided fields overwrite, omitted fields keep the file's current value, so the owner's confirm/override
-    ticks survive agent updates. The whole batch is validated before anything is written.
+    Provided fields overwrite, omitted fields keep the file's current value. ``confirm`` and ``override``
+    can only be changed by the owner in the file, new rows start ``suggested`` with ``item_id`` = hash of the
+    resource, and state changes follow the domain transition rules. The whole batch is validated before
+    anything is written.
     """
     if not updates:
         raise InvalidRows("no rows given")
@@ -82,7 +114,7 @@ def update_triage(path: Path, updates: list[dict[str, Any]]) -> dict[str, Any]:
         errors: list[str] = []
         for i, update in enumerate(updates):
             if "item_id" not in update and update.get("resource"):
-                update = {**update, "item_id": item_id_for(update["resource"])}
+                update = {**update, "item_id": item_id_for(str(update["resource"]))}
             key = str(update.get("item_id", "")).strip()
             existing = table.get(key) if key else None
             try:

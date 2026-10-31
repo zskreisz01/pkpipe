@@ -67,6 +67,12 @@ def test_inbox_to_para_flow_through_the_entry_point(tmp_path, synthetic_vault):
                 rows=[{"item_id": i.id, "state": i.state.value} for i in released + pending],
             )
             assert not err
+            # the agent cannot shortcut the owner: no self-confirmation, no release of the unconfirmed item
+            waiting = pending[0]
+            err, msg = await call(c, "update_triage", rows=[{"item_id": waiting.id, "confirm": True}])
+            assert err and "owner" in msg
+            err, msg = await call(c, "update_triage", rows=[{"item_id": waiting.id, "state": "released"}])
+            assert err and "owner" in msg
 
             # 4. the released item becomes a curated note in PARA; the capture is archived beside it
             item = released[0]

@@ -106,7 +106,15 @@ def main(argv: list[str] | None = None) -> None:
     if args.transport == "stdio":
         server.run(transport="stdio", show_banner=False)
     else:
-        server.run(transport="http", host=host, port=args.port, show_banner=False)
+        # Strict Host/Origin validation: a web page in the owner's browser must not reach the vault through
+        # DNS rebinding or a cross-origin request; only loopback Host headers and non-browser clients pass.
+        server.run(
+            transport="http",
+            host=host,
+            port=args.port,
+            show_banner=False,
+            host_origin_protection=True,
+        )
 
 
 if __name__ == "__main__":

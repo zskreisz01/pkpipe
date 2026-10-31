@@ -128,10 +128,89 @@ def test_crlf_file_stays_crlf_after_update(tmp_path):
     p = tmp_path / "t.md"
     p.write_bytes(FIXTURES["03-crlf"].encode())
     lists.update_triage(
-        p, [{"item_id": "a1", "confirm": True}, {"resource": "n", "ai_suggested_category": "x"}]
+        p, [{"item_id": "a1", "state": "pending"}, {"resource": "n", "ai_suggested_category": "x"}]
     )
     data = p.read_bytes()
     assert b"\r\n" in data and b"\n" not in data.replace(b"\r\n", b"")
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"item_id": "a1", "confirm": True},  # ticking the owner's box
+        {"item_id": "b2", "confirm": False},  # un-ticking it
+        {"item_id": "a1", "override": "tool"},  # overriding for the owner
+        {"item_id": "c3", "override": ""},  # clearing the owner's override
+        {"resource": "https://e.invalid/n", "ai_suggested_category": "x", "confirm": True},
+        {"resource": "https://e.invalid/n", "ai_suggested_category": "x", "override": "tool"},
+    ],
+)
+def test_pipeline_cannot_set_owner_decisions(tmp_path, bad):
+    """Constitution VI / US2: confirm and override are owner decisions; the tool refuses to change them."""
+    p = tmp_path / "t.md"
+    p.write_text(FIXTURES["01-basic"])
+    before = p.read_text()
+    with pytest.raises(InvalidRows, match="owner"):
+        lists.update_triage(p, [bad])
+    assert p.read_text() == before
+
+
+def test_repeating_the_owner_values_is_allowed(tmp_path):
+    p = tmp_path / "t.md"
+    p.write_text(FIXTURES["01-basic"])
+    res = lists.update_triage(p, [{"item_id": "b2", "confirm": True, "override": None, "state": "released"}])
+    assert res["updated"] == ["b2"]
+
+
+@pytest.mark.parametrize(
+    ("item", "state", "reason"),
+    [
+        ("a1", "released", "owner confirms"),  # unconfirmed item cannot be released
+        ("c3", "processed", "not allowed"),  # pending -> processed skips the release
+    ],
+)
+def test_state_changes_follow_the_domain_rules(tmp_path, item, state, reason):
+    """Constitution V: code decides transitions; an agent cannot release an unconfirmed item."""
+    p = tmp_path / "t.md"
+    p.write_text(FIXTURES["01-basic"])
+    with pytest.raises(InvalidRows, match=reason):
+        lists.update_triage(p, [{"item_id": item, "state": state}])
+
+
+def test_terminal_and_quarantined_states_cannot_be_left(tmp_path):
+    """Constitution VI: leaving quarantine is the owner's call; processed is final."""
+    p = tmp_path / "t.md"
+    p.write_text(FIXTURES["01-basic"])
+    lists.update_triage(
+        p, [{"item_id": "b2", "state": "released"}, {"item_id": "c3", "state": "quarantined"}]
+    )
+    lists.update_triage(p, [{"item_id": "b2", "state": "processed"}])
+    for item, state in (("b2", "pending"), ("c3", "released"), ("c3", "pending")):
+        with pytest.raises(InvalidRows, match="not allowed"):
+            lists.update_triage(p, [{"item_id": item, "state": state}])
+
+
+def test_new_rows_start_suggested_with_hash_id(tmp_path):
+    """Constitution VI + edge case 'same resource twice -> one item': ids are the resource hash."""
+    p = tmp_path / "t.md"
+    for bad in (
+        {"resource": "r", "ai_suggested_category": "x", "state": "released"},
+        {"item_id": "custom", "resource": "r", "ai_suggested_category": "x"},
+    ):
+        with pytest.raises(InvalidRows):
+            lists.update_triage(p, [bad])
+    assert not p.exists()
+    lists.update_triage(p, [{"resource": " r ", "ai_suggested_category": "x"}])
+    res = lists.update_triage(p, [{"resource": "r", "ai_suggested_category": "x"}])
+    assert res["unchanged"] == [item_id_for("r")]
+    assert len(lists.read_triage(p)["rows"]) == 1
+
+
+def test_resource_of_existing_row_cannot_change(tmp_path):
+    p = tmp_path / "t.md"
+    p.write_text(FIXTURES["01-basic"])
+    with pytest.raises(InvalidRows, match="resource"):
+        lists.update_triage(p, [{"item_id": "a1", "resource": "https://e.invalid/other"}])
 
 
 def test_conflict_copies_of_triage_file_are_reported(tmp_path):
