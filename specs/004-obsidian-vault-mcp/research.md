@@ -1,7 +1,7 @@
 ---
 spec_id: 004-obsidian-vault-mcp
 title: obsidian-vault MCP server
-status: Draft
+status: Completed
 description: Technology options and decision for obsidian-vault mcp server.
 updated: 2026-10-31
 ---

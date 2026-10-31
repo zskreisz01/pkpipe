@@ -14,6 +14,33 @@ class ItemState(StrEnum):
     QUARANTINED = "quarantined"
 
 
+# Allowed state changes made by pipeline code (constitution V/VI). Leaving ``quarantined`` is an owner
+# decision and ``processed`` is final, so neither has an outgoing transition here. ``released`` additionally
+# requires the owner's confirm tick or override (see :func:`check_transition`).
+TRANSITIONS: dict[ItemState, frozenset[ItemState]] = {
+    ItemState.SUGGESTED: frozenset(
+        {ItemState.SUGGESTED, ItemState.PENDING, ItemState.RELEASED, ItemState.QUARANTINED}
+    ),
+    ItemState.PENDING: frozenset(
+        {ItemState.PENDING, ItemState.SUGGESTED, ItemState.RELEASED, ItemState.QUARANTINED}
+    ),
+    ItemState.RELEASED: frozenset(
+        {ItemState.RELEASED, ItemState.PENDING, ItemState.PROCESSED, ItemState.QUARANTINED}
+    ),
+    ItemState.PROCESSED: frozenset({ItemState.PROCESSED}),
+    ItemState.QUARANTINED: frozenset({ItemState.QUARANTINED}),
+}
+
+
+def check_transition(old: ItemState, new: ItemState, *, owner_decided: bool) -> str | None:
+    """Return why ``old -> new`` is not allowed for pipeline code, or ``None`` when it is."""
+    if new not in TRANSITIONS[old]:
+        return f"state change {old.value} -> {new.value} is not allowed"
+    if new is ItemState.RELEASED and old is not ItemState.RELEASED and not owner_decided:
+        return "an item is released only after the owner confirms or overrides it"
+    return None
+
+
 @dataclass
 class TriageItem:
     id: str
