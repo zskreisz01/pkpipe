@@ -1,8 +1,8 @@
 """Composition root: wires the core (run service, compiler, steps) to the real adapters.
 
 Used by the CLI (``pkpipe run``) and later by ``serve`` (API, app MCP, scheduler). The factory functions
-``make_model``, ``make_tools`` and ``make_notify`` are module attributes on purpose: they are the single
-place where an adapter is chosen, and the place an e2e test swaps in a fake.
+``make_model``, ``make_tools``, ``make_notify`` and ``make_classifier`` are module attributes on purpose:
+they are the single place where an adapter is chosen, and the place an e2e test swaps in a fake.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from pkpipe.engine.registry import load_effective
 from pkpipe.engine.runs import RunService
 from pkpipe.engine.runtime_defaults import SystemClock
 from pkpipe.engine.snapshot import ConfigSnapshot
-from pkpipe.ports import ModelPort, NotifyPort, ToolPort
+from pkpipe.ports import ClassifierPort, ModelPort, NotifyPort, ToolPort
 from pkpipe.steps import StepPorts
 
 DB_ENV = "PKPIPE_DB"
@@ -49,6 +49,19 @@ def make_notify(snapshot: ConfigSnapshot) -> NotifyPort:
     return ChannelNotifier(snapshot.data.get("channels"), snapshot.assets)
 
 
+_CLASSIFIERS: dict[tuple[str, int, str], ClassifierPort] = {}
+
+
+def make_classifier(snapshot: ConfigSnapshot) -> ClassifierPort:
+    """Prompt Guard 2 from ``security.prompt_guard`` (spec 008). Loaded lazily on the first scan and kept per
+    model directory, so a run does not reload the model; a missing model fails the scan closed."""
+    from pkpipe.adapters.classifier_promptguard import PromptGuardClassifier
+
+    clf = PromptGuardClassifier.from_config(snapshot.data.get("security"))
+    key = (str(clf.directory), clf.chunk_tokens, clf.model)
+    return _CLASSIFIERS.setdefault(key, clf)
+
+
 def ports_for(snapshot: ConfigSnapshot) -> StepPorts:
     """Adapters for one pinned config (model profiles and tool servers come from that version)."""
     return StepPorts(
@@ -57,6 +70,7 @@ def ports_for(snapshot: ConfigSnapshot) -> StepPorts:
         model=make_model(snapshot),
         tools=make_tools(snapshot),
         notify=make_notify(snapshot),
+        extra={"classifier": make_classifier(snapshot)},
     )
 
 

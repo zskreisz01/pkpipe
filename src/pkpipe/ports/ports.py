@@ -38,6 +38,21 @@ class ModelPort(Protocol):
     ) -> dict[str, Any]: ...
 
 
+class ClassifierUnavailable(Exception):
+    """The injection classifier (model files, runtime) is not usable; callers fail closed."""
+
+
+@runtime_checkable
+class ClassifierPort(Protocol):
+    """Prompt-injection / jailbreak classifier (Prompt Guard 2 in the reference deployment, spec 008 FR-004).
+
+    ``scan`` splits the text into model-sized chunks and returns ``{"model": str, "max_score": float,
+    "chunks": int, "scores": list[float]}`` with scores in [0, 1] (1 = malicious). Raises
+    :class:`ClassifierUnavailable` when the model cannot run."""
+
+    def scan(self, text: str) -> dict[str, Any]: ...
+
+
 @runtime_checkable
 class ToolPort(Protocol):
     def list_tools(self, allow: list[str]) -> list[str]: ...

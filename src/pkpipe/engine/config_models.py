@@ -227,7 +227,20 @@ class CategoriesConfig(RootModel[list[Category]]):
 class PromptGuard(_Strict):
     model: str
     threshold: float = Field(ge=0.0, le=1.0)
-    chunk_tokens: int = Field(gt=0)
+    chunk_tokens: int = Field(gt=0, le=512)
+    model_dir: str | None = Field(
+        default=None,
+        description="Local model directory (may be env:NAME); default $PKPIPE_PROMPT_GUARD_DIR or "
+        "~/tools/prompt-guard-2/<model name>",
+    )
+    required: bool = Field(
+        default=True,
+        description="Fail closed: without a usable classifier every secure fetch is flagged (spec 008)",
+    )
+
+
+class Heuristics(_Strict):
+    threshold: float = Field(default=1.0, gt=0.0, description="Heuristic score that raises a flag")
 
 
 class OutputGuard(_Strict):
@@ -247,6 +260,7 @@ class UrlFilter(_Strict):
 
 class SecurityConfig(_Strict):
     prompt_guard: PromptGuard
+    heuristics: Heuristics = Field(default_factory=Heuristics)
     output_guard: OutputGuard
     canary: Canary
     url_filter: UrlFilter

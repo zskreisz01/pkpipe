@@ -15,7 +15,7 @@ from typing import Any
 
 from pkpipe.engine.flow_models import Flow, FlowsConfig
 
-ASSET_DIRS = ("prompts", "instructions", "contexts", "schemas", "templates")
+ASSET_DIRS = ("prompts", "instructions", "contexts", "schemas", "templates", "security")
 ASSET_SUFFIXES = (".md", ".json", ".txt")
 
 

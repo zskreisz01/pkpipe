@@ -22,7 +22,7 @@
     "transport": "streamable_http",
     "url": "http://127.0.0.1:8704/mcp",
     "allow": [
-      "fetch_markdown"
+      "fetch_page"
     ]
   },
   "learning": {

@@ -1,0 +1,119 @@
+{
+  "id": "secure_fetch",
+  "description": "Reusable call activity: turn the item's URL (item.resource, or input.url for a direct run) into a validated JSON extract. URL filter, Lightpanda fetch with Chromium fallback (web-fetch MCP), sanitizing, heuristics and Prompt Guard 2, the Reader session without tools, and a verdict made by code. Sets item.fetch_status (clean, flagged, failed), item.extract when clean, and item.flagged with security_flags when any detector fires.",
+  "bpmn": "secure-fetch",
+  "start": "url_check",
+  "nodes": [
+    {
+      "id": "url_check",
+      "type": "code",
+      "bpmn_element": "URL check",
+      "config": {
+        "function": "secure_fetch.url_check"
+      }
+    },
+    {
+      "id": "fetch",
+      "type": "fetch",
+      "bpmn_element": "Fetch as Markdown",
+      "config": {
+        "url": "${url_check.url}",
+        "tool": "webfetch:fetch_page"
+      }
+    },
+    {
+      "id": "sanitize",
+      "type": "sanitize",
+      "bpmn_element": "Sanitize",
+      "config": {
+        "input": "fetch",
+        "max_chars": 24000
+      }
+    },
+    {
+      "id": "scan",
+      "type": "code",
+      "bpmn_element": "Prompt Guard 2 scan",
+      "config": {
+        "function": "secure_fetch.scan",
+        "args": {
+          "input": "sanitize"
+        }
+      }
+    },
+    {
+      "id": "read",
+      "type": "reader",
+      "bpmn_element": "Reader session",
+      "inputs": [
+        "sanitize.title",
+        "sanitize.text"
+      ],
+      "config": {
+        "system": "reader",
+        "instruction": "secure_fetch/read.md",
+        "output_schema": "reader_extract"
+      }
+    },
+    {
+      "id": "verdict",
+      "type": "code",
+      "bpmn_element": "Evaluate verdict",
+      "config": {
+        "function": "secure_fetch.verdict"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "url_check",
+      "to": "fetch",
+      "when": {
+        "path": "url_check.allowed",
+        "truthy": true
+      }
+    },
+    {
+      "from": "url_check",
+      "to": "verdict",
+      "default": true
+    },
+    {
+      "from": "fetch",
+      "to": "sanitize",
+      "when": {
+        "path": "fetch.status",
+        "eq": "ok"
+      }
+    },
+    {
+      "from": "fetch",
+      "to": "verdict",
+      "default": true
+    },
+    {
+      "from": "sanitize",
+      "to": "scan"
+    },
+    {
+      "from": "scan",
+      "to": "read",
+      "when": {
+        "path": "sanitize.kind",
+        "in": [
+          "html",
+          "text"
+        ]
+      }
+    },
+    {
+      "from": "scan",
+      "to": "verdict",
+      "default": true
+    },
+    {
+      "from": "read",
+      "to": "verdict"
+    }
+  ]
+}

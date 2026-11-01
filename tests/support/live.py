@@ -82,11 +82,31 @@ def _lightpanda() -> str | None:
     )
 
 
+@cache
+def _chromium() -> str | None:
+    """Playwright with its Chromium build installed (``uv run playwright install chromium``)."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return "playwright not installed"
+    try:
+        with sync_playwright() as pw:
+            path = pw.chromium.executable_path
+    except Exception as exc:  # noqa: BLE001 - any failure means not usable
+        return f"playwright chromium unusable: {exc}"
+    return (
+        None
+        if path and os.path.exists(path)
+        else "chromium not installed (uv run playwright install chromium)"
+    )
+
+
 PROBES: dict[str, Callable[[], str | None]] = {
     "lmstudio": _lmstudio,
     "judge": _judge,
     "docker": _docker,
     "lightpanda": _lightpanda,
+    "chromium": _chromium,
 }
 
 

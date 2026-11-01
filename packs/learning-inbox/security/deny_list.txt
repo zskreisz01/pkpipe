@@ -1,0 +1,5 @@
+# Deny-list of the URL filter (spec 008 FR-001): one domain per line; subdomains are denied too.
+# The public pack lists only reserved example names; the private overlay adds real domains, and the
+# security-flag handler (spec 009) appends the domain of every quarantined URL in the overlay.
+denied.example
+malicious.example.net

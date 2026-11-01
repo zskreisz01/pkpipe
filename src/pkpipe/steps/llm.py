@@ -26,6 +26,10 @@ from pkpipe.steps.base import (
 )
 from pkpipe.steps.tool import call_tool, check_tool_allowed
 
+#: Step types that are one LLM session with an ``LlmConfig`` (every one needs an eval dataset, spec 013);
+#: ``reader`` is the secure-fetch Reader (spec 008).
+LLM_STEP_TYPES = ("llm", "llm_tools", "reader")
+
 
 class LlmConfig(StepConfig):
     system: str = Field(description="System prompt name: prompts/system/<system>.md")
