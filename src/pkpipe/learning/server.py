@@ -20,6 +20,7 @@ from fastmcp.exceptions import ToolError
 from .config import GatewaySettings
 from .errors import LearningError
 from .gateway import LearningGateway, LearningMetrics
+from .urlcheck import parse_deny_list
 
 DEFAULT_PORT = 8703
 _ITEM_ID = re.compile(r"[A-Za-z0-9_-]{0,64}")
@@ -71,6 +72,23 @@ def _check_loopback(host: str) -> str:
     return host
 
 
+def deny_list_loader(cfg, deny_file: str):
+    """The deny-list file as it is now (overlay first, then pack): the security-flag handler of spec 009
+    adds domains to the overlay copy while the gateway runs, and they apply from the next request on. An
+    unreadable file keeps the list read at startup (``GatewayConfig.deny``)."""
+
+    def load() -> list[str]:
+        found = cfg.find_file(deny_file)
+        if found is None:
+            return []
+        try:
+            return sorted(parse_deny_list(found.read_text(encoding="utf-8")))
+        except OSError:
+            return []
+
+    return load
+
+
 def gateway_from_config(
     pack: Path | None, overlay: Path | None, environ=None, *, metrics: LearningMetrics | None = None
 ) -> LearningGateway:
@@ -81,9 +99,10 @@ def gateway_from_config(
         deny_file = ((cfg.data.get("security") or {}).get("url_filter") or {}).get("deny_list")
         found = cfg.find_file(deny_file) if deny_file else None
         deny_text = found.read_text(encoding="utf-8") if found else None
-        return GatewaySettings.from_config(cfg.data, deny_text=deny_text, environ=environ).build(
-            metrics=metrics
-        )
+        settings = GatewaySettings.from_config(cfg.data, deny_text=deny_text, environ=environ)
+        if deny_file:
+            settings.deny_loader = deny_list_loader(cfg, deny_file)
+        return settings.build(metrics=metrics)
     except (ConfigError, LearningError, OSError) as exc:
         raise SystemExit(f"invalid configuration: {exc}") from None
 

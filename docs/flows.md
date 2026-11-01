@@ -76,7 +76,7 @@ An overlay can change one node of a pack flow by id (`{"nodes": [{"id": "notify"
 | `subflow` | Runs another flow for the current item; its checkpoints nest under the run | `flow` (id or `${item.subflow}`) |
 | `wait` | Polls a status tool until a condition holds; each poll is a checkpoint, the deadline is absolute | `tool`, `arguments`, `until`, `poll_s`, `deadline_s` |
 | `guard` | Flags from regular expressions and classifier scores (code decides); sets `item.flagged` | `input`, `patterns`, `checks` |
-| `output_guard` | Output guard (spec 009): the run's canary, active markup, heuristics and the classifier of `security.classifier` on the listed outputs; flags `canary_leak`, `injection_or_jailbreak`, `malicious_content`; sets `item.flagged`, `item.security_flags`; output holds codes and scores only | `input` (list of refs), `canary` |
+| `output_guard` | Output guard (spec 009): the run's canary, active markup, heuristics and the classifier of `security.classifier` on the listed outputs; flags `canary_leak`, `injection_or_jailbreak`, `malicious_content`; sets `item.flagged`, `item.security_flags`; output holds codes and scores only. Validation: its first conditional edge must be `<id>.flagged` truthy (to `handle_security_flag`), no plain or error edges | `input` (list of refs), `canary` |
 | `fetch` | Secure fetch (spec 008): URL filter again, then one `webfetch:fetch_page` call; `status` `ok`, `blocked` (flag) or `failed`. Raw output | `url`, `tool`, `max_bytes` |
 | `sanitize` | Visible text of a fetched page; metadata only for PDF, video, image. Raw output | `input`, `max_chars` |
 | `reader` | The Reader: an `llm` session without tools and context pack, with a per-run canary; output plus `canary_leaked` | as `llm` (`output_schema` required) |

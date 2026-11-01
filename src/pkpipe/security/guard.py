@@ -14,7 +14,7 @@ flag                        detector
                             (``security.classifier.threshold``), a ``Jailbreak`` category of the safety
                             classifier, or no usable classifier while ``security.classifier.required``
 ``malicious_content``       a safety label in ``security.output_guard.block_on`` (default ``Unsafe``) with a
-                            harm category (Violent, PII, ...)
+                            harm category (Violent, PII, ...) or with no category at all (fail closed)
 ==========================  =================================================================================
 
 Models only report scores, labels and categories; this module decides (constitution V). Only flag names,
@@ -123,6 +123,16 @@ def classifier_flags(
                     flag="malicious_content",
                     detector=model,
                     reason_code="category:" + ",".join(sorted(harm)),
+                    score=score,
+                )
+            )
+        elif label in block and JAILBREAK not in categories:
+            # a blocking label without a known category (the model named none): fail closed
+            flags.append(
+                GuardFlag(
+                    flag="malicious_content",
+                    detector=model,
+                    reason_code=f"label:{label}",
                     score=score,
                 )
             )

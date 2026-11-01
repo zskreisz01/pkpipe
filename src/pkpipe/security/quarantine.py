@@ -97,6 +97,24 @@ def wrap_inert(text: str) -> str:
     return f"{fence}text\n{body}{fence}\n"
 
 
+def text_format(text: str) -> dict[str, bool]:
+    """How to restore ``text`` byte for byte after :func:`wrap_inert` (which works on ``\\n`` lines and ends
+    the block's text with a newline): whether it used CRLF line ends and whether it ended with a newline."""
+    return {"crlf": "\r\n" in text, "final_newline": text.endswith("\n")}
+
+
+def restore_format(text: str, fmt: Any) -> str:
+    """Undo the normalisation of :func:`wrap_inert` with the :func:`text_format` stored in the quarantine
+    note (no record: the text as it is)."""
+    if not isinstance(fmt, dict):
+        return text
+    if fmt.get("final_newline") is False and text.endswith("\n"):
+        text = text[:-1]
+    if fmt.get("crlf"):
+        text = text.replace("\n", "\r\n")
+    return text
+
+
 def unwrap_inert(block: str) -> str | None:
     """The original text of a block made by :func:`wrap_inert` (None when ``block`` has no such block)."""
     m = re.search(r"^(`{3,})text\n(.*?)^\1\s*$", block, flags=re.DOTALL | re.MULTILINE)

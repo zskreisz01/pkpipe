@@ -241,7 +241,8 @@ class Vault:
             source = self.policy.resolve(path, "quarantine_note")
             if self.policy.in_quarantine(source) or self._is_managed(path, source):
                 raise PathRejected("this note cannot be quarantined")
-        original = source.read_text(encoding="utf-8") if source is not None and source.is_file() else None
+        raw = source.read_bytes().decode("utf-8") if source is not None and source.is_file() else None
+        original = raw.replace("\r\n", "\n") if raw is not None else None
         if original is None and target.is_file():
             return {"path": self.policy.rel(target), "original_path": path, "moved": False}
         front = quarantine.quarantine_front_matter(
@@ -251,6 +252,8 @@ class Vault:
             run_id=str(run_id)[:64],
             flagged_at=str(flagged_at)[:40],
         )
+        if raw is not None:
+            front["original_format"] = quarantine.text_format(raw)  # for the exact restore
         text = dump_front_matter(front) + quarantine.quarantine_body(item_id, original)
         target.parent.mkdir(parents=True, exist_ok=True)
         update_text(target, lambda _existing: text)
@@ -277,6 +280,7 @@ class Vault:
             raise PathRejected("invalid original path in the quarantine note")
         if dest.exists():
             raise NoteExists(f"cannot restore: {original_path} exists again; move it away first")
+        text = quarantine.restore_format(text, note.front_matter.get("original_format"))
         if not dry_run:
             update_text(dest, lambda _existing: text)
             target.unlink()

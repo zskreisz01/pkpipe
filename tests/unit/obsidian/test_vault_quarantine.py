@@ -110,3 +110,29 @@ def test_release_of_an_item_that_is_not_quarantined_is_refused(vault):
     vault.update_triage([{"resource": "0-INBOX/example-tool.md", "ai_suggested_category": "tool"}])
     with pytest.raises(VaultError):
         vault.owner_release_quarantine(item_id_for("0-INBOX/example-tool.md"))
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"no final newline",
+        b"windows\r\nline ends\r\n",
+        b"windows without final newline\r\nend",
+        b"",
+        b"trailing blank lines\n\n\n",
+        b"```text\nlooks like the wrapper\n```",
+    ],
+)
+def test_release_restores_the_note_byte_for_byte(synthetic_vault, raw):
+    """US3 "restore the note exactly": the inert wrapper works on LF lines and ends with a newline, so the
+    quarantine note records the original line ends and final newline (regression: a note without a final
+    newline or with CRLF line ends came back changed)."""
+    (synthetic_vault / "0-INBOX" / "raw.md").write_bytes(raw)
+    vault = Vault(VaultPolicy(vault_dir=synthetic_vault))
+    item = item_id_for("0-INBOX/raw.md")
+    vault.update_triage(
+        [{"resource": "0-INBOX/raw.md", "ai_suggested_category": "none", "state": "quarantined"}]
+    )
+    vault.quarantine_note(item, "0-INBOX/raw.md", FLAGS, run_id="r")
+    vault.owner_release_quarantine(item)
+    assert (synthetic_vault / "0-INBOX" / "raw.md").read_bytes() == raw

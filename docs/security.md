@@ -43,13 +43,13 @@ The verdict (`secure_fetch.verdict`) is code: any of `url_filter`, `heuristic`, 
 
 ## Output guard
 
-Runs on every session output that originates from external content, before anything is written to the vault (step type `output_guard`, spec 009). A note with an injected instruction would otherwise attack every agent that reads the vault later (stored injection). A session over external content is marked `canary: true`: the run's canary goes into its system prompt and `pkpipe validate` refuses a flow in which any path after it does not pass an `output_guard` that checks it. In the public pack these are the triage session (`categorize_item.suggest`, before the triage file is written) and the summary of other resources (`other_resource.summarize`, before the PARA note is written). The learning branch writes no derived text (notebook id, link and audio path only), so it has no output to guard.
+Runs on every session output that originates from external content, before anything is written to the vault (step type `output_guard`, spec 009). A note with an injected instruction would otherwise attack every agent that reads the vault later (stored injection). A session over external content is marked `canary: true`: the run's canary goes into its system prompt and `pkpipe validate` refuses a flow in which any path after it does not pass an `output_guard` that checks it, and an `output_guard` must route on its decision: its first conditional edge is `<guard>.flagged` (truthy) to the security branch, with no plain edge (taken even after a flag) and no error edge (a failed check stops the item). In the public pack these are the triage session (`categorize_item.suggest`, before the triage file is written) and the summary of other resources (`other_resource.summarize`, before the PARA note is written). The learning branch writes no derived text (notebook id, link and audio path only), so it has no output to guard.
 
 | Flag | Detector (decided in code) |
 | --- | --- |
 | `canary_leak` | The run's canary or its hex part anywhere in the output: deterministic string match, independent of every model |
 | `injection_or_jailbreak` | Active markup (`<script>`, `<iframe>`, `javascript:`, event handlers), heuristics, the DeBERTa injection score ≥ `classifier.threshold`, a Qwen3Guard `Jailbreak` category, or no usable classifier while `classifier.required` (fail closed) |
-| `malicious_content` | A Qwen3Guard label in `output_guard.block_on` (default `Unsafe`) with a harm category (Violent, PII, Non-violent Illegal Acts, ...) |
+| `malicious_content` | A Qwen3Guard label in `output_guard.block_on` (default `Unsafe`) with a harm category (Violent, PII, Non-violent Illegal Acts, ...), or with no category at all (fail closed) |
 
 The step's output holds flag names, detectors, reason codes and scores, never the checked text. Regression: the spec 008 review once saw the triage session leak its canary on the injection set; the guard now stops such a reply before the triage file is written (`canary_leaks_unguarded` = 0 is a gate, and a flow eval case covers it).
 
@@ -58,10 +58,10 @@ The step's output holds flag names, detectors, reason codes and scores, never th
 The flow calls [Handle Security Flag](process/handle-security-flag.md) for the item:
 
 1. The item stops and becomes `quarantined`; the other items of the run continue (error end event per item). At triage the row is written as `quarantined` with the suggested category `none`.
-2. One row per flag is appended to `security/malicious_urls.jsonl` (url, domain, flag, detector, score, evidence = reason code, item id, run id, timestamp) and the domain goes on the deny-list once (`# pkpipe: flagged N, last <day>` on repeats), in the overlay so every process's URL filter applies it.
+2. One row per flag is appended to `security/malicious_urls.jsonl` (url, domain, flag, detector, score, evidence = reason code, item id, run id, timestamp) and the domain goes on the deny-list once (`# pkpipe: flagged N, last <day>` on repeats), in the overlay so every process's URL filter applies it: the web-fetch server and the learning gateway read the deny-list file again on every request, and the in-process checks (secure fetch, `learning.prepare`) merge the handler's entries.
 3. The note moves to `0-INBOX/_quarantine/` in inert form: verbatim inside a fenced code block, `security_flag` front matter with flag codes only. Only the vault tool `quarantine_note` writes there; `write_note`, `append_note` and `move_note` refuse the folder.
 4. An alert goes to the configured channel and a `security.flag` event to the trace.
-5. A false positive is released by the owner (UI triage page or app MCP `release_quarantine`, owner token, audited): the note is restored exactly, the row is `pending` again and the text becomes a candidate case of the security eval dataset (`<overlay>/evals/candidates/security.jsonl`). Domains are never unblocked automatically.
+5. A false positive is released by the owner (UI triage page or app MCP `release_quarantine`, owner token, audited): the note is restored exactly (byte for byte: the quarantine note records the original line ends and final newline), the row is `pending` again and the text becomes a candidate case of the security eval dataset (`<overlay>/evals/candidates/security.jsonl`). Domains are never unblocked automatically.
 
 ## Private data
 

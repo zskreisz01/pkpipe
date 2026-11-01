@@ -189,3 +189,64 @@ def test_a_guard_that_checks_another_node_does_not_count():
     one = json.loads(json.dumps(ONE))
     one["nodes"][1]["config"]["input"] = ["item"]
     assert any("output_guard that checks it" in e for e in _errors(one))
+
+
+@pytest.mark.parametrize(
+    ("guard_edges", "message"),
+    [
+        # the guard's decision is ignored: a plain edge always runs the write
+        ([{"from": "guard", "to": "write"}], "plain edge"),
+        # the flag edge exists but a plain edge runs the write as well
+        (
+            [
+                {"from": "guard", "to": "quarantine", "when": {"path": "guard.flagged", "truthy": True}},
+                {"from": "guard", "to": "write"},
+            ],
+            "plain edge",
+        ),
+        # another condition is checked first (first match wins), so a flagged output can reach the write
+        (
+            [
+                {"from": "guard", "to": "write", "when": {"path": "item.id", "exists": True}},
+                {"from": "guard", "to": "quarantine", "when": {"path": "guard.flagged", "truthy": True}},
+            ],
+            "first conditional edge",
+        ),
+        # the security branch hangs on something else than the decision
+        (
+            [
+                {"from": "guard", "to": "quarantine", "when": {"path": "guard.scores.heuristic", "gt": 0.9}},
+                {"from": "guard", "to": "write", "default": True},
+            ],
+            "first conditional edge",
+        ),
+        # a failed check continues to the write
+        (
+            [*ONE["edges"][1:], {"from": "guard", "to": "write", "on": "error"}],
+            "error edge",
+        ),
+    ],
+)
+def test_an_output_guard_must_route_a_flag_to_the_security_branch(guard_edges, message):
+    """FR-001/SC-001 as validation: no flow can write a flagged output because of its wiring."""
+    one = json.loads(json.dumps(ONE))
+    one["edges"] = [ONE["edges"][0], *guard_edges]
+    errors = _errors(one)
+    assert any("output_guard 'guard'" in e and message in e for e in errors), errors
+
+
+def test_regression_a_guard_that_ignores_its_decision_writes_a_flagged_output(monkeypatch):
+    """Why the routing rule exists: without it, a plain edge writes the flagged hijack output."""
+    import pkpipe.steps.output_guard as og
+
+    monkeypatch.setattr(og, "guard_routing_errors", lambda flow, node: [])
+    one = json.loads(json.dumps(ONE))
+    one["edges"] = [ONE["edges"][0], {"from": "guard", "to": "write"}]
+    snap = make_snapshot(guarded_flow(), one, assets=ASSETS_009, security=SECURITY)
+    tools = FakeTools({"t:done": lambda body, item: {"ok": True}})
+    ports = make_ports(model=FakeModel(_reply), tools=tools, classifier=FakeClassifier())
+    outcome = make_service(snap, ports).start(
+        "guarded", inputs={"items": [{"id": "hijack", "body": "HIJACK"}]}
+    )
+    assert outcome.ok, outcome.error
+    assert [a["item"] for n, a in tools.calls if n == "t:done"] == ["hijack"]

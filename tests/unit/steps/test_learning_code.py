@@ -13,7 +13,7 @@ INSTRUCTION = "learning-material/notebook.md"
 ASSETS = {f"instructions/{INSTRUCTION}": "  Ten minute overview in English.\n"}
 
 
-def ctx(block_private=True, assets=ASSETS):
+def ctx(block_private=True, assets=ASSETS, **ports):
     snap = make_snapshot(
         assets=assets, security={"url_filter": {"block_private_networks": block_private, "max_bytes": 1}}
     )
@@ -23,7 +23,7 @@ def ctx(block_private=True, assets=ASSETS):
         node=None,
         run=RunInfo("r", "f", "manual", snap.version),
         snapshot=snap,
-        ports=make_ports(tracer=tracer),
+        ports=make_ports(tracer=tracer, **ports),
         item=None,
         inputs={},
         resolver=lambda ref: None,
@@ -144,3 +144,18 @@ def test_any_other_create_error_fails_again_so_the_item_is_retried(error):
     with pytest.raises(StepError, match="learning service"):
         CODE["learning.create_failed"](c, error=error)
     assert tracer.flags == []
+
+
+def test_prepare_refuses_a_domain_the_security_flag_handler_deny_listed():
+    """Spec 009 US2: a domain deny-listed by an earlier flag is blocked by the in-process first check too
+    (regression: prepare checked only scheme and private addresses and left the deny-list to the gateway)."""
+    from tests.fakes import FakeSecurityLog
+
+    c, tracer = ctx(security_log=FakeSecurityLog("flagged.example  # pkpipe: flagged 1, last 2026-11-01\n"))
+    out = CODE["learning.prepare"](
+        c,
+        note={"front_matter": {"source": "https://www.flagged.example/talk"}, "body": ""},
+        instruction=INSTRUCTION,
+    )
+    assert out.output["status"] == "blocked" and out.output["reason"] == "deny_list"
+    assert out.item["flagged"] is True

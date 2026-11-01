@@ -11,7 +11,9 @@ and scores only, never the checked text.
 
 Validation (:func:`pkpipe.steps.llm.guarded_session_errors`): a session with ``canary: true`` (the marker of
 a session over external content) may only be followed by an ``output_guard`` that checks it, so no flow can
-write such an output unchecked.
+write such an output unchecked. The guard itself must route on its decision (:func:`guard_routing_errors`):
+its first conditional edge is ``<guard>.flagged`` truthy, and it has no plain edge (always taken, so it would
+run a write even after a flag) and no error edge (a failed check must stop the item, never continue it).
 """
 
 from __future__ import annotations
@@ -39,10 +41,42 @@ class OutputGuardConfig(StepConfig):
         return [v] if isinstance(v, str) else v
 
 
+#: The flow that handles a flag (log, deny-list, quarantine, alert; spec 009 US2).
+SECURITY_FLAG_FLOW = "handle_security_flag"
+
+
+def _is_flag_condition(cond: Any, node_id: str) -> bool:
+    return cond is not None and cond.path in (f"{node_id}.flagged", "item.flagged") and cond.truthy is True
+
+
+def guard_routing_errors(flow, node) -> list[str]:
+    """Spec 009 FR-001/FR-003 as a validation rule: a flagged output can only take the security branch."""
+    edges = flow.edges_from(node.id)
+    where = f"output_guard '{node.id}'"
+    errors = []
+    if any(e.on == "error" for e in edges):
+        errors.append(f"{where} must not have an error edge: a failed check stops the item (spec 009)")
+    success = [e for e in edges if e.on != "error"]
+    if any(e.when is None and not e.default for e in success):
+        errors.append(
+            f"{where} must route only by its decision: a plain edge is taken even after a flag (spec 009)"
+        )
+    conditional = [e for e in success if e.when is not None]
+    if not conditional or not _is_flag_condition(conditional[0].when, node.id):
+        errors.append(
+            f"{where} needs its first conditional edge on '{node.id}.flagged' (truthy: true) to the security "
+            f"branch ({SECURITY_FLAG_FLOW}), so a flagged output is never written (spec 009 FR-001)"
+        )
+    return errors
+
+
 @register_step
 class OutputGuardStep(StepExecutor):
     type = "output_guard"
     Config = OutputGuardConfig
+
+    def check_flow(self, flow, node, config):
+        return guard_routing_errors(flow, node)
 
     def run(self, node, config: OutputGuardConfig, ctx: StepContext) -> StepResult:
         values = {}

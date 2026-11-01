@@ -37,13 +37,12 @@ def prepare(ctx: StepContext, note: dict[str, Any], instruction: str) -> StepRes
     url = find_source_url((note or {}).get("front_matter"), (note or {}).get("body", ""))
     if url is None:
         return StepResult(output={"status": "no_url", "reason": "no_url", "url": "", "template": ""})
-    block = bool(
-        ((ctx.snapshot.data.get("security") or {}).get("url_filter") or {}).get(
-            "block_private_networks", True
-        )
-    )
+    from pkpipe.steps.secure_fetch import url_policy
+
+    # the deny-list of the config plus the domains the security-flag handler deny-listed (spec 009)
+    policy = url_policy(ctx)
     try:
-        url = check_url(url, block_private_networks=block)
+        url = check_url(url, block_private_networks=policy.block_private_networks, deny=policy.deny)
     except UrlRejected as exc:
         reason = str(exc)
         ctx.ports.tracer.security_flag("url_filter", action="flag", reason_code=reason)

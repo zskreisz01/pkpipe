@@ -103,6 +103,13 @@ def test_safety_moderator_rules():
     assert [f.reason_code for f in classifier_flags(res, threshold=0.5, block_on=["Unsafe"])] == [
         "classifier_unparsed"
     ]
+    # a blocking label without any category still blocks (fail closed); Safe without one does not
+    res = {"model": q, "max_score": 0.9, "label": "Unsafe", "categories": []}
+    assert [(f.flag, f.reason_code) for f in classifier_flags(res, threshold=0.5, block_on=["Unsafe"])] == [
+        ("malicious_content", "label:Unsafe")
+    ]
+    res = {"model": q, "max_score": 0.01, "label": "Safe", "categories": []}
+    assert classifier_flags(res, threshold=0.5, block_on=["Unsafe"]) == []
 
 
 def test_combined_members_are_judged_one_by_one():
