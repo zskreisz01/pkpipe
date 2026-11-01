@@ -43,6 +43,14 @@ CORE_DEFAULTS: dict[str, Any] = {
     },
     "channels": {"channels": {}, "routes": {}},
     "telemetry": {"capture_content": {"flows": []}},
+    # Code-only levels are all-or-nothing (docs/evaluation.md); LLM gates come from the pack.
+    "evals": {
+        "judge_profile": "judge",
+        "suites": {
+            "deterministic": {"gate": {"pass_rate": {"min": 1.0}}},
+            "flows": {"gate": {"pass_rate": {"min": 1.0}}},
+        },
+    },
 }
 
 
@@ -257,6 +265,7 @@ def check_references(cfg: EffectiveConfig) -> tuple[list[str], list[str]]:
                     errors.append(f"{where}: tool '{tool}' references unregistered MCP server '{server}'")
                 elif name not in servers[server].get("allow", []):
                     errors.append(f"{where}: tool '{tool}' is not in the allow list of '{server}'")
+    errors += _check_judge_profile(cfg.data)
     deny = cfg.data.get("security", {}).get("url_filter", {}).get("deny_list")
     if deny and cfg.find_file(deny) is None:
         warnings.append(f"security.url_filter.deny_list '{deny}' not found")
@@ -266,6 +275,24 @@ def check_references(cfg: EffectiveConfig) -> tuple[list[str], list[str]]:
     errors += flow_errors
     warnings += flow_warnings
     return errors, warnings
+
+
+def _check_judge_profile(data: dict[str, Any]) -> list[str]:
+    """Spec 013 FR-002: the judge profile exists and is never a profile that an LLM step runs on."""
+    judge = (data.get("evals") or {}).get("judge_profile")
+    profiles = data.get("models") or {}
+    if not judge or not profiles:
+        return []
+    if judge not in profiles:
+        return [f"evals.json: judge_profile '{judge}' is not a models.json profile"]
+    used = set()
+    for flow in (data.get("flows") or {}).values():
+        for node in flow.get("nodes", []):
+            if node.get("type") in ("llm", "llm_tools"):
+                used.add((node.get("config") or {}).get("profile", "default"))
+    if judge in used:
+        return [f"evals.json: judge_profile '{judge}' is also used by an LLM step; the judge must differ"]
+    return []
 
 
 def load_effective(
