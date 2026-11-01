@@ -5,6 +5,7 @@ Datasets, rubrics and recorded model responses for `pkpipe eval` (spec 013, [doc
 | Path | Content |
 | --- | --- |
 | `datasets/triage.jsonl` | Triage cases: URL, title, owner's note -> expected category |
+| `datasets/improvement_extract.jsonl` | Journal section -> expected improvement statements (spec 015) |
 | `datasets/sessions/<flow>/<node>.jsonl` | Session cases: node inputs -> `must_include` / `must_not` / `max_words` |
 | `datasets/calibration/<rubric>.jsonl` | Outputs with the owner's 1-5 score, for judge calibration |
 | `datasets/flows/*.json` | Flow cases: initial vault, scripted responses, owner decisions -> expected end state |
@@ -20,5 +21,5 @@ production monitoring. Everything here is synthetic; real datasets live in the p
 Re-record after changing a prompt, instruction, schema, model profile or dataset:
 
 ```bash
-uv run pkpipe eval --suite triage,sessions,calibration,security --cassette record --workers 4
+uv run pkpipe eval --suite triage,sessions,calibration,improvement,security --cassette record --workers 4
 ```

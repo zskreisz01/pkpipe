@@ -68,6 +68,25 @@
           "max": 0.2
         }
       }
+    },
+    "improvement": {
+      "gate": {
+        "precision": {
+          "min": 0.9
+        },
+        "recall": {
+          "min": 0.85
+        },
+        "invented_rate": {
+          "max": 0.1
+        },
+        "empty_clean_rate": {
+          "min": 0.8
+        },
+        "schema_valid_rate": {
+          "min": 1.0
+        }
+      }
     }
   },
   "pairwise": {
