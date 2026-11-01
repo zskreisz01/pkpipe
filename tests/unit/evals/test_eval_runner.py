@@ -43,6 +43,11 @@ def test_every_eval_span_carries_the_run_id(tmp_path, snap, otel):
     assert suite.attributes["eval.metric.accuracy"] == 1.0
     case = next(s for s in spans if s.name == "eval.case a")
     assert case.parent.span_id == suite.context.span_id and case.attributes[attrs.EVAL_CASE_ID] == "a"
+    # constitution X: the session under test is a step span with the standard attributes, below the case
+    [step] = [s for s in otel.spans("step") if s.parent.span_id == case.context.span_id]
+    assert step.attributes[attrs.FLOW_ID] == "categorize_item" and step.attributes[attrs.STEP_ID] == "suggest"
+    assert step.attributes[attrs.BPMN_ELEMENT] and step.attributes[attrs.CONFIG_VERSION] == snap.version
+    assert step.attributes[attrs.RUN_TRIGGER] == "eval"
 
 
 def test_reports_as_json_and_markdown(tmp_path, snap):

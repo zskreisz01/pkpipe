@@ -182,6 +182,82 @@ def test_judge_unavailable_skips_the_session_eval(tmp_path, snap):
     assert "judge_mean" not in report.metrics and not run.ok
 
 
+def test_judge_failing_mid_run_fails_closed(tmp_path, snap):
+    """Edge case: a judge that stops answering during the run leaves cases unjudged; a judge mean over the
+    rest is no measurement, so the suite is skipped (blocks a publish), not passed."""
+    from pkpipe.ports import ModelUnavailable
+
+    rows = [dict(SESSION_ROWS[0], id=f"s{i}") for i in range(3)]
+    paths = mini_evals(tmp_path, {"datasets/sessions/other_resource/summarize.jsonl": rows})
+    answers: list[object] = [5, 5, ModelUnavailable("judge server went away")]
+
+    def judge(system, user):
+        a = answers.pop(0)
+        if isinstance(a, Exception):
+            raise a
+        return {"reasoning": "ok", "score": a}
+
+    model = ProfileModel(default=_session_model().models["default"], judge=FakeModel(judge))
+    report = _runner(snap, paths, model).run(["sessions"]).suite("sessions")
+    assert report.metrics["judge_errors"] == 1 and report.metrics["judge_mean"] == 5.0
+    assert report.status is Status.SKIPPED and "judge server went away" in report.reason
+
+
+def test_each_session_must_pass_its_gate_on_its_own(tmp_path, snap):
+    """US2: with several sessions, a bad session is not hidden by a good one in the overall judge mean."""
+    good = [dict(SESSION_ROWS[0], id=f"g{i}") for i in range(3)]
+    bad = [triage_case("b1", "A CLI tool.", "tool")]
+    bad[0]["input"] = {"read.body": "A CLI tool.", "menu.categories": [{"id": "tool"}]}
+    bad[0]["expected"] = {}
+    paths = mini_evals(
+        tmp_path,
+        {
+            "datasets/sessions/other_resource/summarize.jsonl": good,
+            "datasets/sessions/categorize_item/suggest.jsonl": bad,
+            "rubrics/categorize_item.suggest.md": "Score the category choice.",
+        },
+    )
+
+    def subject(system, user):
+        if "minikv" not in user:  # the categorize session
+            return {"category": "tool", "confidence": 0.9, "reason": "r"}
+        return {"title": "minikv", "note": "An embeddable key-value store written in Rust."}
+
+    def judge(system, user):
+        return {"reasoning": "", "score": 2 if '"category"' in user else 5}
+
+    model = ProfileModel(default=FakeModel(subject), judge=FakeModel(judge))
+    report = _runner(snap, paths, model).run(["sessions"]).suite("sessions")
+    assert report.metrics["judge_mean"] == 4.25  # (5 + 5 + 5 + 2) / 4 would pass the overall gate (>= 4.0)
+    failing = [g.metric for g in report.gate if not g.passed]
+    assert failing == ["categorize_item.suggest.judge_mean"], report.gate
+    assert report.status is Status.FAILED
+
+
+def test_calibration_with_unjudged_items_is_an_error(tmp_path, snap):
+    """A calibration measured on a subset (judge failed on some items) is never a pass."""
+    from pkpipe.ports import ModelUnavailable
+
+    rows = [
+        {"id": f"c{i}", "input": {"inputs": {}, "output": {"note": "y"}}, "expected": {"owner_score": 4}}
+        for i in range(3)
+    ]
+    paths = mini_evals(tmp_path, {"datasets/calibration/resource_note.jsonl": rows})
+    answers: list[object] = [4, ModelUnavailable("down"), 4]
+
+    def judge(system, user):
+        a = answers.pop(0)
+        if isinstance(a, Exception):
+            raise a
+        return {"reasoning": "", "score": a}
+
+    report = (
+        _runner(snap, paths, ProfileModel(judge=FakeModel(judge))).run(["calibration"]).suite("calibration")
+    )
+    assert report.metrics["errors"] == 1 and report.metrics["disagreement_rate"] == 0.0
+    assert report.status is Status.ERROR and "could not be judged" in report.reason
+
+
 def test_calibration_reports_disagreement(tmp_path, snap):
     rows = [
         {

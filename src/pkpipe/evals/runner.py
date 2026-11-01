@@ -215,6 +215,12 @@ class EvalRunner:
                 report.notes.append("no gate configured for this suite")
             return
         report.gate = check_gate(report.metrics, gate.gate)
+        per_session = report.metrics.get("per_session")
+        if isinstance(per_session, dict) and len(per_session) > 1:
+            # each session must pass on its own: a good session must not hide a bad one in the mean
+            for session, metrics in per_session.items():
+                for check in check_gate(metrics, gate.gate):
+                    report.gate.append(check.model_copy(update={"metric": f"{session}.{check.metric}"}))
         if report.status is Status.PASSED and not all(g.passed for g in report.gate):
             report.status = Status.FAILED
 

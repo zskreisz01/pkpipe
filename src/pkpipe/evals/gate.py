@@ -29,7 +29,14 @@ from pkpipe.evals.datasets import EvalPaths
 from pkpipe.evals.judge import JudgeUnavailable
 from pkpipe.evals.models import EvalRun
 from pkpipe.evals.runner import EvalRunner, evals_config
-from pkpipe.evals.suites import SUITES, SessionsSuite, run_pairwise, session_targets
+from pkpipe.evals.suites import (
+    SUITES,
+    SessionsSuite,
+    TriageSuite,
+    run_pairwise,
+    session_targets,
+    step_fingerprint,
+)
 from pkpipe.ports import ModelError, ModelPort
 from pkpipe.telemetry import attrs
 
@@ -79,6 +86,32 @@ def threshold_regressions(old: EvalsConfig, new: EvalsConfig) -> list[str]:
         out.append(f"pairwise.min_score lowered from {old.pairwise.min_score} to {new.pairwise.min_score}")
     if new.calibration.max_disagreement_rate > old.calibration.max_disagreement_rate:
         out.append("calibration.max_disagreement_rate raised")
+    if new.calibration.max_gap > old.calibration.max_gap:
+        out.append(f"calibration.max_gap raised from {old.calibration.max_gap} to {new.calibration.max_gap}")
+    return out
+
+
+def llm_steps(snapshot: ConfigSnapshot) -> list[str]:
+    """``flow.node`` of every LLM step."""
+    return sorted(
+        f"{fid}.{node.id}"
+        for fid, flow in snapshot.flows().items()
+        for node in flow.nodes
+        if node.type in ("llm", "llm_tools")
+    )
+
+
+def unevaluated_steps(current: ConfigSnapshot | None, draft: ConfigSnapshot, paths: EvalPaths) -> list[str]:
+    """LLM steps that are new or changed in the draft but have no eval dataset (constitution IX: every LLM
+    step has an eval dataset). Such a change cannot be measured, so it blocks unless overridden."""
+    covered = {f"{TriageSuite.flow}.{TriageSuite.node}"} | {t.name for t in session_targets(paths)}
+    out = []
+    for name in llm_steps(draft):
+        if name in covered:
+            continue
+        flow, node = name.split(".", 1)
+        if current is None or step_fingerprint(current, flow, node) != step_fingerprint(draft, flow, node):
+            out.append(name)
     return out
 
 
@@ -99,7 +132,8 @@ def affected_suites(current: ConfigSnapshot | None, draft: ConfigSnapshot, paths
             changed = suite.fingerprint(current) != suite.fingerprint(draft)
         if changed or old_gates.get(name) != new_gates.get(name):
             affected.append(name)
-    if any(n in affected for n in LLM_SUITES) and "security" not in affected:
+    llm_changed = any(n in affected for n in LLM_SUITES) or unevaluated_steps(current, draft, paths)
+    if llm_changed and "security" not in affected:
         affected.append("security")
     return affected
 
@@ -138,12 +172,18 @@ class PublishGate:
     ) -> GateDecision:
         regressions = threshold_regressions(evals_config(current), evals_config(draft)) if current else []
         affected = affected_suites(current, draft, self.paths)
+        unevaluated = unevaluated_steps(current, draft, self.paths)
         reason = (override_reason or "").strip() or None
-        if not affected and not regressions:
+        if not affected and not regressions and not unevaluated:
             return GateDecision(allowed=True, status="unchanged")
         runner = self.runner(draft)
         run = runner.run(affected) if affected else None
         failures = run.failures() if run else []
+        failures += [
+            f"{name}: LLM step changed but has no eval dataset "
+            f"(add datasets/sessions/{name.replace('.', '/', 1)}.jsonl)"
+            for name in unevaluated
+        ]
         pairwise = self._pairwise(current, draft, runner, failures) if current is not None else []
         decision = GateDecision(
             allowed=False,

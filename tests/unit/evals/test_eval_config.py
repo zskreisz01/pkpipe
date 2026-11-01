@@ -67,6 +67,10 @@ def test_threshold_regressions(pack_dir):
     assert any(f.startswith("security.false_positive_rate: max raised") for f in found)
     assert "sessions.judge_mean: gate removed" in found
     assert any(f.startswith("pairwise.min_score") for f in found)
+    new["calibration"]["max_gap"] = 3  # a looser notion of "agree" is a regression too
+    assert "calibration.max_gap raised from 1 to 3" in threshold_regressions(
+        EvalsConfig(**old), EvalsConfig(**new)
+    )
 
 
 def test_overlay_can_tighten_a_gate(overlay_dir, write_json, pack_dir):

@@ -61,7 +61,7 @@ uv run pkpipe eval --suite production --db ~/.local/share/pkpipe/pkpipe.db --vau
 
 The command prints a Markdown report (metrics, gate table, per-category F1, confusion matrix, failed cases) and writes it as `eval-<time>-<run>.md` and `.json`. Exit code 0 means every requested suite passed its gate; 1 means a red gate, a skipped suite (no dataset, no judge) or an error; 2 is a usage error.
 
-Every run is traced: an `eval run` span, one `eval <suite>` span per suite and one `eval.case <id>` span per case, all with `eval.run_id`, `eval.suite` and `config.version`; model calls below them are ordinary LLM spans. Filter on `eval.run_id` in Phoenix or Langfuse to see one run.
+Every run is traced: an `eval run` span, one `eval <suite>` span per suite and one `eval.case <id>` span per case, all with `eval.run_id`, `eval.suite` and `config.version`; each evaluated session is a `step <node>` span with `flow.id`, `step.id`, `bpmn.element`, `config.version` and `run.trigger` = `eval`, and the model call below it is an ordinary LLM span (content capture off). Filter on `eval.run_id` in Phoenix or Langfuse to see one run.
 
 ## Datasets
 
@@ -85,7 +85,7 @@ A flow case scripts the model by rules: `when` (a substring of the user prompt, 
 - Whatever code can check (schema, required fields, paths, forbidden names) is never decided by an LLM.
 - LLM steps are evaluated with exactly the prompt the engine builds for the flow node (`build_prompt`: system prompt, instruction, context, declared inputs, datamarking, output schema), and the triage answer passes the same `triage.check_category` code the flow runs.
 - The LLM judge scores quality only, with a rubric per session type (`rubrics/<flow>.<node>.md` or `rubrics/<output_schema>.md`), on a 1-5 scale with reasoning. Inputs and outputs reach the judge datamarked.
-- The judge is never the model under test (FR-002): `evals.json` names the judge profile, `pkpipe validate` rejects a judge profile that an LLM step uses, and at run time a judge profile that resolves to the same endpoint and model as a profile under test is refused. The public pack's judge is `google/gemma-4-12b` (`PKPIPE_JUDGE_MODEL`). Without a usable judge the session suite is `skipped`, which never passes, so a publish of an LLM step is blocked.
+- The judge is never the model under test (FR-002): `evals.json` names the judge profile, `pkpipe validate` rejects a judge profile that an LLM step uses, and at run time a judge profile that resolves to the same endpoint and model as a profile under test is refused. The public pack's judge is `google/gemma-4-12b` (`PKPIPE_JUDGE_MODEL`). Without a usable judge (also when it fails on some cases during the run) the session suite is `skipped`, which never passes, so a publish of an LLM step is blocked. A calibration with items the judge could not score is an `error`.
 - Calibration: the owner scores 20 items; `pkpipe eval --suite calibration` lets the judge score the same outputs and reports exact agreement, mean absolute difference, bias and the share of items more than `max_gap` (default 1) points apart. Above `max_disagreement_rate` (default 0.25) the report asks to refine the rubric.
 - For instruction changes, the judge compares old and new outputs pairwise (A/B), which is more sensitive than absolute scores. Each pair is judged twice with the order swapped; only a consistent preference counts, anything else is a tie. The new instruction needs a score (win 1, tie 0.5, loss 0) of at least `pairwise.min_score` (default 0.4: "not clearly worse").
 
@@ -105,7 +105,7 @@ Gates live in `evals.json` (core defaults → pack → overlay, validated like e
 }
 ```
 
-A threshold has exactly one of `min` or `max`. A metric the suite does not produce fails its check. Core defaults gate `deterministic` and `flows` at a pass rate of 1.0.
+A threshold has exactly one of `min` or `max`. A metric the suite does not produce fails its check. With several session datasets the `sessions` gate is checked overall and per session (`<flow>.<node>.<metric>`), so a good session cannot hide a bad one. Thresholds, `pairwise.min_score` and the calibration limits (`max_gap`, `max_disagreement_rate`) only move upwards. Core defaults gate `deterministic` and `flows` at a pass rate of 1.0.
 
 ## Cassettes (CI without a model)
 
@@ -125,6 +125,7 @@ decision.affected, decision.failures, decision.pairwise, decision.threshold_regr
 
 - Affected suites come from fingerprints of what each suite depends on (an LLM node's config, assets and model profile; categories; flows; guards; gates). An affected LLM suite adds the security suite as a smoke test. A first publish runs every suite.
 - A changed session also runs the pairwise A/B comparison against the published config.
+- A new or changed LLM step without an eval dataset (neither the triage session nor `datasets/sessions/<flow>/<node>.jsonl`) blocks, because the change cannot be measured (constitution IX: every LLM step has an eval dataset).
 - A failing, skipped or erroring suite blocks; the owner can override with a non-blank reason, which is returned on the decision (and recorded with the publish). Lowering a threshold cannot be overridden.
 
 ## Where it runs

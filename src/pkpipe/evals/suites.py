@@ -32,6 +32,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from pkpipe import telemetry
 from pkpipe.domain.triage import ItemState, check_transition
 from pkpipe.engine.flow_models import FlowNode
 from pkpipe.engine.snapshot import ConfigSnapshot
@@ -50,6 +51,7 @@ from pkpipe.security.canary import leaked
 from pkpipe.steps.flow_control import pattern_flags
 from pkpipe.steps.llm import LlmConfig, build_prompt
 from pkpipe.steps.triage_code import category_menu, check_category, release_items, select_new
+from pkpipe.telemetry import attrs
 
 
 @dataclass
@@ -153,16 +155,33 @@ def step_fingerprint(snapshot: ConfigSnapshot, flow_id: str, node_id: str) -> st
 
 def run_step(
     snapshot: ConfigSnapshot,
+    flow_id: str,
     node: FlowNode,
     inputs: dict[str, Any],
     model: ModelPort,
     *,
     system_suffix: str = "",
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
-    """One isolated session exactly as the ``llm`` step builds it. Returns (reply, schema)."""
+    """One isolated session exactly as the ``llm`` step builds it. Returns (reply, schema).
+
+    Traced as a step span with the standard attributes (constitution X: ``flow.id``, ``step.id``,
+    ``bpmn.element``, ``config.version``; ``run.trigger`` = ``eval``) so the LLM call below it is attributable
+    to the session under test; content capture stays off (no flow run allows it)."""
     cfg = LlmConfig.model_validate(node.config)
     system, user, schema = build_prompt(cfg, SimpleNamespace(snapshot=snapshot, inputs=inputs))
-    return model.complete(system + system_suffix, user, schema, profile=cfg.profile), schema
+    with telemetry.get_telemetry().tracer.start_as_current_span(f"step {node.id}") as span:
+        span.set_attribute(attrs.SPAN_KIND, "step")
+        telemetry.set_span_attributes(
+            span,
+            flow_id=flow_id,
+            step_id=node.id,
+            bpmn_element=node.bpmn_element or node.id,
+            item_id="",
+            item_category="",
+            config_version=snapshot.version,
+            run_trigger="eval",
+        )
+        return model.complete(system + system_suffix, user, schema, profile=cfg.profile), schema
 
 
 def _code_ctx(snapshot: ConfigSnapshot) -> SimpleNamespace:
@@ -250,7 +269,9 @@ class TriageSuite(Suite):
         menu = category_menu(_code_ctx(ctx.snapshot))["categories"]
         inputs = {k: v for k, v in self.node_inputs(case, menu).items() if k in node.inputs}
         try:
-            reply, schema = run_step(ctx.snapshot, node, inputs, ctx.model, system_suffix=system_suffix)
+            reply, schema = run_step(
+                ctx.snapshot, self.flow, node, inputs, ctx.model, system_suffix=system_suffix
+            )
         except SchemaError as exc:
             return None, None, [f"SchemaError: {exc}"]
         errors = schema_errors(reply, schema)
@@ -358,7 +379,7 @@ class SessionsSuite(Suite):
     def generate(snapshot: ConfigSnapshot, target: SessionTarget, case: EvalCase, model: ModelPort):
         node = find_node(snapshot, target.flow, target.node)
         inputs = {k: v for k, v in case.input.items() if k in node.inputs}
-        return run_step(snapshot, node, inputs, model)
+        return run_step(snapshot, target.flow, node, inputs, model)
 
     def run(self, ctx):
         targets = session_targets(ctx.paths)
@@ -393,9 +414,16 @@ class SessionsSuite(Suite):
             per[target.name] = self._metrics(rs, judged=judge is not None)
             results += rs
         metrics = {**self._metrics(results, judged=ctx.judge is not None), "per_session": per}
+        judge_errors = [r for r in results if "judge_error" in r.details]
+        metrics["judge_errors"] = len(judge_errors)
         report = self.report(metrics=metrics, cases=results, notes=notes)
         if ctx.judge is None:
             report.status, report.reason = Status.SKIPPED, f"judge unavailable: {ctx.judge_error}"
+        elif judge_errors:  # an unjudged case is never a pass (fail closed, spec edge case)
+            report.status = Status.SKIPPED
+            report.reason = (
+                f"judge unavailable for {len(judge_errors)} case(s): {judge_errors[0].details['judge_error']}"
+            )
         return report
 
     def _case(self, ctx, target, case, judge, rubric) -> CaseResult:
@@ -518,12 +546,13 @@ class CalibrationSuite(Suite):
                 notes.append(f"{name}: judge and owner disagree often; refine rubrics/{name}.md")
             results += rs
         pairs = [(r.expected, r.actual) for r in results if r.error is None]
-        metrics = {
-            **calibration_metrics(pairs, max_gap),
-            "per_rubric": per,
-            "errors": sum(1 for r in results if r.error),
-        }
-        return self.report(metrics=metrics, cases=results, notes=notes)
+        errors = [r for r in results if r.error]
+        metrics = {**calibration_metrics(pairs, max_gap), "per_rubric": per, "errors": len(errors)}
+        report = self.report(metrics=metrics, cases=results, notes=notes)
+        if errors:  # agreement measured on a subset is not a calibration (fail closed)
+            report.status = Status.ERROR
+            report.reason = f"{len(errors)} item(s) could not be judged: {errors[0].error}"
+        return report
 
 
 # -- level 3 -------------------------------------------------------------------------------------------------

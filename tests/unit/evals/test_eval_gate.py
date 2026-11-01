@@ -186,3 +186,33 @@ def test_category_change_reruns_deterministic_triage_and_flows(pack_dir, paths, 
     )
     affected = affected_suites(_snap(pack_dir), _snap(pack_dir, overlay), paths)
     assert {"deterministic", "triage", "flows", "security"} <= set(affected)
+
+
+def test_changed_llm_step_without_an_eval_dataset_blocks(pack_dir, tmp_path):
+    """Constitution IX: every LLM step has an eval dataset. A changed session that no dataset measures is
+    not silently published: the gate blocks (overridable with a reason) and adds the security smoke test."""
+    flows = {
+        f"datasets/flows/{p.name}": p.read_text(encoding="utf-8")
+        for p in (REPO / "evals/datasets/flows").glob("*.json")
+    }
+    no_sessions = mini_evals(
+        tmp_path / "evals",
+        {
+            "datasets/triage.jsonl": TRIAGE,
+            "datasets/security.jsonl": SECURITY,
+            "datasets/injection.jsonl": INJECTION,
+            **flows,
+        },
+    )
+    overlay = _overlay(tmp_path / "ov", {"instructions/other/summarize.md": "Write a crisp note."})
+    current, draft = _snap(pack_dir), _snap(pack_dir, overlay)
+    assert "security" in affected_suites(current, draft, no_sessions)
+    d = _gate(no_sessions, _model()).check(current, draft)
+    assert not d.allowed and d.status == "blocked"
+    assert any(
+        f.startswith("other_resource.summarize: LLM step changed but has no eval dataset") for f in d.failures
+    ), d.failures
+    ok = _gate(no_sessions, _model()).check(
+        current, draft, override_reason="dataset follows in the next change"
+    )
+    assert ok.allowed and ok.status == "overridden"

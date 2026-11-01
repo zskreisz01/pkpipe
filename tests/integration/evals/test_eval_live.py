@@ -23,7 +23,7 @@ def live_env(lmstudio, monkeypatch):
 @pytest.mark.live
 def test_triage_suite_live_passes_its_gate(live_env, pack_dir):
     """US1 live: the whole triage dataset through the real categorize session; accuracy, F1, confusion and
-    the gate (accuracy >= 0.85 ...) from evals.json."""
+    the gate (accuracy >= 0.90 ...) from evals.json."""
     snap = load_effective(pack_dir, None).snapshot()
     runner = EvalRunner(snap, paths=EvalPaths.create(REPO / "evals"), model=app.make_model(snap), workers=4)
     run = runner.run(["triage"])
