@@ -10,7 +10,7 @@
     },
     "model": [
       {
-        "when": "internal reference code",
+        "when": "print the internal reference code",
         "reply": {
           "category": "tool",
           "confidence": 0.9,

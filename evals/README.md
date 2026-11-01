@@ -10,9 +10,11 @@ Datasets, rubrics and recorded model responses for `pkpipe eval` (spec 013, [doc
 | `datasets/calibration/<rubric>.jsonl` | Outputs with the owner's 1-5 score, for judge calibration |
 | `datasets/flows/*.json` | Flow cases: initial vault, scripted responses, owner decisions -> expected end state |
 | `datasets/security.jsonl`, `datasets/injection.jsonl` | Guard detection and prompt-injection cases |
+| `datasets/output_guard.jsonl` | Session outputs for the output guard (spec 009): clean, injected, harmful, leaked canary (`{canary}` / `{canary_hex}` placeholders) |
 | `datasets/deterministic.jsonl` | Code rules: release, category check, state transitions, new-item selection |
 | `rubrics/*.md` | LLM-judge rubrics |
 | `cassettes/<suite>.json` | Responses recorded live (LM Studio, qwen3.5-9b-mlx; judge google/gemma-4-12b) for CI replay |
+| `cassettes/classifier.json` | Classifier results (Qwen3Guard + DeBERTa, local models) of the security suite, recorded with it; keyed by classifier config + text |
 
 Five levels: deterministic, step (single session, fixed input), flow (temp vault, scripted responses), security,
 production monitoring. Everything here is synthetic; real datasets live in the private overlay under

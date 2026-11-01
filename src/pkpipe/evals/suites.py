@@ -994,8 +994,6 @@ class SecuritySuite(Suite):
         metrics: dict[str, Any] = {}
         results: list[CaseResult] = []
         guards = guard_nodes(ctx.snapshot)
-        if not guards:
-            notes.append("no guard node with patterns in the flows")
         cases = ctx.cases("datasets/security.jsonl", self.name)
         per_guard: dict[str, Any] = {}
         for gid, patterns in guards:

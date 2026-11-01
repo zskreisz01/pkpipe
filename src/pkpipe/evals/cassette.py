@@ -8,7 +8,8 @@
 * ``auto``   – replay what is recorded, call the real model (and record) for the rest.
 
 Prompts contain random datamarking tokens (``<<<DATA 1a2b3c4d5e6f>>>``, constitution IV) that differ on every
-call; the cassette key normalises them, so the same logical request always finds its recording. Model errors
+call; the cassette key normalises them, and the run canary of spec 009 (``CNY-<hex>``) likewise, so the same
+logical request always finds its recording. Model errors
 (``SchemaError``, ...) are recorded too and replayed as the same exception type.
 
 :class:`CassetteClassifier` does the same for the local ``ClassifierPort`` of the security suite (spec 009).
@@ -37,6 +38,8 @@ from pkpipe.ports import (
 Mode = Literal["record", "replay", "auto"]
 FORMAT = 1
 _TOKEN = re.compile(r"<<<(?:END )?DATA ([0-9a-f]{6,64})>>>")
+#: The run canary of a ``canary: true`` session (spec 009) differs per run like the datamarking tokens.
+_CANARY = re.compile(r"CNY-[0-9a-f]{16}")
 _ERRORS: dict[str, type[ModelError]] = {
     "SchemaError": SchemaError,
     "ModelUnavailable": ModelUnavailable,
@@ -50,10 +53,10 @@ class CassetteMiss(ModelError):
 
 
 def normalise(text: str) -> str:
-    """Replace every datamarking token in ``text`` by a fixed placeholder."""
+    """Replace every datamarking token and run canary in ``text`` by fixed placeholders."""
     for token in set(_TOKEN.findall(text)):
         text = text.replace(token, "TOKEN")
-    return text
+    return _CANARY.sub("CANARY", text)
 
 
 def request_key(system: str, user: str, json_schema: dict[str, Any] | None, profile: str) -> str:
@@ -61,6 +64,7 @@ def request_key(system: str, user: str, json_schema: dict[str, Any] | None, prof
     tokens = set(_TOKEN.findall(user)) | set(_TOKEN.findall(system))
     for token in tokens:
         system, user = system.replace(token, "TOKEN"), user.replace(token, "TOKEN")
+    system, user = _CANARY.sub("CANARY", system), _CANARY.sub("CANARY", user)
     canonical = json.dumps(
         {"system": system, "user": user, "schema": json_schema, "profile": profile},
         sort_keys=True,
