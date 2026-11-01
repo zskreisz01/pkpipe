@@ -95,16 +95,20 @@ def test_mcp_transport_requirements():
 
 
 def test_channel_routes_must_reference_defined_channels():
-    ChannelsConfig.model_validate({"channels": {"d": {"type": "discord_webhook"}}, "routes": {"e": ["d"]}})
+    ChannelsConfig.model_validate({"channels": {"d": {"type": "log"}}, "routes": {"e": ["d"]}})
     with pytest.raises(ValidationError, match="unknown channel 'zzz'"):
-        ChannelsConfig.model_validate({"channels": {"d": {"type": "x"}}, "routes": {"e": ["zzz"]}})
+        ChannelsConfig.model_validate({"channels": {"d": {"type": "log"}}, "routes": {"e": ["zzz"]}})
 
 
 def test_channel_url_must_not_inline_credentials():
     """Secrets are never in config (docs/configuration.md): only env:NAME references."""
-    ChannelsConfig.model_validate({"channels": {"d": {"type": "x", "url": "env:DISCORD_WEBHOOK_URL"}}})
+    ChannelsConfig.model_validate(
+        {"channels": {"d": {"type": "discord_webhook", "url": "env:DISCORD_WEBHOOK_URL"}}}
+    )
     with pytest.raises(ValidationError, match="credentials"):
-        ChannelsConfig.model_validate({"channels": {"d": {"type": "x", "url": "https://user:pw@host/hook"}}})
+        ChannelsConfig.model_validate(
+            {"channels": {"d": {"type": "discord_webhook", "url": "https://user:pw@host/hook"}}}
+        )
 
 
 def _cat(**over):
@@ -159,3 +163,30 @@ def test_validate_effective_valid_config_has_no_errors(pack_dir):
     from pkpipe.engine.registry import load_config
 
     assert validate_effective(load_config(pack_dir)) == []
+
+
+@pytest.mark.parametrize(
+    ("channel", "message"),
+    [
+        ({"type": "pager"}, "unknown channel type 'pager'"),
+        ({"type": "discord_webhook"}, "needs 'url'"),
+        ({"type": "teams_webhook", "url": "https://example.test/hook"}, "env:NAME"),
+        ({"type": "apprise"}, "needs 'urls'"),
+        ({"type": "apprise", "urls": ["json://localhost/x"]}, "env:NAME"),
+    ],
+)
+def test_channel_types_are_checked_and_secrets_must_be_env_refs(channel, message):
+    """Spec 006 FR-003: webhook and Apprise URLs are secrets, only env: references are accepted."""
+    with pytest.raises(ValidationError, match=message):
+        ChannelsConfig.model_validate({"channels": {"c": channel}})
+
+
+def test_apprise_channel_is_configuration_only():
+    """Spec 006 SC-001."""
+    cfg = ChannelsConfig.model_validate(
+        {
+            "channels": {"mail": {"type": "apprise", "urls": ["env:MAIL_URL", "env:NTFY_URL"]}},
+            "ui_url": "http://ui",
+        }
+    )
+    assert cfg.channels["mail"].urls == ["env:MAIL_URL", "env:NTFY_URL"]

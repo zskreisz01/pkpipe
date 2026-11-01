@@ -12,7 +12,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from pkpipe import telemetry
-from pkpipe.adapters.notify_log import LogNotify
+from pkpipe.adapters.notify_router import ChannelNotifier
 from pkpipe.adapters.state_sqlite import SqliteRunStore, open_checkpointer
 from pkpipe.adapters.tools_mcp import McpTools
 from pkpipe.adapters.tracer_otel import OtelTracer
@@ -46,7 +46,7 @@ def make_tools(snapshot: ConfigSnapshot) -> ToolPort:
 
 
 def make_notify(snapshot: ConfigSnapshot) -> NotifyPort:
-    return LogNotify()  # replaced by channel adapters in spec 006
+    return ChannelNotifier(snapshot.data.get("channels"), snapshot.assets)
 
 
 def ports_for(snapshot: ConfigSnapshot) -> StepPorts:

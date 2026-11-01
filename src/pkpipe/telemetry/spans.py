@@ -224,6 +224,14 @@ def tool_span(tool: str) -> Iterator[Span]:
 
 
 @contextlib.contextmanager
+def notify_span(event: str, channel: str, channel_type: str) -> Iterator[Span]:
+    """``notify.send``: one delivery of an event to one channel (spec 006), with the step attributes."""
+    extra = {"notify.event": event, "notify.channel": channel, "notify.channel_type": channel_type}
+    with _child("notify", "notify.send", extra) as span:
+        yield span
+
+
+@contextlib.contextmanager
 def _child(kind: str, name: str, extra: dict[str, str]) -> Iterator[Span]:
     tel = get_telemetry()
     run, item = _run.get(), _item.get()

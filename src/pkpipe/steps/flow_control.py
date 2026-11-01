@@ -49,12 +49,21 @@ class CodeStep(StepExecutor):
 # -- notify -------------------------------------------------------------------------------------------------
 class NotifyConfig(StepConfig):
     event: str = Field(description="Event type; channels come from channels.json routes[event]")
-    message: str = Field(description="Message template with ${ref} placeholders")
+    message: str = Field(
+        default="", description="Message template with ${ref} placeholders (payload.message)"
+    )
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Extra template variables for the event template; ${ref} templates allowed",
+    )
     channels: list[str] | None = Field(default=None, description="Explicit channels instead of the route")
 
 
 @register_step
 class NotifyStep(StepExecutor):
+    """Hands an event to the NotifyPort (spec 006). Delivery failures are reported in the output and traced
+    by the adapter; they never fail the flow."""
+
     type = "notify"
     Config = NotifyConfig
 
@@ -64,15 +73,17 @@ class NotifyStep(StepExecutor):
         return ([f"node '{node.id}': unknown channel(s) {missing}"] if missing else []), []
 
     def run(self, node, config: NotifyConfig, ctx: StepContext) -> StepResult:
-        routes = (ctx.snapshot.data.get("channels") or {}).get("routes") or {}
-        targets = config.channels if config.channels is not None else list(routes.get(config.event, []))
-        message = ctx.render(config.message)
-        if not targets:
+        payload = ctx.render(config.payload)
+        if config.message:
+            payload["message"] = ctx.render(config.message)
+        deliveries = ctx.ports.require("notify").send(config.event, payload, config.channels)
+        if not deliveries:
             return StepResult(output={"event": config.event, "sent": [], "skipped": "no route"})
-        notify = ctx.ports.require("notify")
-        for channel in targets:
-            notify.send(channel, message)
-        return StepResult(output={"event": config.event, "sent": targets})
+        out: dict[str, Any] = {"event": config.event, "sent": [d.channel for d in deliveries if d.ok]}
+        failed = [{"channel": d.channel, "error": d.error} for d in deliveries if not d.ok]
+        if failed:
+            out["failed"] = failed
+        return StepResult(output=out)
 
 
 # -- subflow ------------------------------------------------------------------------------------------------

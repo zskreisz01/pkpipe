@@ -66,12 +66,13 @@ def test_fake_tools_list_respects_allow_list_and_call_records():
         t.call("delete_everything", {})
 
 
-def test_fake_notify_collects_per_channel():
-    n = FakeNotify()
-    n.send("discord_main", "triage ready", [{"id": "confirm", "label": "Confirm"}])
-    n.send("other", "x")
-    assert [s.message for s in n.to("discord_main")] == ["triage ready"]
-    assert n.to("discord_main")[0].actions == [{"id": "confirm", "label": "Confirm"}]
+def test_fake_notify_routes_collects_and_reports_failures():
+    n = FakeNotify(routes={"ready": ["a", "b"]}, fail={"b"})
+    deliveries = n.send("ready", {"message": "triage ready"})
+    assert [(d.channel, d.ok) for d in deliveries] == [("a", True), ("b", False)]
+    assert [s.message for s in n.to("a")] == ["triage ready"] and n.to("b") == []
+    assert n.send("unrouted", {}) == []
+    assert [d.channel for d in n.send("unrouted", {}, ["x"])] == ["x"]
 
 
 def test_in_memory_state_roundtrip_isolates_copies():

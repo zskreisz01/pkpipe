@@ -16,7 +16,7 @@ from pkpipe.cli import main
 from pkpipe.domain.triage import item_id_for
 from pkpipe.obsidian import lists
 from tests.fakes import FakeModel, FakeNotify
-from tests.support.pack_runtime import TRIAGE_FILE, fake_model_reply, owner_decides
+from tests.support.pack_runtime import PACK_ROUTES, TRIAGE_FILE, fake_model_reply, owner_decides
 from tests.support.vault_mcp import free_port, http_server, write_policy
 
 TOOL = item_id_for("0-INBOX/example-tool.md")
@@ -34,7 +34,7 @@ def served_vault(tmp_path, synthetic_vault, write_json):
 @pytest.fixture
 def fakes(monkeypatch):
     model = FakeModel(fake_model_reply({"CLI tool": "tool", "video": "learning-material"}))
-    notify = FakeNotify()
+    notify = FakeNotify(routes=PACK_ROUTES)
     monkeypatch.setattr(app, "make_model", lambda snapshot: model)
     monkeypatch.setattr(app, "make_notify", lambda snapshot: notify)
     monkeypatch.delenv("PKPIPE_OVERLAY_DIR", raising=False)

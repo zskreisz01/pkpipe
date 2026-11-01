@@ -67,7 +67,7 @@ def make_ports(*, model=None, tools=None, notify=None, clock=None, tracer=None, 
         tracer=tracer or RecordingTracer(),
         model=model if model is not None else FakeModel(),
         tools=tools if tools is not None else FakeTools(),
-        notify=notify if notify is not None else FakeNotify(),
+        notify=notify if notify is not None else FakeNotify(routes={"ready": ["main"]}),
         extra=extra,
     )
 
