@@ -103,7 +103,7 @@ C4Container
     Rel(mlearn, nblm, "browser automation")
 ```
 
-Every box is a separate process. The app never imports an MCP server; it reaches them by URL from `mcp_servers.json`. Only the `learning-gateway` knows about Open Notebook or NotebookLM, so switching the learning backend does not touch the app.
+Every box is a separate process. The app never imports an MCP server; it reaches them by URL from `mcp_servers.json`. The one exception is the owner channel: the UI and the app MCP read the triage file and write the owner's decisions through the `pkpipe.obsidian` library in-process (same file locking as the vault server), because owner decisions must not be a tool on the server that LLM sessions can reach. Only the `learning-gateway` knows about Open Notebook or NotebookLM, so switching the learning backend does not touch the app.
 
 ## C4 – level 3: components of the app
 
@@ -151,7 +151,7 @@ Dependencies point inwards: inbound adapters call the core, the core knows only 
 | Component | Module | Depends on | Replacing it affects |
 | --- | --- | --- | --- |
 | REST + UI router | `pkpipe.api` | Run service, Config registry | UI only |
-| App MCP server | `pkpipe.mcp` | Run service, Triage domain | MCP clients only |
+| App MCP server | `pkpipe.mcp` | Run service, Triage domain, `pkpipe.api.services` | MCP clients only |
 | Scheduler | `pkpipe.scheduler` | Run service | Nothing |
 | Run service | `pkpipe.engine.runs` | Flow compiler, RunStorePort, checkpointer | – |
 | Flow compiler | `pkpipe.engine.compiler` | Step executors, Config registry | – |

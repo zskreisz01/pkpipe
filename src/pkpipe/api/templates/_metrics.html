@@ -1,0 +1,8 @@
+{% if metrics %}
+<table data-testid="gate-metrics">
+  <tr><th>Suite</th><th>Metric</th><th>Value</th><th>Gate</th></tr>
+  {% for suite, checks in metrics|dictsort %}{% for metric, c in checks|dictsort if metric != "status" %}
+  <tr><td>{{ suite }}</td><td>{{ metric }}</td><td>{{ "%.3f"|format(c.value) if c.value is number else "missing" }}</td><td>{{ c.op }} {{ c.threshold }}</td></tr>
+  {% endfor %}{% endfor %}
+</table>
+{% endif %}

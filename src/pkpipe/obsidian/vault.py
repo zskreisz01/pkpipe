@@ -159,6 +159,25 @@ class Vault:
         path = self.policy.resolve(self.policy.triage_file, "update_triage")
         return lists.update_triage(path, rows)
 
+    # Owner channels only (UI, app MCP): not registered on the vault MCP server that sessions can reach.
+
+    @_traced
+    def owner_decide(
+        self,
+        item_id: str,
+        *,
+        confirm: bool | None = None,
+        override: str | None = None,
+        categories: set[str] | frozenset[str] | None = None,
+    ) -> dict[str, Any]:
+        path = self.policy.resolve(self.policy.triage_file, "update_triage")
+        return lists.owner_decide(path, item_id, confirm=confirm, override=override, categories=categories)
+
+    @_traced
+    def owner_release_quarantine(self, item_id: str) -> dict[str, Any]:
+        path = self.policy.resolve(self.policy.triage_file, "update_triage")
+        return lists.release_quarantine(path, item_id)
+
     @_traced
     def upsert_processing_list(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         path = self.policy.resolve(self.policy.processing_list, "upsert_processing_list")

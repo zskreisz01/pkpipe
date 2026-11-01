@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Runs{% endblock %}
+{% block body %}
+<h1>Runs</h1>
+<form class="card row" hx-post="/ui/runs" hx-target="#runs" hx-swap="innerHTML">
+  <label for="flow" class="inline">Start a flow</label>
+  <select id="flow" name="flow">{% for f in flows %}<option>{{ f }}</option>{% endfor %}</select>
+  <button class="primary" type="submit">Run</button>
+</form>
+<div id="runs">{% include "_runs_table.html" %}</div>
+{% endblock %}

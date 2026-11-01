@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}pkpipe login{% endblock %}
+{% block body %}
+<h1>pkpipe</h1>
+<form method="post" action="/login" class="card narrow">
+  <label for="token">Owner token</label>
+  <input id="token" name="token" type="password" autocomplete="current-password" required class="wide">
+  {% if error %}<p class="err" id="login-error">{{ error }}</p>{% endif %}
+  <p class="muted">The token is in <code>tokens.json</code> in the data directory or in <code>PKPIPE_TOKEN</code>.</p>
+  <button class="primary" type="submit">Log in</button>
+</form>
+{% endblock %}

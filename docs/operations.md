@@ -105,3 +105,25 @@ Retention and backups follow the backend: for the local default, back up the `ph
 
 - Engine changes happen in this repository via pull requests, with green CI.
 - Deployments pin a released tag of the engine; a private deployment repository holds the overlay, contexts, datasets and service definitions.
+
+## Config UI and app MCP
+
+`pkpipe serve` starts the API, the HTMX UI, the cron scheduler (resuming interrupted runs first) and the app MCP server in one process on one listener:
+
+```bash
+PKPIPE_OVERLAY_DIR=~/pkpipe-overlay PKPIPE_VAULT_DIR=~/Vault uv run pkpipe serve   # http://127.0.0.1:8787
+```
+
+| Option | Meaning |
+| --- | --- |
+| `--host` | `127.0.0.1` (default), another loopback address or a Tailscale address (100.64.0.0/10, fd7a:115c:a1e0::/48). `0.0.0.0` and LAN addresses are refused |
+| `--port` | Default 8787 (also the `ui_url` of `channels.json`) |
+| `--overlay`, `--pack`, `--db`, `--vault` | Same as the other commands; `--vault` / `PKPIPE_VAULT_DIR` enables the triage views and decisions |
+| `--allow-host` | Extra `Host` name to accept, for example a Tailscale MagicDNS name (repeatable) |
+| `--no-scheduler` | UI and MCP only |
+
+**Tokens.** On first start `tokens.json` (mode 0600) is created in the data directory with an **owner** token and an **agent** token; `PKPIPE_TOKEN` / `PKPIPE_AGENT_TOKEN` (24+ characters) override them. Log into the UI with the owner token. Without `PKPIPE_OVERLAY_DIR` the config pages are read-only.
+
+**App MCP** is `http://127.0.0.1:8787/mcp` with `Authorization: Bearer <token>`. The agent token can `run_flow`, `get_run` and `list_triage`; `confirm_item`, `override_item` and `release_quarantine` are owner actions and need the owner token (give it only to a chat agent you trust to act for you). Every owner action and `run_flow` lands in the audit log (UI page `/audit`, `GET /api/audit`). Contract: `specs/014-config-ui-and-app-mcp/contracts/`.
+
+For Tailscale, bind to the machine's Tailscale address (or keep loopback and use `tailscale serve`), add the MagicDNS name with `--allow-host`, and keep using the tokens; Tailscale is not a substitute for them.

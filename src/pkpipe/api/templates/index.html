@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}pkpipe overview{% endblock %}
+{% block body %}
+<h1>Overview</h1>
+<div class="card" id="pending-card">
+  {% if triage_error %}<span class="muted">Triage: {{ triage_error }}</span>
+  {% else %}<a href="/triage"><strong data-testid="pending-count">{{ pending }}</strong> item(s) waiting for your decision</a>{% endif %}
+</div>
+<h2>Recent runs</h2>
+{% include "_runs_table.html" %}
+<h2>Recent publishes</h2>
+{% for p in publishes %}
+<div class="card"><a href="/publishes/{{ p.publish_id }}">{{ p.summary }}</a> <span class="muted">{{ p.created_at[:19] }} · {{ p.commit_sha[:10] }}</span></div>
+{% else %}<p class="muted">Nothing published from the UI yet.</p>{% endfor %}
+{% endblock %}

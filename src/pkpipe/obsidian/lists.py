@@ -7,7 +7,13 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from pkpipe.domain.triage import ItemState, check_transition
+from pkpipe.domain.triage import (
+    ItemState,
+    OwnerDecisionError,
+    check_owner_decision,
+    check_quarantine_release,
+    check_transition,
+)
 
 from .atomic import update_text
 from .errors import InvalidRows
@@ -130,6 +136,68 @@ def update_triage(path: Path, updates: list[dict[str, Any]]) -> dict[str, Any]:
 
     update_text(path, transform)
     return {**result, "conflicts": find_conflicts(path)}
+
+
+def _owner_edit(path: Path, item_id: str, change) -> dict[str, Any]:
+    """Apply ``change(current_row) -> new_row`` to one existing triage row under the file lock."""
+    result: dict[str, Any] = {}
+
+    def transform(text: str | None) -> str:
+        table = TableFile(text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE)
+        existing = table.get(item_id)
+        if existing is None:
+            raise InvalidRows(f"unknown triage item '{item_id}'")
+        try:
+            current = TriageRow.from_cells(existing)
+        except (ValueError, ValidationError):
+            raise InvalidRows(f"item '{item_id}' has an unreadable row") from None
+        try:
+            new = change(current)
+        except OwnerDecisionError as exc:
+            raise InvalidRows(str(exc)) from None
+        table.upsert(new.to_cells())
+        result.update(new.model_dump(mode="json"))
+        return table.render()
+
+    update_text(path, transform)
+    return result
+
+
+def owner_decide(
+    path: Path,
+    item_id: str,
+    *,
+    confirm: bool | None = None,
+    override: str | None = None,
+    categories: set[str] | frozenset[str] | None = None,
+) -> dict[str, Any]:
+    """The owner's confirm tick and/or override category for one item, written to the triage file.
+
+    This is the only writer of ``confirm`` / ``override`` besides the owner's own edit in Obsidian. It is
+    reachable from the owner channels (UI, authenticated app MCP) and never from the vault MCP server, which
+    sessions may use. Decision rules: :func:`pkpipe.domain.triage.check_owner_decision`.
+    """
+
+    def change(row: TriageRow) -> TriageRow:
+        check_owner_decision(row.state, confirm=confirm, override=override, categories=categories)
+        data = row.model_dump()
+        if confirm is not None:
+            data["confirm"] = confirm
+        if override is not None:
+            data["override"] = override.strip() or None
+        return TriageRow(**data)
+
+    return _owner_edit(path, item_id, change)
+
+
+def release_quarantine(path: Path, item_id: str) -> dict[str, Any]:
+    """Owner decision: a quarantined item is a false positive; it goes back to ``pending`` for triage."""
+
+    def change(row: TriageRow) -> TriageRow:
+        check_quarantine_release(row.state)
+        return row.model_copy(update={"state": ItemState.PENDING})
+
+    return _owner_edit(path, item_id, change)
 
 
 def upsert_processing_list(path: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:

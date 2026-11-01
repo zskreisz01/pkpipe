@@ -119,3 +119,11 @@ def otel_factory():
     telemetry.reset()
     for o in created:
         o.telemetry.shutdown()
+
+
+@pytest.fixture
+def stack(tmp_path: Path, synthetic_vault: Path, pack_dir: Path):
+    """Config UI / app MCP stack on synthetic data (tests/support/app_stack.py)."""
+    from tests.support.app_stack import make_stack
+
+    return make_stack(tmp_path, synthetic_vault, pack_dir)

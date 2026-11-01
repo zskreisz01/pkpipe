@@ -1,7 +1,6 @@
 """Command line entry point: ``serve``, ``run <flow>``, ``runs``, ``eval --suite``, ``validate`` (spec 001).
 
-``validate``, ``schema``, ``run``, ``runs`` (spec 005) and ``eval`` (spec 013) are real; ``serve`` is wired by
-a later spec (API) by replacing its entry in :data:`HANDLERS`.
+``validate``, ``schema``, ``run``, ``runs`` (spec 005), ``eval`` (spec 013) and ``serve`` (spec 014) are real.
 """
 
 from __future__ import annotations
@@ -122,6 +121,12 @@ def _eval(args: argparse.Namespace) -> int:
     return eval_command(args)
 
 
+def _serve(args: argparse.Namespace) -> int:
+    from pkpipe.serve import serve_command
+
+    return serve_command(args)
+
+
 def _not_implemented(args: argparse.Namespace) -> int:
     print(f"'{args.cmd}' is not implemented yet", file=sys.stderr)
     return 1
@@ -129,7 +134,7 @@ def _not_implemented(args: argparse.Namespace) -> int:
 
 #: command name -> handler. Later specs replace the stubs (``HANDLERS["serve"] = ...``).
 HANDLERS: dict[str, Handler] = {
-    "serve": _not_implemented,
+    "serve": _serve,
     "run": _run,
     "runs": _runs,
     "eval": _eval,
@@ -142,7 +147,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pkpipe", description="Local-first agent pipeline")
     parser.add_argument("--version", action="version", version=__version__)
     sub = parser.add_subparsers(dest="cmd")
-    sub.add_parser("serve", help="start API, UI, scheduler and app MCP server")
+    serve = sub.add_parser("serve", help="start API, UI, scheduler and app MCP server")
+    from pkpipe.serve import add_arguments as add_serve_arguments
+
+    add_serve_arguments(serve)
     run = sub.add_parser("run", help="run one flow now, or resume interrupted runs")
     run.add_argument("flow", nargs="?")
     run.add_argument("--resume", metavar="RUN_ID", help="continue a run from its last checkpoint")
