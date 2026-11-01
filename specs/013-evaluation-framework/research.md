@@ -1,9 +1,9 @@
 ---
 spec_id: 013-evaluation-framework
 title: Evaluation framework and gates
-status: Draft
+status: Completed
 description: Technology options and decision for evaluation framework and gates.
-updated: 2026-10-31
+updated: 2026-11-01
 ---
 
 # Research: 013-evaluation-framework
@@ -24,4 +24,5 @@ The chosen option is the one marked in the table; it keeps the core independent 
 
 ## R-3 – Risks and open points
 
-- Validate the choice with a spike before the spec moves to Active.
+- Validated: the own runner (`pkpipe.evals`) runs all suites with pytest-independent CLI and records/replays model
+  responses; Phoenix / Langfuse see eval runs through OTLP spans with `eval.run_id`. DeepEval was not needed.

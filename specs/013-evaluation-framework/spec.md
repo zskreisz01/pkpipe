@@ -1,7 +1,7 @@
 ---
 spec_id: 013-evaluation-framework
 title: Evaluation framework and gates
-status: Draft
+status: Completed
 description: Five eval levels with datasets, code-first scoring, an LLM judge with calibration, recorded LLM responses for CI, and the publish gate used by the config UI.
 relevant_when:
   - eval
@@ -11,14 +11,14 @@ relevant_when:
   - cassette
   - regression
 related: [014-config-ui-and-app-mcp]
-updated: 2026-10-31
+updated: 2026-11-01
 ---
 
 # Feature Specification: Evaluation framework and gates
 
 **Feature Branch**: `spec/013-evaluation-framework`
 **Created**: 2026-10-31
-**Status**: Draft
+**Status**: Completed
 **Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
 **Companions**: [research.md](research.md) · [data-model.md](data-model.md)
 
@@ -82,6 +82,17 @@ Flow tests run in CI with recorded responses.
 ### Session 2026-10-31
 
 - Q: Is this spec part of the public engine? → A: Yes; private categories, contexts and datasets stay in the overlay.
+
+### Session 2026-11-01 (implementation)
+
+- Q: Which judge model? → A: A different model than the one under test (FR-002): the public pack uses
+  `google/gemma-4-12b` (`PKPIPE_JUDGE_MODEL`); `pkpipe validate` rejects a judge profile used by an LLM step and the
+  runner refuses a judge that resolves to the same endpoint and model.
+- Q: Where are the gates? → A: `evals.json` (layered config, schema exported); thresholds only move upwards.
+- Q: Dataset gaps? → A: `context_leak.jsonl` (query guard, spec 011) and `improvement_extract.jsonl` (spec 015) are
+  added with those specs; the security suite measures the current pattern guard (gate 0.80) until the classifier guard
+  of spec 009 raises it to 0.90.
+- Status: Completed. Measured live (qwen3.5-9b-mlx, judge gemma-4-12b) – see docs/evaluation.md.
 
 ## Out of Scope
 

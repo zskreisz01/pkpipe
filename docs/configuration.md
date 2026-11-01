@@ -25,6 +25,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
 | `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir |
+| `evals.json` | Eval gates per suite (`min` / `max` per metric), judge profile, pairwise and calibration limits ([Evaluation](evaluation.md)). Thresholds only move upwards |
 | `telemetry.json` | Prompt/response content capture per flow (`capture_content.flows`); journal and context flows are always off. Exporters come from `OTEL_*` env ([operations](operations.md)) |
 | `flows/*.json` | Graph: nodes, edges, conditions, subflow calls ([Flows](flows.md)) |
 | `steps/*.json` | Defaults per step type: model profile, output schema, retry |
@@ -35,7 +36,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 
 ## Model profiles
 
-Steps name a profile (`default`, `judge`), never an endpoint. `models.json` maps profile names to settings:
+Steps name a profile (`default`, `judge`), never an endpoint. The `judge` profile is used only by the eval judge and must be a different model than the one under test (spec 013): the public pack uses `env:PKPIPE_JUDGE_MODEL|google/gemma-4-12b` on `env:PKPIPE_JUDGE_BASE_URL|env:PKPIPE_MODEL_BASE_URL|...`, and `pkpipe validate` rejects an `evals.json` `judge_profile` that an LLM step uses. `models.json` maps profile names to settings:
 
 | Field | Meaning | Default |
 | --- | --- | --- |
