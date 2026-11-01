@@ -91,6 +91,7 @@
         "payload": {
           "new": "${backlog.new}",
           "backlog": "${backlog.backlog}",
+          "invalid": "${backlog.invalid}",
           "awaiting": "${backlog.awaiting}"
         }
       }
@@ -123,7 +124,7 @@
     },
     {
       "from": "rows",
-      "to": "END",
+      "to": "backlog",
       "default": true
     },
     {
@@ -132,7 +133,16 @@
     },
     {
       "from": "backlog",
-      "to": "notify"
+      "to": "notify",
+      "when": {
+        "path": "backlog.notify",
+        "truthy": true
+      }
+    },
+    {
+      "from": "backlog",
+      "to": "END",
+      "default": true
     }
   ]
 }

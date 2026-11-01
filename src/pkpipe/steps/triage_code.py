@@ -8,7 +8,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from pkpipe.domain.triage import ItemState, TriageItem, is_unreviewed, item_id_for, needs_retriage, release
+from pkpipe.domain.triage import (
+    ItemState,
+    TriageItem,
+    is_unreviewed,
+    item_id_for,
+    needs_decision,
+    needs_retriage,
+    release,
+)
 from pkpipe.steps.base import StepContext, StepResult, register_code
 
 MANAGED_FILES = ("Inbox-Triage.md", "Manual-Resource-Processing-List.md")
@@ -56,7 +64,8 @@ def select_new(
             continue
         if r.get("item_id") in seen or not r.get("resource"):
             continue
-        if needs_retriage(state, r.get("ai_suggested_category", ""), r.get("override") or None, valid):
+        suggested, override = r.get("ai_suggested_category", ""), r.get("override") or None
+        if needs_retriage(state, suggested, bool(r.get("confirm")), override, valid):
             seen.add(r["item_id"])
             items.append({"id": r["item_id"], "path": r["resource"], "resource": r["resource"]})
             retriage += 1
@@ -109,23 +118,45 @@ def backlog(
     ctx: StepContext, triage: dict[str, Any], new_rows: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
     """Notification payload for ``triage_ready``: the new suggestions plus the backlog of older items that
-    still wait for the owner (neither confirmed nor overridden, not processed or quarantined)."""
+    still wait for the owner: neither confirmed nor overridden, or decided on a category that is no longer
+    configured (``invalid``: a removed category or an unknown override). Finished items do not count."""
+    valid = frozenset(_categories(ctx))
     fresh = {r["item_id"] for r in new_rows or []}
-    older = 0
+    older = invalid = 0
     for r in (triage or {}).get("rows", []):
         try:
             state = ItemState(r.get("state", "suggested"))
         except ValueError:
             continue
-        if r.get("item_id") not in fresh and is_unreviewed(
-            state, bool(r.get("confirm")), r.get("override") or None
-        ):
+        if r.get("item_id") in fresh:
+            continue
+        confirm, override = bool(r.get("confirm")), r.get("override") or None
+        if is_unreviewed(state, confirm, override):
             older += 1
+        elif needs_decision(state, r.get("ai_suggested_category", ""), confirm, override, valid):
+            invalid += 1
     new = len(fresh)
-    message = f"Triage ready: {new} new item(s) to confirm or override in 0-INBOX/Inbox-Triage.md."
+    if new:
+        message = f"Triage ready: {new} new item(s) to confirm or override in 0-INBOX/Inbox-Triage.md."
+    else:
+        message = "Triage: no new items in 0-INBOX/Inbox-Triage.md."
     if older:
         message += f" {older} older item(s) still wait for your decision."
-    return {"new": new, "backlog": older, "awaiting": new + older, "message": message}
+    if invalid:
+        message += (
+            f" {invalid} item(s) name a category that is no longer configured: write a configured category"
+            " into override."
+        )
+    return {
+        "new": new,
+        "backlog": older,
+        "invalid": invalid,
+        "awaiting": new + older + invalid,
+        "message": message,
+        # New suggestions or a decision that can never be released need the owner; an unchanged backlog of
+        # unreviewed items alone does not send a mail every evening (it is in the 06:00 summary).
+        "notify": bool(new or invalid),
+    }
 
 
 @register_code("triage.release")

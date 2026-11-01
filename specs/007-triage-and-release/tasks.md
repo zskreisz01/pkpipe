@@ -1,6 +1,6 @@
 ---
 spec_id: 007-triage-and-release
-status: Completed
+status: Active
 description: Tasks for Daily triage and morning release
 updated: 2026-11-01
 ---
@@ -21,6 +21,8 @@ Format: `- [ ] T001 [USx] Description` · `[USx]` = user story
 
 - [x] T004 [US2] Flow `process_released.json` with fan-out to subflows
 - [x] T005 [US2] Re-triage on unknown category
+- [x] T011 [US2] Review fix: no re-suggestion of confirmed items (FR-005); `invalid` decisions reported in `triage_ready` even without new items; flow eval case `unknown-override-goes-back-to-owner`
+- [ ] T012 [US1] De-duplicate two INBOX notes that capture the same URL (deferred, see spec `status_reason`)
 
 ## Phase: User Story 3 (P2)
 

@@ -78,15 +78,35 @@ def release(items: list[TriageItem]) -> tuple[list[TriageItem], list[TriageItem]
 
 
 def needs_retriage(
-    state: ItemState, suggested: str, override: str | None, valid_categories: frozenset[str] | set[str]
+    state: ItemState,
+    suggested: str,
+    confirm: bool,
+    override: str | None,
+    valid_categories: frozenset[str] | set[str],
 ) -> bool:
-    """An unfinished item whose AI suggestion names a category that is no longer configured, and which has
-    no valid owner override, is flagged for re-triage (the category was removed from the config)."""
-    if state not in (ItemState.SUGGESTED, ItemState.PENDING):
+    """An open item whose AI suggestion names a category that is no longer configured, and on which the owner
+    has not decided yet, is flagged for re-triage (the category was removed from the config).
+
+    An item the owner already confirmed is never re-suggested: the confirm tick belongs to the old suggestion
+    and would otherwise release a category the owner never saw (constitution VI). See :func:`needs_decision`.
+    """
+    if state not in (ItemState.SUGGESTED, ItemState.PENDING) or confirm or override:
         return False
-    if override and override in valid_categories:
+    return suggested not in valid_categories
+
+
+def needs_decision(
+    state: ItemState,
+    suggested: str,
+    confirm: bool,
+    override: str | None,
+    valid_categories: frozenset[str] | set[str],
+) -> bool:
+    """An open item the owner decided on, whose effective category is not configured (removed category or an
+    unknown override). It is never released; the owner has to write a configured category into override."""
+    if state not in (ItemState.SUGGESTED, ItemState.PENDING) or not (confirm or override):
         return False
-    return not override and suggested not in valid_categories
+    return (override or suggested) not in valid_categories
 
 
 def is_unreviewed(state: ItemState, confirm: bool, override: str | None) -> bool:

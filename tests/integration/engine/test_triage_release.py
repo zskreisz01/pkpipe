@@ -1,7 +1,7 @@
 """Spec 007: the 20:00 triage and 06:00 release flows with fake ports on a real ``Vault`` (real files).
 
 Covers US1 (suggestions, no tools / datamarked), US2 (only decided items released, override wins, backlog in
-the next notification), US3 (daily summary), FR-001..FR-004, SC-002 and the edge cases (same resource twice,
+the next notification), US3 (daily summary), FR-001..FR-005, SC-002 and the edge cases (same note twice,
 category removed from the config).
 """
 
@@ -156,28 +156,72 @@ def test_quarantined_and_processed_items_are_skipped_by_release(world):
     assert world.notify.sent[-1].message == "Processed 0, quarantined 0, failed 0; 0 item(s) still pending."
 
 
-def test_category_removed_from_config_flags_the_item_for_retriage(world):
-    """T005 / edge case: a confirmed item whose category was removed is not released; the next triage
-    suggests again from the remaining categories and the owner decides again."""
+def test_category_removed_from_config_flags_an_undecided_item_for_retriage(world):
+    """T005 / edge case: an unreviewed item whose suggested category was removed is suggested again from the
+    remaining categories; it is still not released until the owner decides on the new suggestion."""
     assert world.svc.start("triage").ok
-    owner_decides(world.vault, confirm=[TOOL])
+    assert world.svc.start("process_released").ok  # both unreviewed -> pending
     world.drop_category("tool")
-    assert world.svc.start("process_released").ok
-    assert _states(world.vault)[TOOL] == "pending"  # not released, flagged
-    assert not list((world.vault / "3-Resources").rglob(f"{TOOL}.md"))
 
     world.script({"CLI tool": "marketing"})
     again = world.svc.start("triage")
     assert again.ok and again.outputs["select_new"]["retriage"] == 1
+    assert [i["id"] for i in again.outputs["select_new"]["items"]] == [TOOL]
     rows = {r["item_id"]: r for r in lists.read_triage(world.vault / TRIAGE_FILE)["rows"]}
     assert rows[TOOL]["ai_suggested_category"] == "marketing" and rows[TOOL]["state"] == "suggested"
-    assert world.notify.sent[-1].message.startswith("Triage ready: 1 new item(s)")
+    assert world.notify.sent[-1].message == (
+        "Triage ready: 1 new item(s) to confirm or override in 0-INBOX/Inbox-Triage.md. "
+        "1 older item(s) still wait for your decision."
+    )
+    assert world.svc.start("process_released").ok
+    assert _states(world.vault)[TOOL] == "pending"  # SC-002: the new suggestion is not confirmed yet
+
+    owner_decides(world.vault, confirm=[TOOL])
+    assert world.svc.start("process_released").ok
+    assert _states(world.vault)[TOOL] == "processed"
+    assert (world.vault / "3-Resources/Marketing" / f"{TOOL}.md").exists()
 
 
-def test_same_resource_captured_twice_is_one_item(world):
-    """Edge case: id = hash of the resource, so a repeated listing entry yields one row and one session."""
+def test_confirmed_item_whose_category_was_removed_goes_back_to_the_owner(world):
+    """Edge case + constitution VI: the confirm tick belongs to the removed category. The item is not
+    released, not silently re-suggested (the tick would release a category the owner never saw), and the
+    evening notification asks for an override even without new items."""
+    assert world.svc.start("triage").ok
+    owner_decides(world.vault, confirm=[TOOL])
+    world.drop_category("tool")
+    assert world.svc.start("process_released").ok
+    assert _states(world.vault)[TOOL] == "pending"
+    assert not list((world.vault / "3-Resources").rglob(f"{TOOL}.md"))
+
+    calls = len(world.model.calls)
+    again = world.svc.start("triage")
+    assert again.ok and again.outputs["select_new"]["count"] == 0 and len(world.model.calls) == calls
+    sent = world.notify.sent[-1]
+    assert sent.event == "triage_ready" and sent.payload["invalid"] == 1 and sent.payload["new"] == 0
+    assert "1 item(s) name a category that is no longer configured" in sent.message
+    assert world.svc.start("process_released").ok
+    assert _states(world.vault)[TOOL] == "pending"  # still not released
+
+    owner_decides(world.vault, override={TOOL: "misc"})
+    assert world.svc.start("process_released").ok
+    assert _states(world.vault)[TOOL] == "processed"
+    assert (world.vault / "3-Resources/Misc" / f"{TOOL}.md").exists()
+
+
+def test_unchanged_unreviewed_backlog_alone_sends_no_evening_mail(world):
+    """US2-AS1 without nagging: nothing new and nothing undeliverable -> no triage_ready notification; the
+    pending items are in the 06:00 summary and in the next triage notification."""
+    assert world.svc.start("triage").ok
+    sent = len(world.notify.sent)
+    assert world.svc.start("triage").ok and len(world.notify.sent) == sent
+
+
+def test_one_row_per_note_and_a_rerun_does_not_duplicate(world):
+    """Edge case (note-path level; URL-level de-duplication is deferred, see spec status_reason): id = hash of
+    the note path, so a second run adds no row and the id ignores surrounding whitespace."""
     from pkpipe.steps import CODE
 
+    assert world.svc.start("triage").ok
     assert world.svc.start("triage").ok
     rows = lists.read_triage(world.vault / TRIAGE_FILE)["rows"]
     assert len({r["item_id"] for r in rows}) == len(rows) == 2

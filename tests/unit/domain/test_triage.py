@@ -56,18 +56,35 @@ def test_release_rule_output_is_always_an_allowed_transition():
             assert check_transition(state, item.state, owner_decided=confirm or bool(override)) is None
 
 
-def test_needs_retriage_only_for_open_items_with_a_removed_suggested_category():
+def test_needs_retriage_only_for_open_undecided_items_with_a_removed_suggested_category():
     """Spec 007 T005 edge case: category removed from config while pending -> flagged for re-triage."""
     from pkpipe.domain.triage import needs_retriage
 
     valid = {"tool", "misc"}
-    assert needs_retriage(ItemState.PENDING, "gone", None, valid)
-    assert needs_retriage(ItemState.SUGGESTED, "gone", None, valid)
-    assert not needs_retriage(ItemState.PENDING, "tool", None, valid)
-    assert not needs_retriage(ItemState.PENDING, "gone", "misc", valid)  # a valid override decides
-    assert not needs_retriage(ItemState.PENDING, "gone", "also-gone", valid)  # owner's choice, not the AI's
+    assert needs_retriage(ItemState.PENDING, "gone", False, None, valid)
+    assert needs_retriage(ItemState.SUGGESTED, "gone", False, None, valid)
+    assert not needs_retriage(ItemState.PENDING, "tool", False, None, valid)
+    assert not needs_retriage(ItemState.PENDING, "gone", False, "misc", valid)  # a valid override decides
+    assert not needs_retriage(ItemState.PENDING, "gone", False, "also-gone", valid)  # owner's choice
+    # constitution VI: the confirm tick was given for the old suggestion; a new one must not inherit it
+    assert not needs_retriage(ItemState.PENDING, "gone", True, None, valid)
     for final in (ItemState.PROCESSED, ItemState.QUARANTINED, ItemState.RELEASED):
-        assert not needs_retriage(final, "gone", None, valid)
+        assert not needs_retriage(final, "gone", False, None, valid)
+
+
+def test_needs_decision_for_decided_items_on_an_unconfigured_category():
+    """Spec 007 edge case: a confirmed removed category or an unknown override goes back to the owner."""
+    from pkpipe.domain.triage import needs_decision
+
+    valid = {"tool", "misc"}
+    assert needs_decision(ItemState.PENDING, "gone", True, None, valid)
+    assert needs_decision(ItemState.SUGGESTED, "tool", False, "no-such", valid)
+    assert needs_decision(ItemState.PENDING, "tool", True, "no-such", valid)  # override wins, and is unknown
+    assert not needs_decision(ItemState.PENDING, "gone", True, "misc", valid)
+    assert not needs_decision(ItemState.PENDING, "tool", True, None, valid)
+    assert not needs_decision(ItemState.PENDING, "gone", False, None, valid)  # undecided: re-triage instead
+    for final in (ItemState.PROCESSED, ItemState.QUARANTINED, ItemState.RELEASED):
+        assert not needs_decision(final, "gone", True, None, valid)
 
 
 def test_is_unreviewed_means_waiting_for_the_owner():

@@ -1,7 +1,8 @@
 ---
 spec_id: 007-triage-and-release
 title: Daily triage and morning release
-status: Completed
+status: Active
+status_reason: "Deferred: de-duplicating two different INBOX notes that capture the same URL (edge case 'same resource captured twice' is met for the note path only). Everything else is implemented and tested."
 description: The 20:00 triage flow suggests a category per new INBOX item in an isolated session and notifies the owner; the 06:00 flow releases only confirmed or overridden items and fans them out to the category processes.
 relevant_when:
   - triage
@@ -18,7 +19,7 @@ updated: 2026-11-01
 
 **Feature Branch**: `spec/007-triage-and-release`
 **Created**: 2026-10-31
-**Status**: Completed
+**Status**: Active
 **Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
 
 ## User Scenarios & Testing *(mandatory)*
@@ -68,6 +69,7 @@ After processing, the owner gets counts of processed, pending and quarantined it
 - **FR-002**: The categorization session MUST NOT fetch item content (constitution IV).
 - **FR-003**: Release MUST follow `domain.triage.release`; quarantined and processed items are skipped.
 - **FR-004**: Each released item MUST run in its own instance; a security flag affects only that item.
+- **FR-005**: A confirm tick MUST NOT release a category the owner has not seen: a confirmed item whose category was removed is not re-suggested but reported back to the owner (review 2026-11-01).
 
 ### Key Entities
 
@@ -87,6 +89,8 @@ After processing, the owner gets counts of processed, pending and quarantined it
 ### Session 2026-11-01
 
 - Q: What happens when a category is removed while an item is open? → A: The next triage run selects the item again and suggests a category from the remaining ones; an override naming an unknown category is never released.
+- Q (review): What if the owner had already confirmed the removed category? → A: The item is not re-suggested, because the confirm tick (an owner field the pipeline cannot clear) would release a category the owner never saw (constitution VI). It stays pending and the evening `triage_ready` notification reports it (with unknown overrides) as `invalid`, also on evenings without new items, until the owner writes a configured override.
+- Q (review): What is "the same resource"? → A: For now the INBOX note path (`item_id_for(path)`, as in spec 004/005). Two different notes that capture the same URL are still two items; URL-level de-duplication needs the source of each note before selection and is deferred (see `status_reason`).
 
 ## Out of Scope
 
