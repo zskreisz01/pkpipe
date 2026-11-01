@@ -39,6 +39,7 @@ from pkpipe.evals.suites import (
     step_fingerprint,
 )
 from pkpipe.ports import ModelError, ModelPort
+from pkpipe.steps.llm import LLM_STEP_TYPES
 from pkpipe.telemetry import attrs
 
 #: suites a publish may run, in order (production is monitoring only)
@@ -98,7 +99,7 @@ def llm_steps(snapshot: ConfigSnapshot) -> list[str]:
         f"{fid}.{node.id}"
         for fid, flow in snapshot.flows().items()
         for node in flow.nodes
-        if node.type in ("llm", "llm_tools")
+        if node.type in LLM_STEP_TYPES
     )
 
 

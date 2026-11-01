@@ -13,7 +13,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [005-flow-engine](005-flow-engine/spec.md) | Flow engine: compiler, step executors, run service, scheduler | Completed | research · data-model |
 | [006-notifications](006-notifications/spec.md) | Notification port and channels | Completed |  |
 | [007-triage-and-release](007-triage-and-release/spec.md) | Daily triage and morning release | Active |  |
-| [008-secure-fetch](008-secure-fetch/spec.md) | Secure fetch | Draft | research · data-model |
+| [008-secure-fetch](008-secure-fetch/spec.md) | Secure fetch | Active | research · data-model |
 | [009-output-guard-and-quarantine](009-output-guard-and-quarantine/spec.md) | Output guard and quarantine | Draft | research · data-model |
 | [010-category-sessions](010-category-sessions/spec.md) | Category session plans and Process Other Resource | Draft | data-model |
 | [011-context-packs](011-context-packs/spec.md) | Context packs and weekly refresh | Draft |  |

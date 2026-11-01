@@ -106,6 +106,24 @@ Retention and backups follow the backend: for the local default, back up the `ph
 - Engine changes happen in this repository via pull requests, with green CI.
 - Deployments pin a released tag of the engine; a private deployment repository holds the overlay, contexts, datasets and service definitions.
 
+## Web fetch
+
+Flows fetch pages only through the web-fetch MCP server (spec 008):
+
+```bash
+LIGHTPANDA_DISABLE_TELEMETRY=true uv run python -m pkpipe.webfetch.server --stats-file ~/.local/share/pkpipe/webfetch-stats.jsonl
+uv run pkpipe run secure_fetch --input '{"url": "https://example.org/"}' --json   # one URL through the whole check
+```
+
+| Option | Meaning |
+| --- | --- |
+| `--host`, `--port` | Loopback only, default 127.0.0.1:8704 (the `webfetch` entry of `mcp_servers.json`) |
+| `--pack`, `--overlay` | Config layers for the URL filter and deny-list (default: public pack, `PKPIPE_OVERLAY_DIR`) |
+| `--timeout` | Seconds per browser attempt (default 30); a timeout falls back to Chromium once |
+| `--stats-file` | One JSON line per fetch (status, fetcher, fallback, reason; no URL) |
+
+**Fallback rate (SC-002).** `fetch_stats` (MCP tool) returns the counters of the running server, including `fallback_rate`; `pkpipe eval --suite production --fetch-stats <file>` reports `fetch_fallback_rate` and the outcome counts over the stats file. Every fetch step span carries `fetch.fetcher`, `fetch.fallback`, `fetch.status` and `fetch.reason`.
+
 ## Config UI and app MCP
 
 `pkpipe serve` starts the API, the HTMX UI, the cron scheduler (resuming interrupted runs first) and the app MCP server in one process on one listener:

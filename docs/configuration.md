@@ -24,7 +24,8 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `channels.json` | Notification channels and routing per event type |
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
-| `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir |
+| `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir ([Secure fetch](#secure-fetch)) |
+| `security/deny_list.txt` | Deny-list of the URL filter: one domain per line (subdomains included), `#` comments |
 | `evals.json` | Eval gates per suite (`min` / `max` per metric), judge profile, pairwise and calibration limits ([Evaluation](evaluation.md)). Thresholds only move upwards |
 | `telemetry.json` | Prompt/response content capture per flow (`capture_content.flows`); journal and context flows are always off. Exporters come from `OTEL_*` env ([operations](operations.md)) |
 | `flows/*.json` | Graph: nodes, edges, conditions, subflow calls ([Flows](flows.md)) |
@@ -59,6 +60,22 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 Webhook and Apprise URLs contain secrets, so the config accepts only `env:NAME` references; they are resolved when sending, never logged, and the notifier's HTTP client is excluded from httpx auto-instrumentation so tokens do not reach traces. Redirects are not followed.
 
 **Templates** are Jinja2 files `templates/<event>.<channel type>.md|json` in the pack or overlay (an overlay file replaces the pack file). The step payload is the template context: `message` plus the step's `payload` keys. A `.json` template is the channel-native body and must write values as `{{ value | tojson }}`. Without a template the `message` is sent; a broken template falls back to plain text with a span event. Text beyond the channel limit (Discord 2000, others 4000 characters) is truncated and ends with `ui_url`. The pack ships `triage_ready`, `daily_summary`, `security_flag` and `weekly_review` for Discord, Teams and Apprise.
+
+## Secure fetch
+
+`security.json` keys used by the `secure_fetch` flow (spec 008):
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `url_filter.block_private_networks` | Refuse private, loopback, link-local and CGNAT targets (after DNS) | `true` |
+| `url_filter.max_bytes` | Size limit of a page; larger pages are blocked (security flag) | 2000000 |
+| `url_filter.deny_list` | Deny-list file in the config layers (`security/deny_list.txt`) | none |
+| `prompt_guard.model`, `chunk_tokens` (≤ 512), `threshold` | Prompt Guard 2 model name, chunk size, flag threshold | pack: 86M, 512, 0.5 |
+| `prompt_guard.model_dir` | Local model directory (may be `env:NAME`); else `$PKPIPE_PROMPT_GUARD_DIR`, else `~/tools/prompt-guard-2/<model name>` | none |
+| `prompt_guard.required` | Without a usable classifier every fetch is flagged (fail closed) | `true` |
+| `heuristics.threshold` | Heuristic score that raises a flag | 1.0 |
+
+The `webfetch` entry of `mcp_servers.json` points at the web-fetch MCP server (`python -m pkpipe.webfetch.server`, 127.0.0.1:8704, allow list `fetch_page`). The server reads the same layered config (`--pack`, `--overlay` or `PKPIPE_OVERLAY_DIR`) and re-reads the URL filter and deny-list for every fetch.
 
 ## Model profiles
 

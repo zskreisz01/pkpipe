@@ -192,8 +192,10 @@ def validate_flow(
 
 
 #: Step types whose output is external data that no schema has validated (tool results, wait poll results,
-#: tool-using sessions that saw such results).
-UNVALIDATED_OUTPUT_TYPES = frozenset({"tool", "wait", "llm_tools"})
+#: tool-using sessions that saw such results), plus the raw stages of secure fetch (spec 008): the fetched
+#: page, the sanitized text and the Reader output (which quotes page text as evidence). Sessions with tools
+#: take the secure-fetch verdict's ``extract`` (or ``item.extract``) instead.
+UNVALIDATED_OUTPUT_TYPES = frozenset({"tool", "wait", "llm_tools", "fetch", "sanitize", "reader", "subflow"})
 
 
 def _unvalidated_source(flow: Flow, ref: str, registry: StepRegistry) -> bool:
@@ -287,13 +289,15 @@ def private_data_errors(
 
     for node in flow.nodes:
         cfg = node.config
-        if node.type in ("llm", "llm_tools"):
+        if node.type in ("llm", "llm_tools", "reader"):
             profile_errors(node.id, str(cfg.get("profile", "default")))
         if environ is not None:
             continue
         if node.type == "llm_tools":
             errors.append(f"{where}: node '{node.id}' is a session with tools; journal sessions have none")
         tools = [cfg["tool"]] if node.type in ("tool", "wait") and isinstance(cfg.get("tool"), str) else []
+        if node.type == "fetch":  # secure fetch (spec 008) always leaves the machine
+            tools.append(str(cfg.get("tool") or "webfetch:fetch_page"))
         tools += [
             c.get("tool") for c in cfg.get("checks", []) if node.type == "guard" and isinstance(c, dict)
         ]

@@ -11,7 +11,7 @@ pkpipe is a single Python application that orchestrates flows with LangGraph, pl
 The binding rules are in the constitution (`.specify/memory/constitution.md`). In short:
 
 1. **Local-first, model-agnostic, deployable anywhere.** The reference deployment is one machine with a local model; the same engine runs in the cloud (for example Microsoft Foundry) by swapping configuration and adapters.
-2. **Hexagonal core.** The core depends only on ports; integrations are adapters.
+2. **Hexagonal core.** The core depends only on ports; integrations are adapters. The deterministic security code (`pkpipe.security`: URL filter, sanitizer, heuristics, canary, verdict) is held to the same import rule, so steps may use it.
 3. **Configuration over code.** Flows, categories, session plans and instructions are JSON + Markdown, layered (public pack → private overlay) and versioned in git.
 4. **Untrusted content isolation.** Raw web text only reaches sessions without tools.
 5. **Code decides, models propose.** Gates, flags and state changes are deterministic code.
@@ -82,7 +82,7 @@ C4Container
         ContainerDb(cfg, "Config repo", "git: JSON + Markdown", "Flows, categories, sessions, instructions")
         Container(mvault, "obsidian-vault", "FastMCP", "Vault notes and lists")
         Container(msearch, "web-search", "MCP", "SearXNG or Brave")
-        Container(mfetch, "web-fetch", "Lightpanda MCP", "Page to Markdown, Chromium fallback")
+        Container(mfetch, "web-fetch", "pkpipe.webfetch MCP", "fetch_page only: Lightpanda, Chromium fallback, filtering proxy")
         Container(mlearn, "learning-gateway", "FastMCP", "Backends: open_notebook, notebooklm_browser, fake")
         Container(on, "Open Notebook", "Docker", "API + SurrealDB + local TTS")
     }

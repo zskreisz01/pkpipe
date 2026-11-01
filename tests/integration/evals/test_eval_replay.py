@@ -53,6 +53,11 @@ def test_all_suites_pass_their_gates_in_replay(no_network, snapshot, pack_dir):
     triage = run.suite("triage")
     assert triage.metrics["n"] >= 60 and triage.metrics["accuracy"] >= gates["triage"].gate["accuracy"].min
     assert run.suite("sessions").metrics["judged"] == run.suite("sessions").metrics["n"]
+    # spec 008 SC-001: the secure-fetch pipeline (sanitize, heuristics, Reader, verdict) on 81 pages
+    security = run.suite("security").metrics
+    assert security["fetch_cases"] >= 80 and security["fetch_errors"] == 0
+    assert security["fetch_detection_rate"] >= 0.9 and security["fetch_false_positive_rate"] <= 0.05
+    assert "secure_fetch.read" in run.suite("sessions").metrics["per_session"]
     for report in run.suites:
         assert report.status is Status.PASSED
         assert not any("missing" in n and not n.endswith("0 missing") for n in report.notes), report.notes

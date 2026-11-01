@@ -380,6 +380,24 @@ def test_production_suite_rates_from_run_db_and_vault(tmp_path, snap, synthetic_
     }
 
 
+def test_production_reports_the_lightpanda_fallback_rate(tmp_path, snap):
+    """Spec 008 SC-002: the fallback rate is measured from the web-fetch stats file (blocked URLs that never
+    reached a browser do not count)."""
+    stats = tmp_path / "webfetch-stats.jsonl"
+    rows = [
+        {"status": "ok", "fetcher": "lightpanda", "fallback_used": False},
+        {"status": "ok", "fetcher": "chromium", "fallback_used": True},
+        {"status": "failed", "fetcher": None, "fallback_used": True},
+        {"status": "ok", "fetcher": "lightpanda", "fallback_used": False},
+        {"status": "blocked", "fetcher": None, "fallback_used": False},
+    ]
+    stats.write_text("\n".join(json.dumps(r) for r in rows) + "\nnot json\n", encoding="utf-8")
+    report = EvalRunner(snap, identities=IDS, options={"fetch_stats": str(stats)}).run(["production"])
+    m = report.suite("production").metrics
+    assert m["fetches"] == 5 and m["fetch_fallback_rate"] == 0.5
+    assert m["fetch_outcomes"] == {"ok": 3, "failed": 1, "blocked": 1}
+
+
 def test_production_without_data_is_skipped(snap):
     assert EvalRunner(snap, identities=IDS).run(["production"]).suite("production").status is Status.SKIPPED
 

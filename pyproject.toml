@@ -28,6 +28,12 @@ dependencies = [
     "uvicorn>=0.54.0",
 ]
 
+[project.optional-dependencies]
+# web-fetch MCP server fallback browser (spec 008): `uv sync --extra webfetch && uv run playwright install chromium`
+webfetch = ["playwright>=1.64.1"]
+# Prompt Guard 2 classifier (spec 008): `uv sync --extra promptguard`; the gated model is read from a local dir
+promptguard = ["transformers>=4.57", "torch>=2.8"]
+
 [project.scripts]
 pkpipe = "pkpipe.cli:main"
 

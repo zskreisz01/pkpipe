@@ -1,0 +1,48 @@
+{
+  "type": "object",
+  "required": [
+    "title",
+    "summary",
+    "facts",
+    "links",
+    "injection_suspected",
+    "evidence"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "facts": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "string",
+        "maxLength": 400
+      }
+    },
+    "links": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "injection_suspected": {
+      "type": "boolean"
+    },
+    "evidence": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 1000
+    }
+  }
+}

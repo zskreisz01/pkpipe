@@ -9,6 +9,7 @@ import pytest
 from pkpipe import ports
 from pkpipe.engine.registry import config_version
 from tests.fakes import (
+    FakeClassifier,
     FakeClock,
     FakeModel,
     FakeNotify,
@@ -30,6 +31,7 @@ FAKES = {
     "NotifyPort": FakeNotify(),
     "StatePort": InMemoryState(),
     "ConfigPort": InMemoryConfig(),
+    "ClassifierPort": FakeClassifier(),
 }
 
 

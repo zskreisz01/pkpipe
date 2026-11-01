@@ -10,7 +10,7 @@ import pytest
 from tests.conftest import REPO
 
 SRC = REPO / "src" / "pkpipe"
-CORE = ("engine", "domain", "steps")
+CORE = ("engine", "domain", "steps", "security")
 CORE_THIRD_PARTY = {"langgraph", "pydantic", "langchain_core"}  # allowed besides pkpipe.ports and stdlib
 STDLIB = __import__("sys").stdlib_module_names
 
@@ -53,7 +53,9 @@ def test_core_imports_only_ports_stdlib_and_allowed_libs(path):
     for mod in _imports(path):
         top = mod.split(".")[0]
         if top == "pkpipe":
-            allowed = mod.startswith(("pkpipe.ports", "pkpipe.domain", "pkpipe.engine", "pkpipe.steps"))
+            allowed = mod.startswith(
+                ("pkpipe.ports", "pkpipe.domain", "pkpipe.engine", "pkpipe.steps", "pkpipe.security")
+            )
             assert allowed or mod == "pkpipe", f"{path.name} imports {mod}: core may only use ports"
         else:
             assert top in STDLIB or top in CORE_THIRD_PARTY or top == "__future__", (

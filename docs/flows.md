@@ -76,10 +76,15 @@ An overlay can change one node of a pack flow by id (`{"nodes": [{"id": "notify"
 | `subflow` | Runs another flow for the current item; its checkpoints nest under the run | `flow` (id or `${item.subflow}`) |
 | `wait` | Polls a status tool until a condition holds; each poll is a checkpoint, the deadline is absolute | `tool`, `arguments`, `until`, `poll_s`, `deadline_s` |
 | `guard` | Flags from regular expressions and classifier scores (code decides); sets `item.flagged` | `input`, `patterns`, `checks` |
+| `fetch` | Secure fetch (spec 008): URL filter again, then one `webfetch:fetch_page` call; `status` `ok`, `blocked` (flag) or `failed`. Raw output | `url`, `tool`, `max_bytes` |
+| `sanitize` | Visible text of a fetched page; metadata only for PDF, video, image. Raw output | `input`, `max_chars` |
+| `reader` | The Reader: an `llm` session without tools and context pack, with a per-run canary; output plus `canary_leaked` | as `llm` (`output_schema` required) |
 
 Prompts and schemas are files of the layered config: `prompts/system/<system>.md`, `instructions/<instruction>`, `contexts/<context>.md`, `schemas/<output_schema>.json`. Every input is wrapped in random delimiters (datamarking) and the system prompt says that text inside them is data.
 
-Built-in `code` functions: `item.set`, `inbox.select_new`, `triage.category_menu`, `triage.check_category`, `triage.suggested_rows`, `triage.backlog`, `triage.release`, `triage.finalize`, and the self-improvement functions `improvement.locate_journal`, `improvement.section`, `improvement.new_rows`, `improvement.select_review`, `improvement.attach_journals`, `improvement.check_evidence`, `improvement.propose`, `improvement.no_evidence`, `improvement.review_rows`, `improvement.proposal_rows`, `improvement.summary` ([Self-Improvement Cycle](process/self-improvement-cycle.md)).
+Raw external text never reaches a session with tools: `fetch`, `sanitize` and `reader` outputs (like `tool`, `wait`, `llm_tools` and `subflow` outputs) are refused as `llm_tools` inputs; take the secure-fetch verdict's `extract` (`item.extract`) instead.
+
+Built-in `code` functions: `secure_fetch.url_check`, `secure_fetch.scan`, `secure_fetch.verdict`, `item.set`, `inbox.select_new`, `triage.category_menu`, `triage.check_category`, `triage.suggested_rows`, `triage.backlog`, `triage.release`, `triage.finalize`, and the self-improvement functions `improvement.locate_journal`, `improvement.section`, `improvement.new_rows`, `improvement.select_review`, `improvement.attach_journals`, `improvement.check_evidence`, `improvement.propose`, `improvement.no_evidence`, `improvement.review_rows`, `improvement.proposal_rows`, `improvement.summary` ([Self-Improvement Cycle](process/self-improvement-cycle.md)).
 
 ### Triage and release (spec 007)
 
