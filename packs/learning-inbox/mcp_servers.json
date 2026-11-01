@@ -26,14 +26,9 @@
     "transport": "streamable_http",
     "url": "http://127.0.0.1:8704/mcp",
     "allow": [
-<<<<<<< HEAD
       "fetch_page"
-    ]
-=======
-      "fetch_markdown"
     ],
     "egress": true
->>>>>>> dev
   },
   "learning": {
     "transport": "streamable_http",

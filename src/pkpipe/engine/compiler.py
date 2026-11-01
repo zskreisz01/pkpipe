@@ -289,13 +289,15 @@ def private_data_errors(
 
     for node in flow.nodes:
         cfg = node.config
-        if node.type in ("llm", "llm_tools"):
+        if node.type in ("llm", "llm_tools", "reader"):
             profile_errors(node.id, str(cfg.get("profile", "default")))
         if environ is not None:
             continue
         if node.type == "llm_tools":
             errors.append(f"{where}: node '{node.id}' is a session with tools; journal sessions have none")
         tools = [cfg["tool"]] if node.type in ("tool", "wait") and isinstance(cfg.get("tool"), str) else []
+        if node.type == "fetch":  # secure fetch (spec 008) always leaves the machine
+            tools.append(str(cfg.get("tool") or "webfetch:fetch_page"))
         tools += [
             c.get("tool") for c in cfg.get("checks", []) if node.type == "guard" and isinstance(c, dict)
         ]
