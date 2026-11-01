@@ -8,7 +8,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from pkpipe.domain.triage import ItemState, TriageItem, item_id_for, release
+from pkpipe.domain.triage import (
+    ItemState,
+    TriageItem,
+    is_unreviewed,
+    item_id_for,
+    needs_decision,
+    needs_retriage,
+    release,
+)
 from pkpipe.steps.base import StepContext, StepResult, register_code
 
 MANAGED_FILES = ("Inbox-Triage.md", "Manual-Resource-Processing-List.md")
@@ -34,16 +42,34 @@ def select_new(
 ) -> dict[str, Any]:
     """INBOX notes that are not yet in the triage file. Item id = hash of the note path (the resource)."""
     skip = set(MANAGED_FILES) | set(exclude or [])
-    known = {r.get("item_id") for r in (triage or {}).get("rows", [])}
-    items = []
+    rows = (triage or {}).get("rows", [])
+    known = {r.get("item_id") for r in rows}
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
     for name in (listing or {}).get("notes", []):
         if name in skip:
             continue
         resource = f"{folder.rstrip('/')}/{name}"
         item_id = item_id_for(resource)
-        if item_id not in known:
+        if item_id not in known and item_id not in seen:  # the same resource is one item (id = hash)
+            seen.add(item_id)
             items.append({"id": item_id, "path": resource, "resource": resource})
-    return {"items": items, "count": len(items)}
+    # Re-triage: the suggested category was removed from the config while the item was still open.
+    valid = frozenset(_categories(ctx))
+    retriage = 0
+    for r in rows:
+        try:
+            state = ItemState(r.get("state", "suggested"))
+        except ValueError:
+            continue
+        if r.get("item_id") in seen or not r.get("resource"):
+            continue
+        suggested, override = r.get("ai_suggested_category", ""), r.get("override") or None
+        if needs_retriage(state, suggested, bool(r.get("confirm")), override, valid):
+            seen.add(r["item_id"])
+            items.append({"id": r["item_id"], "path": r["resource"], "resource": r["resource"]})
+            retriage += 1
+    return {"items": items, "count": len(items), "retriage": retriage}
 
 
 @register_code("triage.category_menu")
@@ -87,6 +113,52 @@ def suggested_rows(ctx: StepContext, results: list[dict[str, Any]]) -> dict[str,
     return {"rows": rows, "count": len(rows), "failed": failed}
 
 
+@register_code("triage.backlog")
+def backlog(
+    ctx: StepContext, triage: dict[str, Any], new_rows: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
+    """Notification payload for ``triage_ready``: the new suggestions plus the backlog of older items that
+    still wait for the owner: neither confirmed nor overridden, or decided on a category that is no longer
+    configured (``invalid``: a removed category or an unknown override). Finished items do not count."""
+    valid = frozenset(_categories(ctx))
+    fresh = {r["item_id"] for r in new_rows or []}
+    older = invalid = 0
+    for r in (triage or {}).get("rows", []):
+        try:
+            state = ItemState(r.get("state", "suggested"))
+        except ValueError:
+            continue
+        if r.get("item_id") in fresh:
+            continue
+        confirm, override = bool(r.get("confirm")), r.get("override") or None
+        if is_unreviewed(state, confirm, override):
+            older += 1
+        elif needs_decision(state, r.get("ai_suggested_category", ""), confirm, override, valid):
+            invalid += 1
+    new = len(fresh)
+    if new:
+        message = f"Triage ready: {new} new item(s) to confirm or override in 0-INBOX/Inbox-Triage.md."
+    else:
+        message = "Triage: no new items in 0-INBOX/Inbox-Triage.md."
+    if older:
+        message += f" {older} older item(s) still wait for your decision."
+    if invalid:
+        message += (
+            f" {invalid} item(s) name a category that is no longer configured: write a configured category"
+            " into override."
+        )
+    return {
+        "new": new,
+        "backlog": older,
+        "invalid": invalid,
+        "awaiting": new + older + invalid,
+        "message": message,
+        # New suggestions or a decision that can never be released need the owner; an unchanged backlog of
+        # unreviewed items alone does not send a mail every evening (it is in the 06:00 summary).
+        "notify": bool(new or invalid),
+    }
+
+
 @register_code("triage.release")
 def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
     """06:00 rule: only confirmed or overridden items are released; the rest stays pending.
@@ -108,10 +180,10 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
     before = {i.id: i.state for i in items}
     released, pending = release(items)
     unknown = [i for i in released if i.effective_category not in cats]
-    for i in unknown:
-        i.state = ItemState.PENDING if before[i.id] is not ItemState.RELEASED else ItemState.RELEASED
+    for i in unknown:  # also a ``released`` item left over from a failed run: back to the owner, never stuck
+        i.state = ItemState.PENDING
     released = [i for i in released if i.effective_category in cats]
-    pending = pending + [i for i in unknown if i.state is ItemState.PENDING]
+    pending = pending + unknown
     rows = [
         {"item_id": i.id, "state": i.state.value} for i in released + pending if before[i.id] is not i.state
     ]

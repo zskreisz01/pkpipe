@@ -63,7 +63,7 @@ flowchart LR
   - **UI:** the triage view in the pkpipe web UI.
   - **Chat agent:** ask your MCP chat client to `list_triage`, then `confirm_item` / `override_item`.
 - **Tips:** the notification shows confidence and reason per item; look closely at low-confidence ones. Every override becomes a training signal for the triage eval, so overriding is better than confirming a wrong category.
-- **If you skip it:** unreviewed items stay `pending` and appear again in the next notification. Nothing is processed by default.
+- **If you skip it:** unreviewed items stay `pending`, are counted in the 06:00 daily summary and appear again in the next triage notification ("N older item(s) still wait for your decision"). Nothing is processed by default.
 
 ### Work through the processing list
 
@@ -145,8 +145,10 @@ flowchart LR
 
 ### Re-triage an item
 
-- **When:** the notification lists an item as "needs re-triage", because its category was removed from config while it was pending.
-- **How:** override it to an existing category in `Inbox-Triage.md`.
+- **When:** a category was removed from config while an item was open.
+  - An item you had **not** decided on yet is suggested again automatically by the next 20:00 triage (it shows up as a new item); confirm or override the new suggestion.
+  - An item you had **confirmed** (or overridden to a category that does not exist) is never released. The 20:00 notification says "N item(s) name a category that is no longer configured", even on evenings without new items.
+- **How:** write an existing category id into **override** in `Inbox-Triage.md`. pkpipe never re-suggests a confirmed item, because your tick belongs to the old category.
 
 ### Keep the machine healthy
 

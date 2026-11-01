@@ -1,0 +1,64 @@
+{
+  "id": "unknown-override-goes-back-to-owner",
+  "source": "synthetic",
+  "description": "An override naming an unconfigured category is never released; the next evening asks the owner for a configured override even without new items.",
+  "input": {
+    "vault": {
+      "0-INBOX/cli-tool.md": "---\nsource: https://example.invalid/cli\n---\nA fictional CLI tool for formatting tables.\n"
+    },
+    "model": [
+      {
+        "when": "formatting tables",
+        "reply": {
+          "category": "tool",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "override": {
+            "0-INBOX/cli-tool.md": "no-such-category"
+          }
+        }
+      },
+      {
+        "run": "process_released"
+      },
+      {
+        "run": "triage"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/cli-tool.md": {
+        "ai_suggested_category": "tool",
+        "override": "no-such-category",
+        "state": "pending"
+      }
+    },
+    "processing": {
+      "0-INBOX/cli-tool.md": null
+    },
+    "notify_contains": [
+      "Triage ready: 1 new item(s)",
+      "1 item(s) still pending",
+      "Triage: no new items",
+      "1 item(s) name a category that is no longer configured"
+    ]
+  }
+}

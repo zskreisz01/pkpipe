@@ -33,6 +33,7 @@ def test_select_new_skips_managed_files_and_already_triaged_items():
             {"id": item_id_for("0-INBOX/new.md"), "path": "0-INBOX/new.md", "resource": "0-INBOX/new.md"}
         ],
         "count": 1,
+        "retriage": 0,
     }
 
 
@@ -100,6 +101,19 @@ def test_release_only_confirmed_or_overridden_items():
     ]
 
 
+def test_release_returns_a_leftover_released_item_with_a_removed_category_to_pending():
+    """Spec 007 edge case: an item left ``released`` by a failed run whose category was removed afterwards
+    is neither processed nor left stuck in ``released``; it goes back to the owner as pending."""
+    rows = [
+        _row("r", cat="removed-cat", confirm=True, state="released"),
+        _row("ok", confirm=True, state="released"),
+    ]
+    out = CODE["triage.release"](_ctx(), triage={"rows": rows})
+    assert [i["id"] for i in out["released"]] == ["ok"]
+    assert out["pending"] == ["r"] and out["unknown_category"] == ["r"] and out["count_pending"] == 1
+    assert out["rows"] == [{"item_id": "r", "state": "pending"}]
+
+
 def test_finalize_marks_processed_quarantined_and_keeps_failed_released():
     results = [
         {
@@ -125,3 +139,59 @@ def test_finalize_marks_processed_quarantined_and_keeps_failed_released():
         }
     ]
     assert (out["processed"], out["quarantined"], out["failed"]) == (1, 1, 1)
+
+
+def test_select_new_dedupes_and_flags_removed_category_for_retriage():
+    """Spec 007 T005 / edge cases: one item per resource; an open item whose category was removed from the
+    config is selected again, finished or decided items are not."""
+    rows = [
+        _row("gone1", cat="removed-cat", state="pending"),
+        _row("fine", cat="tool", state="pending"),
+        _row("done", cat="removed-cat", state="processed"),
+        _row("decided", cat="removed-cat", override="misc", state="pending"),
+        _row("confirmed", cat="removed-cat", confirm=True, state="pending"),
+    ]
+    out = CODE["inbox.select_new"](_ctx(), listing={"notes": ["n.md", "n.md"]}, triage={"rows": rows})
+    assert [i["id"] for i in out["items"]] == [item_id_for("0-INBOX/n.md"), "gone1"]
+    assert out["items"][1]["path"] == "0-INBOX/gone1.md" and out["retriage"] == 1 and out["count"] == 2
+
+
+def test_backlog_counts_older_unreviewed_items_for_the_notification():
+    """Spec 007 T003 / US2-AS1: the next notification mentions what still waits."""
+    rows = [
+        _row("new1"),
+        _row("old1", state="pending"),
+        _row("old2"),
+        _row("ok", confirm=True, state="pending"),
+        _row("ov", override="misc", state="pending"),
+        _row("fin", state="processed"),
+    ]
+    out = CODE["triage.backlog"](_ctx(), triage={"rows": rows}, new_rows=[{"item_id": "new1"}])
+    assert (out["new"], out["backlog"], out["invalid"], out["awaiting"]) == (1, 2, 0, 3)
+    assert out["notify"] is True
+    assert out["message"] == (
+        "Triage ready: 1 new item(s) to confirm or override in 0-INBOX/Inbox-Triage.md. "
+        "2 older item(s) still wait for your decision."
+    )
+    quiet = CODE["triage.backlog"](_ctx(), triage={"rows": []}, new_rows=[{"item_id": "x"}])
+    assert quiet["backlog"] == 0 and "older" not in quiet["message"]
+
+
+def test_backlog_reports_decisions_on_an_unconfigured_category_even_without_new_items():
+    """Spec 007 edge case: a confirmed removed category or an unknown override is never released, so the
+    owner is told to write a configured override; an unchanged unreviewed backlog alone sends nothing."""
+    rows = [
+        _row("conf", cat="removed-cat", confirm=True, state="pending"),
+        _row("ov", override="no-such", state="pending"),
+        _row("old", state="pending"),
+        _row("fin", cat="removed-cat", confirm=True, state="processed"),
+    ]
+    out = CODE["triage.backlog"](_ctx(), triage={"rows": rows}, new_rows=[])
+    assert (out["new"], out["backlog"], out["invalid"], out["awaiting"]) == (0, 1, 2, 3)
+    assert out["notify"] is True
+    assert out["message"] == (
+        "Triage: no new items in 0-INBOX/Inbox-Triage.md. 1 older item(s) still wait for your decision. "
+        "2 item(s) name a category that is no longer configured: write a configured category into override."
+    )
+    only_old = CODE["triage.backlog"](_ctx(), triage={"rows": rows[2:]}, new_rows=[])
+    assert only_old["notify"] is False and only_old["backlog"] == 1
