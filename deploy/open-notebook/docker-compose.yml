@@ -1,0 +1,48 @@
+# Open Notebook + Speaches (local TTS, Kokoro voice) for the pkpipe learning gateway (spec 012).
+# Derived from lfnovo/open-notebook v1.15.0 (docker-compose.yml, docs/5-CONFIGURATION/local-tts.md).
+# Images are pinned by digest (Docker Hub digest == GHCR digest, verified 2026-10-31); update tag and digest
+# together after reading the release notes. Every port is bound to 127.0.0.1.
+#
+#   cp .env.example .env     # fill the three values (see the comments there)
+#   docker compose up -d
+#   uv run python -m pkpipe.learning.open_notebook_setup
+name: open-notebook
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2@sha256:e5d7387e3727bbe2f7cd6d869e48cd34777272258572ead37c9656b25f745723
+    command:
+      - start
+      - --log
+      - info
+      - --user
+      - ${SURREAL_USER:?set SURREAL_USER in .env}
+      - --pass
+      - ${SURREAL_PASSWORD:?set SURREAL_PASSWORD in .env}
+      - rocksdb:/mydata/mydatabase.db
+    user: root
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: ["./data/surreal:/mydata"]
+    restart: unless-stopped
+
+  speaches:
+    image: ghcr.io/speaches-ai/speaches:latest-cpu@sha256:21e3df06d842fb7802ab470dd77c25f0e8c0d22950e8d8c6ae886e851af53ef8
+    ports: ["127.0.0.1:8969:8000"]
+    volumes: ["hf-hub-cache:/home/ubuntu/.cache/huggingface/hub"]
+    restart: unless-stopped
+
+  open_notebook:
+    image: lfnovo/open_notebook:1.15.0@sha256:54b2025a4a4853c188f74b9b8246eca8c5480e5dd1babfa92db1038ff2f30212
+    ports: ["127.0.0.1:8502:8502", "127.0.0.1:5055:5055"]
+    environment:
+      - OPEN_NOTEBOOK_ENCRYPTION_KEY=${OPEN_NOTEBOOK_ENCRYPTION_KEY:?set OPEN_NOTEBOOK_ENCRYPTION_KEY in .env}
+      - SURREAL_URL=ws://surrealdb:8000/rpc
+      - SURREAL_USER=${SURREAL_USER}
+      - SURREAL_PASSWORD=${SURREAL_PASSWORD}
+      - SURREAL_NAMESPACE=open_notebook
+      - SURREAL_DATABASE=open_notebook
+    volumes: ["./data/notebook:/app/data"]
+    depends_on: [surrealdb, speaches]
+    restart: unless-stopped
+
+volumes:
+  hf-hub-cache:

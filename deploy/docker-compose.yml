@@ -12,7 +12,7 @@ services:
       PHOENIX_ENABLE_AUTH: "false"     # local-only (127.0.0.1) dev backend; enable auth before exposing it
     volumes:
       - phoenix-data:/mnt/data
-  # open-notebook: see the Open Notebook docs for the current image and env vars
+  # open-notebook + Speaches TTS: see deploy/open-notebook/
   # lightpanda: see the Lightpanda docs for the current image
 
 volumes:
