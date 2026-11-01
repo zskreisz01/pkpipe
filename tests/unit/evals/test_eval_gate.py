@@ -164,6 +164,7 @@ def test_first_publish_runs_every_gated_suite(pack_dir, paths):
         "triage",
         "sessions",
         "calibration",
+        "improvement",
         "flows",
         "security",
     ]

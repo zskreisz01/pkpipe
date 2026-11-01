@@ -11,8 +11,8 @@ title: Operations
 | `0 20 * * *` | `triage` | Categorize new INBOX items, notify |
 | `0 6 * * *` | `process_released` | Process confirmed or overridden items |
 | `0 19 * * 0` | `context_refresh` | Rebuild context packs |
-| `30 21 * * *` | `improvement_extract` | Private overlay: journal extraction |
-| `30 19 * * 0` | `improvement_review` | Private overlay: weekly review |
+| `30 21 * * *` | `improvement_extract` | Optional, enabled by an overlay `schedules.json` entry: journal extraction ([cycle](process/self-improvement-cycle.md)) |
+| `30 19 * * 0` | `improvement_review` | Optional, enabled by an overlay entry: weekly review |
 | Manual (UI, CLI, app MCP) | Any | e.g. `run_flow("triage")` |
 
 APScheduler with a SQLite job store; missed runs (machine asleep) run once on wake (`misfire_grace_time` + `coalesce`). One instance per flow; item parallelism is configurable (default 2, because the local model serves requests sequentially). LangGraph checkpoints make long waits resumable after a restart.

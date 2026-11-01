@@ -9,7 +9,7 @@ Daily extraction of improvement items from journal notes with a local session wi
 ## Technical Context
 
 **Language/Version**: Python 3.12+ (`uv`)
-**Primary Dependencies**: Flows `improvement_extract.json`, `improvement_review.json` (enabled via overlay schedules).
+**Primary Dependencies**: Flows `improvement_extract.json`, `improvement_review.json` and the subflow `review_improvement.json` (enabled via overlay schedules); vault tools `read_notes`, `read_improvements`, `update_improvements`.
 **Testing**: pytest with port fakes, eval suite
 **Target**: single machine, local model server
 
@@ -32,7 +32,9 @@ Daily extraction of improvement items from journal notes with a local session wi
 
 ## Project Structure
 
-`packs/learning-inbox/flows/`, `src/pkpipe/domain/improvement.py`.
+`packs/learning-inbox/flows/`, `src/pkpipe/domain/improvement.py` (rules), `src/pkpipe/steps/improvement_code.py` (code
+functions), `src/pkpipe/obsidian/improvements.py` (backlog table), `src/pkpipe/evals/suites.py` (`improvement` suite),
+`evals/datasets/improvement_extract.jsonl` and `evals/datasets/sessions/review_improvement/`.
 
 ## Complexity Tracking
 

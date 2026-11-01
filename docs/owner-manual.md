@@ -52,7 +52,16 @@ flowchart LR
 
 - **What:** a short daily note on what went well, what did not and what you want to try.
 - **When:** before 21:30, when the extraction runs.
-- **How:** write in your usual journal note. Use clear phrasing such as "next time I will…" or "experiment: …"; the extraction session picks these up as improvement items in state `proposed`. It runs locally, without tools, and the journal never leaves the machine.
+- **How:** write in the day's journal note (`2-Areas/Journal/YYYY-MM-DD.md` by default) and put what you want to change under an `## Improvement` heading, one bullet per item, in your own words ("Stretch for ten minutes every morning."). Add how you will know it worked in the same bullet if you like. The extraction session copies each bullet as an improvement item in state `proposed`; it never rewrites or invents. Only that section is read by the session, which runs locally without tools, and the journal never leaves the machine.
+
+### Review the improvement backlog
+
+*Only if the self-improvement cycle is enabled in your overlay.*
+
+- **What:** decide what happens to the proposed items and to the weekly verdict proposals.
+- **When:** after the Sunday 19:30 "weekly review ready" notification.
+- **How:** open `2-Areas/Self-Improvement/Improvement-Backlog.md`. Set **status** yourself: `proposed` to `active` (or `dropped`), later `kept`, `adjusted` or `dropped`. The agent never changes a status; it only writes the **evidence** (quotes from your journal, each checked against the journal text), a **verdict** (keep / adjust / drop) with a **reason** and a **next** experiment for active items. A `kept` item of area `system` gets a proposal note in `2-Areas/Self-Improvement/System-Changes/`: applying it is a config change that only publishes through the eval gate.
+- **If you skip it:** nothing changes; the next review makes a new proposal.
 
 ### Confirm or override triage
 

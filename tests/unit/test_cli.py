@@ -96,7 +96,11 @@ def test_schema_command_writes_one_schema_per_config_file(tmp_path, capsys):
             "evals",
             "flow",
         )
-    } | {"triage-row.schema.json", "processing-list-row.schema.json"}
+    } | {
+        "triage-row.schema.json",
+        "processing-list-row.schema.json",
+        "improvement-item.schema.json",
+    }
     json.loads((tmp_path / "s" / "models.schema.json").read_text())
 
 
@@ -113,3 +117,16 @@ def test_schema_command_exports_triage_and_processing_row_schemas(tmp_path):
     assert set(proc["required"]) == {"item_id", "category", "obsidian_link"}
     assert set(triage["$defs"]["ItemState"]["enum"]) == {s.value for s in ItemState}
     assert set(proc["$defs"]["ProcessingStatus"]["enum"]) == {s.value for s in ProcessingStatus}
+
+
+def test_schema_command_exports_the_improvement_item_schema(tmp_path):
+    """Spec 015 data-model.md: the backlog item schema matches the model (required fields, enums)."""
+    from pkpipe.domain.improvement import Area, ImprovementItem, ItemType, Status
+
+    assert main(["schema", "--out", str(tmp_path)]) == 0
+    item = json.loads((tmp_path / "improvement-item.schema.json").read_text())
+    assert item == ImprovementItem.model_json_schema()
+    assert set(item["required"]) == {"id", "source_note", "date", "statement", "area", "type"}
+    assert set(item["$defs"]["Status"]["enum"]) == {s.value for s in Status}
+    assert set(item["$defs"]["Area"]["enum"]) == {a.value for a in Area}
+    assert set(item["$defs"]["ItemType"]["enum"]) == {t.value for t in ItemType}

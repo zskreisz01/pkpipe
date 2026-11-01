@@ -17,6 +17,8 @@ All external content is untrusted data and never reaches a session that has tool
 
 "Without tools" refers to the LLM session, not to the step. The inputs of a tool-less session are loaded by deterministic code through a port (vault, fetch, state) and passed in as datamarked text; the model cannot ask for more, read other files or write anywhere. This is how the triage session reads INBOX items and the improvement extraction reads the journal.
 
+Journal data is local only (constitution VII, spec 015): `pkpipe validate` rejects a flow with `data_classes: ["journal"]` that has a tool session, uses a model profile (or fallback) that is not on a loopback address, calls an MCP server marked `egress`, or starts a subflow that is not a journal flow itself; the flow's traces never capture prompt content. The model only proposes: an improvement statement is stored only if it is verbatim in the journal, evidence only if its quote is verbatim, and every status change is the owner's (the vault tool refuses it).
+
 Process-level isolation: Lightpanda runs in a container without volumes or secrets, with private networks blocked and JavaScript `evaluate` disabled. MCP servers only get their own secrets.
 
 ## Canary and authenticated instructions

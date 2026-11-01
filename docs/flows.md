@@ -43,7 +43,7 @@ flowchart LR
 | `id` | Flow id; must equal the file name | required |
 | `description` | What the flow does | `""` |
 | `bpmn` | Process page (`docs/process/<bpmn>.md`) the flow implements | none |
-| `data_classes` | Private data the flow handles (`journal`, `context`): prompt capture is forced off | `[]` |
+| `data_classes` | Private data the flow handles (`journal`, `context`): prompt capture is forced off. `journal` flows are also validated as local only: no tool sessions, loopback model profiles, no `egress` MCP server, journal subflows only | `[]` |
 | `start` | Entry node, or use edges from `START` (conditional start) | required unless `START` edges |
 | `nodes` | Steps, see below | required |
 | `edges` | Transitions, see below | `[]` |
@@ -79,7 +79,7 @@ An overlay can change one node of a pack flow by id (`{"nodes": [{"id": "notify"
 
 Prompts and schemas are files of the layered config: `prompts/system/<system>.md`, `instructions/<instruction>`, `contexts/<context>.md`, `schemas/<output_schema>.json`. Every input is wrapped in random delimiters (datamarking) and the system prompt says that text inside them is data.
 
-Built-in `code` functions: `item.set`, `inbox.select_new`, `triage.category_menu`, `triage.check_category`, `triage.suggested_rows`, `triage.release`, `triage.finalize`.
+Built-in `code` functions: `item.set`, `inbox.select_new`, `triage.category_menu`, `triage.check_category`, `triage.suggested_rows`, `triage.release`, `triage.finalize`, and the self-improvement functions `improvement.locate_journal`, `improvement.section`, `improvement.new_rows`, `improvement.select_review`, `improvement.attach_journals`, `improvement.check_evidence`, `improvement.propose`, `improvement.no_evidence`, `improvement.review_rows`, `improvement.proposal_rows`, `improvement.summary` ([Self-Improvement Cycle](process/self-improvement-cycle.md)).
 
 ## References and templates
 

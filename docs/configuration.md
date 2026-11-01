@@ -20,7 +20,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | File | Describes |
 | --- | --- |
 | `models.json` | Model profiles: endpoint, model, temperature, context, fallback (`default`, `judge`) |
-| `mcp_servers.json` | MCP registration: transport, URL, allowed tools, backend |
+| `mcp_servers.json` | MCP registration: transport, URL, allowed tools, backend, `egress` (the server sends data off this machine: web search, fetch, hosted backends; flows that handle journal data must not call it) |
 | `channels.json` | Notification channels and routing per event type |
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
