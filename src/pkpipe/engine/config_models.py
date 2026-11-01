@@ -62,7 +62,13 @@ class McpServer(_Strict):
     url: str | None = None
     command: str | None = None
     args: list[str] = Field(default_factory=list)
-    backend: str | None = None
+    backend: str | None = Field(
+        default=None, description="learning server only: open_notebook | notebooklm_browser | fake"
+    )
+    options: dict[str, Any] = Field(
+        default_factory=dict,
+        description="learning server only: gateway settings (timeout_s, data_dir, backend_options)",
+    )
     allow: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
