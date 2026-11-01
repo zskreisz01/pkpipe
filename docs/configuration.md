@@ -90,7 +90,7 @@ The `learning` entry of `mcp_servers.json` selects and tunes the backend of the 
 | `options.timeout_s` | A generation that is still running after this many seconds fails with the reason `timeout after N min`; keep `learning_material.wait_generation.deadline_s` (6000) above it | 5400 (90 minutes, local TTS is slow) |
 | `options.data_dir` | Job store (`jobs.db`) and, below it, `audio/` | `$PKPIPE_DATA_DIR/learning` |
 | `options.audio_dir` | Where downloaded podcasts go | `<data_dir>/audio` |
-| `options.backend_options` | Passed to the backend. Open Notebook: `api_url` (`http://127.0.0.1:5055`), `ui_url` (`http://127.0.0.1:8502`), `episode_profile` (`pkpipe_overview`), `speaker_profile` (`pkpipe_duo`), `password_env` (name of the environment variable that holds the API password, if authentication is on), `request_timeout_s` | see the left |
+| `options.backend_options` | Passed to the backend. Open Notebook: `api_url` (`http://127.0.0.1:5055`), `ui_url` (`http://127.0.0.1:8502`), `episode_profile` (`pkpipe_overview`), `speaker_profile` (`pkpipe_duo`), `password_env` (name of the environment variable that holds the API password, if authentication is on), `request_timeout_s`. NotebookLM: `driver` (`module:factory`), `options` (passed to the factory), `call_timeout_s` (120) | see the left |
 
 The URL filter comes from `security.json` `url_filter` (`block_private_networks`, `deny_list`). Run the server with `uv run python -m pkpipe.learning.server` (port 8703, loopback only); the stack is described in `deploy/open-notebook/README.md`. Unknown option names are rejected.
 

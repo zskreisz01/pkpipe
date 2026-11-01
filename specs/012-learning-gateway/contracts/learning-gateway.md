@@ -19,7 +19,7 @@ a JSON object; an error is an MCP tool error whose message is safe to show and t
 
 | Tool | Arguments | Returns | Errors |
 | --- | --- | --- | --- |
-| `create` | `url: str`, `template: str = ""`, `item_id: str = ""` | `NotebookJob` with `status: generating` (`job_id`, `nb_id`, `backend`, ...) | `private_network`, `scheme_not_allowed`, `deny_list`, ... (URL filter, before any backend call); `template too long` (4000 characters); `item_id may only contain ...`; backend unavailable (recorded as a failed job) |
+| `create` | `url: str`, `template: str = ""`, `item_id: str = ""` | `NotebookJob` with `status: generating` (`job_id`, `nb_id`, `backend`, ...) | `url_blocked: <code>` with code `private_network`, `scheme_not_allowed`, `deny_list`, `credentials_in_url`, `invalid_url` (URL filter, before any backend call; the flow keys on the `url_blocked:` prefix); `template too long` (4000 characters); `item_id may only contain ...`; backend unavailable (recorded as a failed job) |
 | `status` | `job_id: str` | `NotebookJob`: `status` = `generating`, `ready` or `failed`, `reason` when failed, `link` when ready, `elapsed_s` | `unknown job` |
 | `link` | `nb_id: str` | `{nb_id, url}` | `unknown notebook` |
 | `audio` | `job_id: str` | `{job_id, audio_path, bytes}`: the podcast downloaded into the gateway's audio folder | `unknown job`; `job is <status>, audio exists only for a ready job` |
@@ -52,7 +52,7 @@ Behaviour that does not depend on the backend:
 | Backend (`mcp_servers.json` `learning.backend`) | Implementation | Status |
 | --- | --- | --- |
 | `open_notebook` (default) | REST: `POST /api/notebooks`, `POST /api/sources/json` (type `link`), `POST /api/podcasts/generate`, `GET /api/podcasts/jobs/{id}`, `GET /api/podcasts/episodes/{id}/audio`; local TTS by Speaches (Kokoro) | implemented, live tested |
-| `notebooklm_browser` | `NotebookLMBrowserBackend` over a `NotebookLMDriver` (browser automation client) named in `options.backend_options.driver` as `module:factory`; every driver error becomes a fast `BackendUnavailable` naming the step | interface and contract tested with a scripted driver; **no driver is shipped** and the owner's Google account is never used by tests |
+| `notebooklm_browser` | `NotebookLMBrowserBackend` over a `NotebookLMDriver` (browser automation client) named in `options.backend_options.driver` as `module:factory`; every driver error, and every driver call that takes longer than `backend_options.call_timeout_s` (default 120 s), becomes a fast `BackendUnavailable` naming the step | interface and contract tested with a scripted driver; **no driver is shipped** and the owner's Google account is never used by tests |
 | `fake` | `FakeBackend` (scripted: `ready_after`, `fail`, `never`, `down`) | tests and flow evals |
 
 ## Configuration
@@ -91,5 +91,12 @@ by `password_env`, never from the config.
 `link` or the first URL of the body, template from `instructions/learning-material/notebook.md`, first URL check)
 -> `create` -> `wait_generation` (60 s polls) -> `link` -> `audio` -> `ready`. Branches: `blocked` URL -> security
 flag -> `quarantined`; no URL -> `failed`; failed generation or timeout -> `failed` (reason in `item.failure_reason`);
-audio download error -> `failed`; `create` error (service down) -> the item fails, stays `released` and is retried by
-the next run.
+audio download error -> `failed`; `create` error -> `create_failed` (`learning.create_failed`): `url_blocked: <code>` (the
+gateway's DNS check or deny list) -> security flag -> `quarantined`; any other error (service down) -> the item fails,
+stays `released` and is retried by the next run. A wait error (deadline, status tool error) -> `failed` with the error
+message as reason.
+
+## Metrics
+
+The gateway records `pkpipe.learning_timeouts_total` (a job reached `timeout_s`) and
+`pkpipe.learning_generation_seconds` (start to ready) with the `OTEL_*` settings of its environment.

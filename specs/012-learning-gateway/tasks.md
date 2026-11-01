@@ -29,5 +29,5 @@ Format: `- [x] T001 [USx] Description` · `[USx]` = user story
 ## Verification
 
 - [x] T007 CI green (ruff, pytest)
-- [x] T008 Eval gates passed where applicable (no new LLM step; flow suite 17/17 with four new learning cases)
+- [x] T008 Eval gates passed where applicable (no new LLM step; flow suite 15/15 with six new learning cases)
 - [x] T009 Docs updated; BPMN image and Mermaid unchanged: the process did not change (constitution XI)
