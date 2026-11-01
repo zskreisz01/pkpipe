@@ -24,4 +24,6 @@ The chosen option is the one marked in the table; it keeps the core independent 
 
 ## R-3 – Risks and open points
 
-- Validate the choice with a spike before the spec moves to Active.
+- Spike done (2026-11-01, Lightpanda 1.0.2): `lightpanda fetch --json --dump html` renders JavaScript, reports status and headers (content type for PDF), honours `--http-proxy` for HTTP and CONNECT, fails with `ResponseTooLarge` above `--http-max-response-size`. `--block-private-networks` also blocks the proxy connection, so network policy lives in the proxy instead. Chromium routes loopback through the proxy only with `--proxy-bypass-list=<-loopback>`.
+- Lightpanda's own MCP exposes ~30 tools including `evaluate`, `click`, `fill`: not used; the web-fetch server has one fetch tool.
+- Plain HTTP + Trafilatura is not implemented (Lightpanda covers static pages).

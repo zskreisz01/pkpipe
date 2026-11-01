@@ -1063,13 +1063,18 @@ class ProductionSuite(Suite):
 
     def run(self, ctx):
         db, vault = ctx.options.get("db"), ctx.options.get("vault")
-        if not db and not vault:
-            return self.report(Status.SKIPPED, reason="no production data: pass --db and/or --vault")
+        stats = ctx.options.get("fetch_stats")
+        if not db and not vault and not stats:
+            return self.report(
+                Status.SKIPPED, reason="no production data: pass --db, --vault and/or --fetch-stats"
+            )
         metrics: dict[str, Any] = {}
         if db:
             metrics.update(self._runs(Path(db)))
         if vault:
             metrics.update(self._vault(Path(vault)))
+        if stats:
+            metrics.update(self._fetch(Path(stats)))
         return self.report(metrics=metrics)
 
     @staticmethod
@@ -1095,6 +1100,27 @@ class ProductionSuite(Suite):
             "run_seconds_p50": round(percentile(durations, 50), 3),
             "run_seconds_p95": round(percentile(durations, 95), 3),
             "runs_by_flow": by_flow,
+        }
+
+    @staticmethod
+    def _fetch(stats: Path) -> dict[str, Any]:
+        """Spec 008 SC-002: Lightpanda fallback rate and outcomes from the web-fetch stats file."""
+        rows = []
+        if stats.is_file():
+            for line in stats.read_text(encoding="utf-8").splitlines():
+                try:
+                    rows.append(json.loads(line))
+                except ValueError:
+                    continue
+        attempted = [r for r in rows if r.get("fetcher") or r.get("fallback_used")]
+        outcomes: dict[str, int] = {}
+        for r in rows:
+            outcomes[str(r.get("status"))] = outcomes.get(str(r.get("status")), 0) + 1
+        fallbacks = sum(bool(r.get("fallback_used")) for r in attempted)
+        return {
+            "fetches": len(rows),
+            "fetch_outcomes": outcomes,
+            "fetch_fallback_rate": _rate(fallbacks, len(attempted)),
         }
 
     @staticmethod

@@ -31,13 +31,14 @@ Everything you need on your machine to run pkpipe in its reference setup: local 
 
 | ✓ | Component | Why | Install | Check |
 | --- | --- | --- | --- | --- |
-| [ ] | Hugging Face account + access token | Llama Prompt Guard 2 is a gated model | Accept the model licence on Hugging Face, create a read token, store it as `HF_TOKEN` | `uv run huggingface-cli whoami` |
-| [ ] | Llama Prompt Guard 2 (86M) | Injection and jailbreak classifier | Downloaded on first run, or ahead with `huggingface-cli download` | Present in the HF cache |
+| [ ] | Hugging Face account + access token | Llama Prompt Guard 2 is a gated model | Accept the model licence on Hugging Face, then `hf auth login` | `hf auth whoami` |
+| [ ] | Llama Prompt Guard 2 (86M) | Injection and jailbreak classifier (secure fetch, spec 008) | `uv sync --extra promptguard`, then `hf download meta-llama/Llama-Prompt-Guard-2-86M --local-dir ~/tools/prompt-guard-2/Llama-Prompt-Guard-2-86M` (or set `PKPIPE_PROMPT_GUARD_DIR`). pkpipe never downloads it at run time | `uv run pytest tests/integration/security` runs instead of skipping |
 | [ ] | Qwen3Guard | Harmful-content classifier for the output guard | Load it in the model server next to the main model | Listed by `/v1/models` |
-| [ ] | Lightpanda | Isolated headless fetch (no volumes, no secrets) | Docker image, see the Lightpanda docs | Container runs |
-| [ ] | Chromium for Playwright | Fallback fetch for pages Lightpanda cannot render | `uv run playwright install chromium` | Command succeeds |
+| [ ] | Lightpanda | Headless fetch, one process per page with a clean environment, behind the filtering proxy of the web-fetch server | Binary on `PATH` (or `LIGHTPANDA_BIN`); set `LIGHTPANDA_DISABLE_TELEMETRY=true` | `lightpanda version` |
+| [ ] | Chromium for Playwright | Fallback fetch for pages Lightpanda cannot render | `uv sync --extra webfetch && uv run playwright install chromium` | Command succeeds |
+| [ ] | web-fetch MCP server | The only way flows fetch pages (spec 008) | `uv run python -m pkpipe.webfetch.server` (127.0.0.1:8704), or `deploy/launchd/io.pkpipe.web-fetch.plist.example` | `pkpipe run secure_fetch --input '{"url": "https://example.org"}'` |
 
-Without these, triage still works (it only sees URL, title and note), but no web content is fetched or processed.
+Without these, triage still works (it only sees URL, title and note), but no web content is fetched or processed. Without Prompt Guard 2 every secure fetch is flagged (fail closed) unless the overlay sets `security.prompt_guard.required: false`.
 
 ## 4. Optional components
 

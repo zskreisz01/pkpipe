@@ -19,7 +19,7 @@ All external content is untrusted data and never reaches a session that has tool
 
 Journal data is local only (constitution VII, spec 015): `pkpipe validate` rejects a flow with `data_classes: ["journal"]` that has a tool session, uses a model profile (or fallback) that is not on a loopback address, calls an MCP server marked `egress`, or starts a subflow that is not a journal flow itself. Every run checks the profile again when it compiles the flow: if an environment variable of the `env:` chain (for example `PKPIPE_MODEL_BASE_URL`) points at another host, the journal run stops before any session starts, while other flows may still use that host. The flow's traces never capture prompt content. The model only proposes: an improvement statement is stored only if it is verbatim in the journal, evidence only if its quote is verbatim, and every status change is the owner's (the vault tool refuses it).
 
-Process-level isolation: Lightpanda runs in a container without volumes or secrets, with private networks blocked and JavaScript `evaluate` disabled. MCP servers only get their own secrets.
+Process-level isolation: pages are fetched only by the web-fetch MCP server (`pkpipe.webfetch`), which exposes one tool, `fetch_page` (plus `fetch_stats`), instead of Lightpanda's own MCP with its ~30 tools such as `evaluate`, `click` and `fill`: no model can run JavaScript in a page or drive the browser. Lightpanda runs as one process per page with a minimal environment (no API keys, tokens or webhook URLs) in an empty temporary home directory; Chromium (fallback) runs the same way with downloads, service workers and non-proxied WebRTC off. Both browsers send every request through a filtering proxy of the server that applies the URL filter after DNS resolution and connects to the address it checked, so redirect hops, scripts and XHR to private addresses are refused and DNS rebinding cannot swap in a private address. MCP servers only get their own secrets.
 
 ## Canary and authenticated instructions
 
@@ -31,11 +31,15 @@ Process-level isolation: Lightpanda runs in a container without volumes or secre
 
 | Layer | Tool | Catches |
 | --- | --- | --- |
-| URL filter | Deny-list, private networks blocked, size limit | Known bad sources, SSRF |
-| Sanitizing | Hidden HTML, zero-width and Unicode tag characters removed | Invisible injections |
-| Heuristics | Regexes: "ignore previous", role tags, base64 blobs | Naive attacks, cheaply |
-| Classifier | Llama Prompt Guard 2 (86M), 512-token chunks, multilingual | Injection and jailbreak |
+| URL filter | Deny-list (`security/deny_list.txt`, subdomains included), only http(s), no credentials in URLs, private networks blocked after DNS resolution (loopback, RFC 1918, link-local and cloud metadata, CGNAT, IPv6 local, numeric IP forms) on the URL and on every request the browser makes, size limit (`max_bytes`) | Known bad sources, SSRF, redirects into the private network |
+| Sanitizing | Hidden HTML (hidden attribute, `aria-hidden`, hiding inline styles and simple `<style>` rules, off-screen text), comments, scripts, zero-width, bidi and Unicode tag characters removed; the removed text is kept aside for the heuristics | Invisible injections |
+| Heuristics | Regexes with weights: overrides ("ignore previous instructions"), role tags, text addressed to the model, role changes, prompt-leak and exfiltration requests, output hijacking, base64 blobs; hidden matches count separately (`hidden_<rule>`) | Naive attacks, cheaply |
+| Classifier | Llama Prompt Guard 2 (86M), 512-token chunks with overlap, maximum over chunks; missing model fails closed | Injection and jailbreak |
 | Reader verdict | `injection_suspected` + canary check | Context-dependent attempts |
+
+The verdict (`secure_fetch.verdict`) is code: any of `url_filter`, `heuristic`, `classifier`, `canary` or `reader` flags the item. A timeout or an unreachable page after the Chromium fallback is a failed fetch, not a flag. Measured on the synthetic `secure_fetch.jsonl` set (40 attack pages of 11 types, 41 clean pages, Prompt Guard 2 not installed): detection 1.0, false positives 0.024, canary leaks 0 ([Evaluation](evaluation.md)).
+
+**Test-only loopback allowance.** Tests fetch synthetic pages from a local fixture server, which the URL filter would block as loopback. They use an allowance for exactly that `127.0.0.1:<port>`: in-process it is a port of the run (`fetch_test_loopback`, set by the test's composition root), for the web-fetch server process the environment variable `PKPIPE_WEBFETCH_TEST_LOOPBACK`, which accepts only loopback IP literals with a port and is logged at start-up. Neither is a config key: `security.url_filter` rejects unknown keys, so no pack or overlay can enable it. Never set the variable in a deployment.
 
 ## Output guard
 

@@ -53,7 +53,7 @@ def eval_command(args: argparse.Namespace) -> int:
             mode=mode,
             workers=args.workers,
             limit=args.limit,
-            options={"db": args.db, "vault": args.vault},
+            options={"db": args.db, "vault": args.vault, "fetch_stats": args.fetch_stats},
         )
         run = runner.run(names)
     finally:
@@ -89,6 +89,9 @@ def add_arguments(ev: argparse.ArgumentParser) -> None:
     ev.add_argument("--out", help="report directory (default: $PKPIPE_DATA_DIR/evals)")
     ev.add_argument("--db", help="production suite: app DB to read runs from")
     ev.add_argument("--vault", help="production suite: vault directory (triage file, processing list)")
+    ev.add_argument(
+        "--fetch-stats", help="production suite: web-fetch stats file (fallback rate, spec 008 SC-002)"
+    )
     ev.add_argument("--json", action="store_true", help="print the JSON report instead of Markdown")
 
 

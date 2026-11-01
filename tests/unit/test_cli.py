@@ -94,6 +94,9 @@ def test_schema_command_writes_one_schema_per_config_file(tmp_path, capsys):
         "triage-row.schema.json",
         "processing-list-row.schema.json",
         "improvement-item.schema.json",
+        "fetch-result.schema.json",
+        "reader-extract.schema.json",
+        "verdict.schema.json",
     }
     json.loads((tmp_path / "s" / "models.schema.json").read_text())
 

@@ -25,7 +25,7 @@ Run everything: `uv run pytest`. One level: `uv run pytest tests/unit`.
 
 | Marker | Meaning |
 | --- | --- |
-| `live` | Needs a real local service. `@pytest.mark.live` = LM Studio at `PKPIPE_MODEL_BASE_URL` (default `http://127.0.0.1:1234/v1`) with model `PKPIPE_MODEL_NAME` (default `qwen3.5-9b-mlx`). `@pytest.mark.live("judge")` = the eval judge model `PKPIPE_JUDGE_MODEL` (default `google/gemma-4-12b`) on the same server, different from the model under test (spec 013). Other services: `@pytest.mark.live("docker")`, `@pytest.mark.live("lightpanda")`, `@pytest.mark.live("browser")` (Playwright Chromium for the UI e2e test, spec 014: `uv run playwright install chromium`), combinations allowed. |
+| `live` | Needs a real local service. `@pytest.mark.live` = LM Studio at `PKPIPE_MODEL_BASE_URL` (default `http://127.0.0.1:1234/v1`) with model `PKPIPE_MODEL_NAME` (default `qwen3.5-9b-mlx`). `@pytest.mark.live("judge")` = the eval judge model `PKPIPE_JUDGE_MODEL` (default `google/gemma-4-12b`) on the same server, different from the model under test (spec 013). Other services: `@pytest.mark.live("docker")`, `@pytest.mark.live("lightpanda")`, `@pytest.mark.live("browser")` (Playwright Chromium for the UI e2e test, spec 014, and the secure-fetch fallback, spec 008: `uv run playwright install chromium`), combinations allowed. |
 | `docs` | Builds the Docusaurus site (`npm run build`); skipped when `website/node_modules` is missing. |
 
 Live tests are **skipped** when the service is unreachable, so GitHub CI stays green. On the machine that owns the
@@ -33,3 +33,14 @@ services run `PKPIPE_REQUIRE_LIVE=1 uv run pytest` to turn every skip of a live 
 Qwen3.5 may emit `<think>...</think>`; adapters and tests must tolerate and strip it.
 
 Add a probe for a new service in `tests/support/live.py` (`PROBES`).
+
+## Secure fetch fixtures (spec 008)
+
+`tests/support/fixture_site.py` serves synthetic pages on 127.0.0.1 (clean, hidden and visible injections, redirects
+and page requests to private addresses, oversized, PDF, video). Loopback is blocked by the URL filter, so tests use
+the test-only allowance for exactly that port: `fetch_test_loopback` in the run's ports, or
+`PKPIPE_WEBFETCH_TEST_LOOPBACK=127.0.0.1:<port>` for the web-fetch server process (`tests/support/webfetch_mcp.py`).
+It is not a config key and must never be set in a deployment. The Prompt Guard 2 test
+(`tests/integration/security/test_promptguard_live.py`) skips with its reason while the gated model is not
+installed; that skip is not a live-service skip, so `PKPIPE_REQUIRE_LIVE=1` keeps it a skip.
+

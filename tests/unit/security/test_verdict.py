@@ -84,3 +84,18 @@ def test_reader_extract_rejects_extra_fields():
         ReaderExtract.model_validate(
             {"title": "t", "summary": "s", "facts": [], "injection_suspected": False, "tool": "x"}
         )
+
+
+def test_pack_reader_schema_matches_the_reader_extract_model():
+    """The structured-output schema the Reader gets (pack) and the model the verdict validates with agree:
+    same fields, same required set, no extra properties."""
+    import json
+
+    from pkpipe.security.verdict import security_json_schemas
+    from tests.conftest import PACK
+
+    pack = json.loads((PACK / "schemas/reader_extract.json").read_text(encoding="utf-8"))
+    model = security_json_schemas()["reader-extract"]
+    assert set(pack["properties"]) == set(model["properties"])
+    assert pack["additionalProperties"] is False and model["additionalProperties"] is False
+    assert set(model["required"]) <= set(pack["required"])

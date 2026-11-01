@@ -19,7 +19,10 @@ def test_exported_schema_files_validate_the_pack_and_reject_a_broken_overlay(tmp
             "triage-row",
             "processing-list-row",
             "improvement-item",
-        }:  # vault row schemas (specs 004, 015)
+            "fetch-result",
+            "reader-extract",
+            "verdict",
+        }:  # vault row schemas (specs 004, 015), secure-fetch structures (spec 008)
             continue
         files = sorted((pack_dir / "flows").glob("*.json")) if stem == "flow" else [pack_dir / f"{stem}.json"]
         for f in files:

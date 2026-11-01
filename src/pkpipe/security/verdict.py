@@ -58,6 +58,15 @@ class Verdict(BaseModel):
     scores: dict[str, Any] = Field(default_factory=dict, description="Per-detector scores")
 
 
+def security_json_schemas() -> dict[str, dict[str, Any]]:
+    """Exchanged secure-fetch structures for ``pkpipe schema`` (spec 008 data-model)."""
+    return {
+        "fetch-result": FetchResult.model_json_schema(),
+        "reader-extract": ReaderExtract.model_json_schema(),
+        "verdict": Verdict.model_json_schema(),
+    }
+
+
 def evaluate(
     *,
     url_check: dict[str, Any] | None,

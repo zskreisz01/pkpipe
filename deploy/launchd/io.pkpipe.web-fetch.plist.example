@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Example only: copy to ~/Library/LaunchAgents/, replace the placeholder paths, then
+     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.pkpipe.web-fetch.plist
+     Never set PKPIPE_WEBFETCH_TEST_LOOPBACK here: it is a test-only allowance. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>io.pkpipe.web-fetch</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/path/to/pkpipe/.venv/bin/python</string>
+    <string>-m</string>
+    <string>pkpipe.webfetch.server</string>
+    <string>--host</string>
+    <string>127.0.0.1</string>
+    <string>--port</string>
+    <string>8704</string>
+    <string>--stats-file</string>
+    <string>/path/to/pkpipe-data/webfetch-stats.jsonl</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/path/to/home/.local/bin:/usr/bin:/bin</string>
+    <key>LIGHTPANDA_DISABLE_TELEMETRY</key><string>true</string>
+    <key>PKPIPE_OVERLAY_DIR</key><string>/path/to/pkpipe-overlay</string>
+  </dict>
+  <key>WorkingDirectory</key><string>/path/to/pkpipe</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/pkpipe-web-fetch.log</string>
+  <key>StandardErrorPath</key><string>/tmp/pkpipe-web-fetch.err</string>
+</dict>
+</plist>
