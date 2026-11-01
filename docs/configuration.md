@@ -20,7 +20,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | File | Describes |
 | --- | --- |
 | `models.json` | Model profiles: endpoint, model, temperature, context, fallback (`default`, `judge`) |
-| `mcp_servers.json` | MCP registration: transport, URL, allowed tools, backend |
+| `mcp_servers.json` | MCP registration: transport, URL, allowed tools, backend, `egress` (the server sends data off this machine: web search, fetch, hosted backends; flows that handle journal data must not call it) |
 | `channels.json` | Notification channels and routing per event type |
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
@@ -113,5 +113,13 @@ A session receives at most one pack. A session with the enterprise pack has no w
 ## Publishing a change
 
 Edits in the UI are drafts. Publish runs schema and reference validation and a smoke eval on the affected step's dataset, then commits to the config git repo. A running flow finishes on the config version it started with; the version hash is stored in the run state and on every trace.
+
+The UI edits the **private overlay** (`PKPIPE_OVERLAY_DIR`), which must be its own git repository; the public pack is never written. A draft is a set of file changes stored in the app DB; each file remembers the hash it started from, so a file that changed on disk meanwhile (Obsidian, git, a second tab) is reported as a conflict instead of being overwritten. Editable: the known config files, `flows/*.json` and text assets below `prompts/`, `instructions/`, `contexts/`, `schemas/` and `templates/` (256 KiB at most). Publish does, in this order:
+
+1. **Validate** the draft with the same loader as `pkpipe validate` (a temp copy of the overlay with the draft applied).
+2. **Gate** it with the spec 013 `PublishGate`: only the suites whose inputs changed run (plus the security smoke test for LLM changes); a failing or unmeasurable change blocks. An override needs a written reason and is recorded; lowering a gate threshold is refused outright.
+3. **Commit** only the draft's files (`git commit -- <paths>`) to the overlay repository. Uncommitted edits to those files, or an overlay that is not a git repo, refuse the publish. Nothing is pushed; pushing is yours.
+
+Every publish keeps its diff, and **rollback** is a `git revert` that is validated before it is committed. After a publish or rollback the scheduler re-reads `schedules.json`. A new category is a form in the UI that adds an entry to the overlay's `categories.json` (sessions and instructions are added in the editor); see [Operations](operations.md#config-ui-and-app-mcp).
 
 The version is a sha256 over the effective JSON (including flows) and the text assets (`prompts/`, `instructions/`, `contexts/`, `schemas/`), so editing a prompt is a new version too. When a run starts, the snapshot of that version is stored in the app DB and the run, including a resume after a restart, uses only that snapshot.

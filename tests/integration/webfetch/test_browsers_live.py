@@ -38,7 +38,7 @@ def chromium_only(site, **kw):
 
 BACKENDS = [
     pytest.param(lightpanda_only, marks=pytest.mark.live("lightpanda"), id="lightpanda"),
-    pytest.param(chromium_only, marks=pytest.mark.live("chromium"), id="chromium"),
+    pytest.param(chromium_only, marks=pytest.mark.live("browser"), id="chromium"),
 ]
 
 
@@ -94,7 +94,7 @@ def test_without_the_allowance_the_fixture_is_unreachable(site):
     assert res["status"] == "blocked" and res["reason"] == "private_network"
 
 
-@pytest.mark.live("chromium")
+@pytest.mark.live("browser")
 def test_lightpanda_failure_falls_back_to_chromium_and_is_counted(site):
     """FR-002 fallback + SC-002: the fallback is used once and the fallback rate is measured."""
     f = SecureFetcher(
@@ -107,7 +107,7 @@ def test_lightpanda_failure_falls_back_to_chromium_and_is_counted(site):
     assert f.stats_summary()["fallback_rate"] == 1.0
 
 
-@pytest.mark.live("lightpanda", "chromium")
+@pytest.mark.live("lightpanda", "browser")
 def test_timeout_falls_back_once_then_fails(site):
     """Edge case: Lightpanda times out, Chromium is tried once and times out too -> failed (no flag)."""
     f = SecureFetcher(

@@ -17,6 +17,8 @@ All external content is untrusted data and never reaches a session that has tool
 
 "Without tools" refers to the LLM session, not to the step. The inputs of a tool-less session are loaded by deterministic code through a port (vault, fetch, state) and passed in as datamarked text; the model cannot ask for more, read other files or write anywhere. This is how the triage session reads INBOX items and the improvement extraction reads the journal.
 
+Journal data is local only (constitution VII, spec 015): `pkpipe validate` rejects a flow with `data_classes: ["journal"]` that has a tool session, uses a model profile (or fallback) that is not on a loopback address, calls an MCP server marked `egress`, or starts a subflow that is not a journal flow itself. Every run checks the profile again when it compiles the flow: if an environment variable of the `env:` chain (for example `PKPIPE_MODEL_BASE_URL`) points at another host, the journal run stops before any session starts, while other flows may still use that host. The flow's traces never capture prompt content. The model only proposes: an improvement statement is stored only if it is verbatim in the journal, evidence only if its quote is verbatim, and every status change is the owner's (the vault tool refuses it).
+
 Process-level isolation: Lightpanda runs in a container without volumes or secrets, with private networks blocked and JavaScript `evaluate` disabled. MCP servers only get their own secrets.
 
 ## Canary and authenticated instructions
@@ -56,3 +58,17 @@ Runs on every session output that originates from external content, before anyth
 ## Private data
 
 Journals and context packs are processed only by local sessions without tools, are never sent to web search or the learning service, are excluded from trace content capture, and never appear in this repository.
+
+## UI and app MCP access
+
+The config UI and the app MCP server (spec 014) can publish config and release triage items, so they are guarded like a local admin console:
+
+- **Network**: loopback by default; only loopback and Tailscale addresses are accepted as listen address. A token is always required, also on loopback.
+- **Tokens**: an owner token (UI and every MCP tool) and an agent token (MCP `run_flow`, `get_run`, `list_triage`). Compared in constant time; stored in a 0600 file or the environment, never in config. Failed logins are throttled.
+- **Browser**: login sets an HttpOnly, SameSite=Strict cookie. State-changing cookie requests need an `X-CSRF-Token` header (an HMAC of the session) and a same-origin `Origin`/`Sec-Fetch-Site`. A cookie never authorizes `/mcp`.
+- **DNS rebinding**: the `Host` header must be on the allowlist, otherwise HTTP 421.
+- **Headers**: CSP `default-src 'self'` with no inline script or style, `frame-ancestors 'none'`, `X-Content-Type-Options`, `Referrer-Policy: same-origin`, `Cache-Control: no-store`. HTMX is vendored (no CDN) with eval disabled.
+- **Owner decisions** (confirm, override, quarantine release) are separate from the pipeline's own triage writer: the vault MCP server that sessions can reach still refuses to change `confirm` / `override`. Decisions follow the triage domain rules (quarantined and processed items cannot be confirmed; overrides must name a configured category) and are audited.
+- **Raw external content** never reaches the chat agent through MCP: `get_run` returns step names only and triage resources are length-capped and datamarked (random `<<DATA:nonce>>` delimiters per call). An owner action refused for the agent token is audited.
+- **One active run per flow** across every channel: UI, MCP and the cron scheduler of `pkpipe serve` share the same check.
+- **Config editing** is confined to known config paths below the overlay (no `..`, absolute paths or hidden folders), size-capped, and publish commits only the draft's files. Neither validation nor publish writes through a symlink that leaves the overlay, the token file is refused when other users can read it, and a draft edited while its eval gate ran is not published.

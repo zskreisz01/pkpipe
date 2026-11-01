@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Config{% endblock %}
+{% block body %}
+<h1>Config</h1>
+{% if not editable %}
+<p class="card err">No private overlay is configured (<code>PKPIPE_OVERLAY_DIR</code>): the config is read-only here.</p>
+{% endif %}
+<h2>Files</h2>
+<table id="files"><thead><tr><th>File</th><th>Source</th></tr></thead><tbody>
+{% for f in files %}<tr><td><a href="/config/edit?path={{ f.path|urlencode }}">{{ f.path }}</a></td><td class="muted">{{ f.source }}</td></tr>{% endfor %}
+</tbody></table>
+{% if draft %}
+<div id="draft">{% include "_draft.html" %}</div>
+{% endif %}
+<h2>Published changes</h2>
+{% for p in publishes %}
+<div class="card"><a href="/publishes/{{ p.publish_id }}">{{ p.summary }}</a>
+  <span class="pill">{{ p.kind }}</span>{% if p.reverted_by %} <span class="muted">rolled back</span>{% endif %}
+  <span class="muted">{{ p.created_at[:19] }} · {{ p.commit_sha[:10] }}</span></div>
+{% else %}<p class="muted">Nothing published from the UI yet.</p>{% endfor %}
+{% endblock %}

@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "required": ["evidence"],
+  "additionalProperties": false,
+  "properties": {
+    "evidence": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "required": ["quote", "signal"],
+        "additionalProperties": false,
+        "properties": {
+          "quote": {"type": "string", "maxLength": 300},
+          "signal": {"type": "string", "enum": ["supports", "contradicts", "neutral"]}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ info.path }}{% endblock %}
+{% block body %}
+<h1>{{ info.path }}</h1>
+<p class="muted">Source: {{ info.source }}. Edits go to a draft; nothing changes until you publish. <a href="/config">Back to config</a></p>
+<div id="editor">{% include "_editor.html" %}</div>
+{% endblock %}

@@ -10,7 +10,7 @@ from pkpipe.engine.registry import load_effective
 from pkpipe.evals import EvalPaths, EvalRunner, Status, evals_config
 from tests.conftest import REPO
 
-LLM_SUITES = ["triage", "sessions", "calibration", "security"]
+LLM_SUITES = ["triage", "sessions", "calibration", "improvement", "security"]
 
 
 @pytest.fixture
@@ -56,3 +56,23 @@ def test_all_suites_pass_their_gates_in_replay(no_network, snapshot, pack_dir):
     for report in run.suites:
         assert report.status is Status.PASSED
         assert not any("missing" in n and not n.endswith("0 missing") for n in report.notes), report.notes
+
+
+def test_improvement_extraction_replays_with_the_spec_015_precision(no_network, snapshot):
+    """Spec 015 SC-001: the recorded extraction responses give precision >= 0.9 on the dataset; the
+    review sessions are part of the sessions suite."""
+    runner = EvalRunner(
+        snapshot,
+        paths=EvalPaths.create(REPO / "evals"),
+        model=None,
+        mode="replay",
+        identities={"default": "recorded|qwen3.5-9b-mlx", "judge": "recorded|google/gemma-4-12b"},
+    )
+    run = runner.run(["improvement", "sessions"])
+    improvement = run.suite("improvement")
+    assert improvement.status is Status.PASSED, improvement.failures()
+    assert improvement.metrics["precision"] >= 0.9 and improvement.metrics["n"] == 25
+    assert improvement.metrics["empty_clean_rate"] >= 0.8
+    per = run.suite("sessions").metrics["per_session"]
+    assert {"review_improvement.evidence", "review_improvement.verdict"} <= set(per)
+    assert no_network == []

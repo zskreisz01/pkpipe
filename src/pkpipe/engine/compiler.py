@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import os
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Annotated, Any, TypedDict
 
 from langgraph.errors import GraphBubbleUp
@@ -179,6 +180,7 @@ def validate_flow(
                     f"{where}: for_each node '{node.id}' takes only plain edges; route items in a subflow "
                     "and use on_item_error: continue for failures"
                 )
+    errors += private_data_errors(flow, snapshot)
     for edge in flow.edges:
         for path in condition_paths(edge.when) if edge.when else []:
             root = path.split(".", 1)[0]
@@ -206,6 +208,112 @@ def _unvalidated_source(flow: Flow, ref: str, registry: StepRegistry) -> bool:
     if source.type in UNVALIDATED_OUTPUT_TYPES:
         return True
     return source.type == "llm" and not source.config.get("output_schema")
+
+
+#: Data classes whose flows stay on this machine: local model, no tool that sends data away (spec 015 FR-002).
+LOCAL_ONLY_CLASSES = frozenset({"journal"})
+
+
+def _is_loopback(url: str) -> bool:
+    import ipaddress
+    from urllib.parse import urlsplit
+
+    host = urlsplit(url).hostname or ""
+    try:
+        return host == "localhost" or ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _profile_url(value: str) -> str | None:
+    """The literal URL of ``base_url`` (``env:NAME|default`` chains: every alternative must be loopback, so
+    the last literal one is taken); ``None`` when it is only an environment lookup without a default."""
+    parts = [p for p in value.split("|") if not p.startswith("env:")]
+    return parts[-1] if parts else None
+
+
+def _resolved_url(value: str, environ: Mapping[str, str]) -> str | None:
+    """The URL ``base_url`` resolves to in ``environ`` right now (same rules as the model adapter: the first
+    set ``env:`` variable, else the literal); ``None`` when nothing resolves."""
+    for part in value.split("|"):
+        if not part.startswith("env:"):
+            return part
+        if environ.get(part[4:]):
+            return environ[part[4:]]
+    return None
+
+
+def private_data_errors(
+    flow: Flow, snapshot: ConfigSnapshot, environ: Mapping[str, str] | None = None
+) -> list[str]:
+    """Spec 015 FR-002 / constitution VII: a flow handling journal data is local only. Its sessions have no
+    tools and use a model profile (and fallbacks) on a loopback address, its tool nodes call no MCP server
+    marked ``egress``, and it only starts subflows that are journal flows too (so capture stays off).
+
+    Without ``environ`` (config validation) the configured default of each ``env:`` chain is checked. With
+    ``environ`` (every run, when it compiles a flow) only the value the chain resolves to right now is
+    checked, so an environment variable pointing the profile at another host stops that run before any
+    journal text is sent, while the rest of the config still loads."""
+    if not LOCAL_ONLY_CLASSES & set(flow.data_classes):
+        return []
+    where = f"flow '{flow.id}' (journal data)"
+    errors: list[str] = []
+    models = snapshot.data.get("models") or {}
+    servers = snapshot.data.get("mcp_servers") or {}
+    flows = snapshot.data.get("flows") or {}
+
+    def profile_errors(node_id: str, name: str) -> None:
+        seen: set[str] = set()
+        while name and name not in seen:
+            seen.add(name)
+            profile = models.get(name)
+            if profile is None:
+                return  # reported by the session's own checks
+            base_url = str(profile.get("base_url", ""))
+            if environ is not None:
+                current = _resolved_url(base_url, environ)
+                if current is not None and not _is_loopback(current):
+                    errors.append(
+                        f"{where}: node '{node_id}' uses model profile '{name}' whose base_url resolves "
+                        "to a non-loopback address in this environment; journal data is processed "
+                        "locally only"
+                    )
+            else:
+                url = _profile_url(base_url)
+                if url is None or not _is_loopback(url):
+                    errors.append(
+                        f"{where}: node '{node_id}' uses model profile '{name}' that is not on a loopback "
+                        "address; journal data is processed locally only"
+                    )
+            name = profile.get("fallback") or ""
+
+    for node in flow.nodes:
+        cfg = node.config
+        if node.type in ("llm", "llm_tools"):
+            profile_errors(node.id, str(cfg.get("profile", "default")))
+        if environ is not None:
+            continue
+        if node.type == "llm_tools":
+            errors.append(f"{where}: node '{node.id}' is a session with tools; journal sessions have none")
+        tools = [cfg["tool"]] if node.type in ("tool", "wait") and isinstance(cfg.get("tool"), str) else []
+        tools += [
+            c.get("tool") for c in cfg.get("checks", []) if node.type == "guard" and isinstance(c, dict)
+        ]
+        for tool in filter(None, tools):
+            server = tool.partition(":")[0]
+            if (servers.get(server) or {}).get("egress"):
+                errors.append(
+                    f"{where}: node '{node.id}' calls '{tool}' on a server that sends data off the machine "
+                    "(egress)"
+                )
+        target = cfg.get("flow")
+        if node.type == "subflow" and isinstance(target, str) and "${" not in target:
+            if LOCAL_ONLY_CLASSES - set((flows.get(target) or {}).get("data_classes", [])):
+                errors.append(
+                    f"{where}: node '{node.id}' starts subflow '{target}' that is not a journal flow "
+                    "(it would not be local only and its traces could capture content)"
+                )
+    return errors
 
 
 def _subflow_targets(flow: Flow) -> list[str]:
@@ -284,6 +392,7 @@ class FlowCompiler:
         """Compiled graph of ``flow_id``; subflows are compiled lazily and inherit the checkpointer."""
         flow = self.snapshot.flow(flow_id)
         errors, _ = validate_flow(flow, self.snapshot, self.registry)
+        errors += private_data_errors(flow, self.snapshot, os.environ)
         if errors:
             raise FlowError(errors)
         return self._build(flow).compile(checkpointer=checkpointer, name=flow.id)

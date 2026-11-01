@@ -31,6 +31,7 @@ from pkpipe.evals.models import EvalRun
 from pkpipe.evals.runner import EvalRunner, evals_config
 from pkpipe.evals.suites import (
     SUITES,
+    ImprovementSuite,
     SessionsSuite,
     TriageSuite,
     run_pairwise,
@@ -42,8 +43,8 @@ from pkpipe.steps.llm import LLM_STEP_TYPES
 from pkpipe.telemetry import attrs
 
 #: suites a publish may run, in order (production is monitoring only)
-GATED_SUITES = ("deterministic", "triage", "sessions", "calibration", "flows", "security")
-LLM_SUITES = ("triage", "sessions")
+GATED_SUITES = ("deterministic", "triage", "sessions", "calibration", "improvement", "flows", "security")
+LLM_SUITES = ("triage", "sessions", "improvement")
 
 
 @dataclass
@@ -106,6 +107,8 @@ def unevaluated_steps(current: ConfigSnapshot | None, draft: ConfigSnapshot, pat
     """LLM steps that are new or changed in the draft but have no eval dataset (constitution IX: every LLM
     step has an eval dataset). Such a change cannot be measured, so it blocks unless overridden."""
     covered = {f"{TriageSuite.flow}.{TriageSuite.node}"} | {t.name for t in session_targets(paths)}
+    if paths.find(ImprovementSuite.dataset) is not None:
+        covered.add(f"{ImprovementSuite.flow}.{ImprovementSuite.node}")
     out = []
     for name in llm_steps(draft):
         if name in covered:

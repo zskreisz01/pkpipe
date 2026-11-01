@@ -6,7 +6,7 @@ title: Owner manual
 
 This page lists only what **you**, the owner, have to do by hand. Everything else runs on its own. pkpipe never processes, releases or adopts anything without you (constitution VI). If you skip a task, nothing breaks: items wait in a pending or proposed state until you get to them.
 
-> **Status:** pkpipe is pre-alpha. This manual describes the designed behaviour (see `docs/` and `specs/`); file names and UI views may still change while the specs are implemented.
+> **Status:** pkpipe is pre-alpha (the config UI, `pkpipe serve` and the app MCP server exist; see [Operations](operations.md#config-ui-and-app-mcp)). This manual describes the designed behaviour (see `docs/` and `specs/`); file names and UI views may still change while the specs are implemented.
 
 Times are the defaults from `schedules.json`. If you change a schedule, the matching task moves with it.
 
@@ -52,7 +52,16 @@ flowchart LR
 
 - **What:** a short daily note on what went well, what did not and what you want to try.
 - **When:** before 21:30, when the extraction runs.
-- **How:** write in your usual journal note. Use clear phrasing such as "next time I will…" or "experiment: …"; the extraction session picks these up as improvement items in state `proposed`. It runs locally, without tools, and the journal never leaves the machine.
+- **How:** write in the day's journal note (`2-Areas/Journal/YYYY-MM-DD.md` by default) and put what you want to change under an `## Improvement` heading, one bullet per item, in your own words ("Stretch for ten minutes every morning."). Add how you will know it worked in the same bullet if you like. The extraction session copies each bullet as an improvement item in state `proposed`; it never rewrites or invents. Only that section is read by the session, which runs locally without tools, and the journal never leaves the machine.
+
+### Review the improvement backlog
+
+*Only if the self-improvement cycle is enabled in your overlay.*
+
+- **What:** decide what happens to the proposed items and to the weekly verdict proposals.
+- **When:** after the Sunday 19:30 "weekly review ready" notification.
+- **How:** open `2-Areas/Self-Improvement/Improvement-Backlog.md`. Set **status** yourself: `proposed` to `active` (or `dropped`), later `kept`, `adjusted` or `dropped`. The agent never changes a status; it only writes the **evidence** (quotes from your journal, each checked against the journal text), a **verdict** (keep / adjust / drop) with a **reason** and a **next** experiment for active items. A `kept` item of area `system` gets a proposal note in `2-Areas/Self-Improvement/System-Changes/`: applying it is a config change that only publishes through the eval gate.
+- **If you skip it:** nothing changes; the next review makes a new proposal.
 
 ### Confirm or override triage
 
@@ -61,7 +70,7 @@ flowchart LR
 - **How**, one of:
   - **Obsidian:** open `0-INBOX/Inbox-Triage.md`. For each row, tick the **confirm** checkbox if the suggestion is right, or write a category id into **override**. Leave a row alone to keep it pending.
   - **UI:** the triage view in the pkpipe web UI.
-  - **Chat agent:** ask your MCP chat client to `list_triage`, then `confirm_item` / `override_item`.
+  - **Chat agent:** ask your MCP chat client to `list_triage`, then `confirm_item` / `override_item`. These are owner actions: the client must use the owner token (the agent token can only list and run flows). Each decision is logged on the UI audit page.
 - **Tips:** the notification shows confidence and reason per item; look closely at low-confidence ones. Every override becomes a training signal for the triage eval, so overriding is better than confirming a wrong category.
 - **If you skip it:** unreviewed items stay `pending`, are counted in the 06:00 daily summary and appear again in the next triage notification ("N older item(s) still wait for your decision"). Nothing is processed by default.
 

@@ -9,7 +9,7 @@ FastAPI + HTMX UI for editing config (draft, validate, smoke eval, publish to gi
 ## Technical Context
 
 **Language/Version**: Python 3.12+ (`uv`)
-**Primary Dependencies**: FastAPI, Jinja2, HTMX, Monaco editor, FastMCP.
+**Primary Dependencies**: FastAPI, uvicorn, Jinja2, HTMX (vendored), FastMCP, Playwright (dev, e2e). Monaco deferred.
 **Testing**: pytest with port fakes
 **Target**: single machine, local model server
 
@@ -32,7 +32,11 @@ FastAPI + HTMX UI for editing config (draft, validate, smoke eval, publish to gi
 
 ## Project Structure
 
-`src/pkpipe/api/`, `src/pkpipe/mcp/server.py`.
+`src/pkpipe/api/` (`security.py` access control, `workspace.py` drafts, `publish.py` git publish and rollback,
+`services.py` use cases, `app.py` routes, `templates/`, `static/`), `src/pkpipe/mcp/server.py` (app MCP tools),
+`src/pkpipe/adapters/app_store_sqlite.py` (drafts, publishes, audit), `src/pkpipe/serve.py` (`pkpipe serve`),
+owner writers in `pkpipe.obsidian.lists` and rules in `pkpipe.domain.triage`. Tests: `tests/unit/api`,
+`tests/integration/api`, `tests/e2e/test_ui_browser.py`.
 
 ## Complexity Tracking
 

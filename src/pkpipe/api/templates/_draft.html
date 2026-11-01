@@ -1,0 +1,56 @@
+<h2>Draft <code>{{ draft.draft_id }}</code> <span class="muted">rev {{ draft.rev }}</span></h2>
+{% if message %}<p class="{{ 'err' if error else 'ok' }}" data-testid="draft-message">{{ message }}</p>{% endif %}
+{% if draft.files %}
+<p>Changed files: {% for p in draft.files %}<code>{{ p }}</code> {% endfor %}</p>
+{% for d in diffs %}<details open><summary>{{ d.path }}</summary><pre data-testid="diff">{{ d.diff }}</pre></details>{% endfor %}
+<div class="card">
+  <div class="row">
+    <button hx-post="/ui/drafts/{{ draft.draft_id }}/validate" hx-target="#draft" hx-swap="innerHTML">Validate</button>
+    <button hx-post="/ui/drafts/{{ draft.draft_id }}/smoke" hx-target="#draft" hx-swap="innerHTML">Smoke eval</button>
+    <button class="danger" hx-post="/ui/drafts/{{ draft.draft_id }}/discard" hx-confirm="Discard the whole draft?">Discard draft</button>
+  </div>
+  <form hx-post="/ui/drafts/{{ draft.draft_id }}/publish" hx-target="#draft" hx-swap="innerHTML">
+    <label for="summary">Commit summary</label>
+    <input id="summary" name="summary" type="text" class="wide" maxlength="120">
+    <label for="override">Override reason (only if the eval gate blocks)</label>
+    <input id="override" name="override_reason" type="text" class="wide">
+    <p><button class="primary" type="submit">Publish</button></p>
+  </form>
+</div>
+{% else %}<p class="muted">The draft has no changes yet. Open a file above and save an edit, or add a category.</p>{% endif %}
+{% if result %}
+<div class="card" id="result" data-testid="result">
+{% if result.kind == "validate" %}
+  <strong class="{{ 'ok' if result.ok else 'err' }}" data-testid="validate-status">{{ "Valid" if result.ok else "Invalid" }}</strong>
+  {% for e in result.errors %}<p class="err">{{ e }}</p>{% endfor %}
+  {% for w in result.warnings %}<p class="muted">warning: {{ w }}</p>{% endfor %}
+{% elif result.kind in ("gate", "publish") %}
+  {% if result.kind == "publish" %}
+    <strong class="{{ 'ok' if result.published else 'err' }}" data-testid="publish-status">{{ "Published" if result.published else "Not published" }}</strong>
+    {% if result.published %} commit <code>{{ result.publish.commit_sha[:10] }}</code> · <a href="/publishes/{{ result.publish.publish_id }}">diff and rollback</a>{% endif %}
+  {% endif %}
+  {% if result.stage == "validate" %}
+    {% for e in result.errors %}<p class="err">{{ e }}</p>{% endfor %}
+  {% else %}
+    <p>Eval gate: <span class="pill {{ result.status }}" data-testid="gate-status">{{ result.status }}</span>
+      {% if result.affected %}suites: {{ result.affected|join(", ") }}{% endif %}</p>
+    {% for f in result.failures %}<p class="err">{{ f }}</p>{% endfor %}
+    {% with metrics = result.metrics %}{% include "_metrics.html" %}{% endwith %}
+  {% endif %}
+{% endif %}
+</div>
+{% endif %}
+
+<h2>New category</h2>
+<form class="card" hx-post="/ui/config/category" hx-target="#draft" hx-swap="innerHTML" id="category-form">
+  <input type="hidden" name="draft_id" value="{{ draft.draft_id }}"><input type="hidden" name="rev" value="{{ draft.rev }}">
+  <div class="row">
+    <div><label for="cat-id">Id</label><input id="cat-id" name="id" type="text" required pattern="[a-z0-9_\-]+"></div>
+    <div><label for="cat-label">Label</label><input id="cat-label" name="label" type="text" required></div>
+    <div><label for="cat-subflow">Subflow</label><select id="cat-subflow" name="subflow">{% for f in flows %}<option>{{ f }}</option>{% endfor %}</select></div>
+    <div><label for="cat-para">PARA path</label><input id="cat-para" name="para_path" type="text" required placeholder="3-Resources/Topic"></div>
+  </div>
+  <label for="cat-hint">Triage hint (what belongs here)</label>
+  <input id="cat-hint" name="triage_hint" type="text" required class="wide">
+  <p><button type="submit">Add to draft</button></p>
+</form>

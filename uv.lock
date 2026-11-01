@@ -1993,7 +1993,9 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "pydantic" },
     { name = "python-frontmatter" },
+    { name = "python-multipart" },
     { name = "sqlalchemy" },
+    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -2035,9 +2037,11 @@ requires-dist = [
     { name = "playwright", marker = "extra == 'webfetch'", specifier = ">=1.64.1" },
     { name = "pydantic", specifier = ">=2" },
     { name = "python-frontmatter", specifier = ">=1.3.0" },
+    { name = "python-multipart", specifier = ">=0.0.33" },
     { name = "sqlalchemy", specifier = ">=2.1.6" },
     { name = "torch", marker = "extra == 'promptguard'", specifier = ">=2.8" },
     { name = "transformers", marker = "extra == 'promptguard'", specifier = ">=4.57" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 provides-extras = ["webfetch", "promptguard"]
 

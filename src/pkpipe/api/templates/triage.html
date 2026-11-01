@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Triage{% endblock %}
+{% block body %}
+<h1>Triage</h1>
+{% if error %}<p class="err">{{ error }}</p>{% endif %}
+{% if conflicts %}<p class="err">Sync conflict file(s): {{ conflicts|join(", ") }}</p>{% endif %}
+{% if invalid %}<p class="err">{{ invalid }} unreadable row(s) in the triage file.</p>{% endif %}
+<table id="triage-table">
+  <thead><tr><th>Item</th><th>Resource</th><th>Suggested</th><th>Override</th><th>State</th><th>Decision</th></tr></thead>
+  <tbody>
+  {% for r in rows %}{% include "_triage_row.html" %}{% else %}<tr><td colspan="6" class="muted">No items.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endblock %}
