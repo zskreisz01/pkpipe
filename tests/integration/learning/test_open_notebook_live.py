@@ -6,7 +6,8 @@ with the reason (``PKPIPE_REQUIRE_LIVE=1`` turns the skip into a failure).
 
 The source is a synthetic page served from a loopback HTTP server; Open Notebook (inside Docker) fetches it
 through ``host.docker.internal``, so the gateway's private-network rule is switched off for these tests only.
-Generation of the short podcast takes minutes on CPU: it is generated once and shared by the tests.
+The full podcast generation takes 10 to 30 minutes on CPU (a thinking model writes the transcript), so it runs
+only with ``PKPIPE_LIVE_AUDIO=1``; the other tests cancel their job right after the fast checks.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import contextlib
 import functools
 import http.server
 import json
+import os
 import threading
 import time
 import urllib.request
@@ -84,19 +86,37 @@ def make_gateway(stack, tmp_path_factory, name="gw", timeout_s=GENERATION_DEADLI
     return LearningGateway(backend, JobStore(base / "jobs.db"), config)
 
 
+def cleanup(stack, job):
+    """Leave the stack as it was: cancel the job, no test notebook, no test episode."""
+    base = stack.api_url
+    with contextlib.suppress(Exception):
+        httpx.delete(f"{base}/api/commands/jobs/{job['job_id']}", timeout=30)
+        for episode in httpx.get(f"{base}/api/podcasts/episodes", timeout=30).json():
+            if episode["name"] == f"pkpipe {job['item_id']}":
+                httpx.delete(f"{base}/api/podcasts/episodes/{episode['id']}", timeout=30)
+        httpx.delete(f"{base}/api/notebooks/{job['nb_id']}?delete_exclusive_sources=true", timeout=30)
+
+
 @pytest.fixture(scope="module")
 def generated(stack, page_url, tmp_path_factory):
-    """One notebook with a short podcast, created through the gateway; the job is polled by the tests."""
+    """A notebook created through the gateway; its podcast job is cancelled after the fast checks."""
     gw = make_gateway(stack, tmp_path_factory, "live-gw")
     job = gw.create(page_url, TEMPLATE, "live-item-1")
     yield gw, job
-    with contextlib.suppress(Exception):  # leave the stack as it was: no test notebook, no test episode
-        for episode in httpx.get(f"{stack.api_url}/api/podcasts/episodes", timeout=30).json():
-            if episode["name"] == f"pkpipe {job['item_id']}":
-                httpx.delete(f"{stack.api_url}/api/podcasts/episodes/{episode['id']}", timeout=30)
-        httpx.delete(
-            f"{stack.api_url}/api/notebooks/{job['nb_id']}?delete_exclusive_sources=true", timeout=30
+    cleanup(stack, job)
+
+
+@pytest.fixture
+def generated_audio(stack, page_url, tmp_path_factory):
+    """A notebook whose short podcast is generated to the end (minutes on CPU, so opt-in)."""
+    if os.environ.get("PKPIPE_LIVE_AUDIO") != "1":
+        pytest.skip(
+            "full podcast generation takes 10 to 30 minutes on CPU: set PKPIPE_LIVE_AUDIO=1 to run it"
         )
+    gw = make_gateway(stack, tmp_path_factory, "live-audio")
+    job = gw.create(page_url, TEMPLATE, "live-item-audio")
+    yield gw, job
+    cleanup(stack, job)
 
 
 def api(stack, path):
@@ -125,15 +145,33 @@ def test_link_opens_the_notebook_in_the_open_notebook_ui(stack, generated):
         assert resp.status == 200
 
 
-def test_short_podcast_is_generated_with_kokoro_and_downloaded(stack, generated):
-    """US1-AS2, SC-001 (ready): poll until ready, then audio and link are stored."""
+def test_kokoro_voice_synthesizes_speech_through_speaches(stack):
+    """Local TTS (the part of the podcast that does not need an LLM): a Kokoro voice speaks a sentence."""
+    speaches = SetupOptions().speaches_host_url
+    body = {"input": "Plants turn light into sugar.", "model": SetupOptions().tts_model, "voice": "af_heart"}
+    resp = httpx.post(f"{speaches}/v1/audio/speech", json=body, timeout=120)
+    assert resp.status_code == 200 and len(resp.content) > 5_000
+    assert resp.content[:3] == b"ID3" or resp.content[0] == 0xFF, "an MP3 file"
+
+
+def test_cancelling_the_job_stops_the_generation(stack, generated):
+    """The fast checks above leave no generation running on the shared LM Studio."""
     gw, job = generated
+    cleanup(stack, job)
+    time.sleep(2)
+    state = api(stack, f"/api/podcasts/jobs/{job['job_id']}")
+    assert state["status"] != "completed"
+
+
+def test_short_podcast_is_generated_with_kokoro_and_downloaded(stack, generated_audio):
+    """US1-AS2, SC-001 (ready): poll until ready, then audio and link are stored."""
+    gw, job = generated_audio
     deadline = time.time() + GENERATION_DEADLINE_S
     status = gw.status(job["job_id"])
     while status["status"] == "generating" and time.time() < deadline:
         time.sleep(15)
         status = gw.status(job["job_id"])
-    assert status["status"] == JobStatus.READY, status
+    assert status["status"] == JobStatus.READY, f"{status.get('status')}: {status.get('reason')}"
     assert status["link"].startswith("http://127.0.0.1:8502/notebooks/")
     audio = gw.audio(job["job_id"])
     data = Path(audio["audio_path"]).read_bytes()

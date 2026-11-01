@@ -37,5 +37,6 @@ I, II, III).
 - Qwen3.5 as podcast model fails ("Invalid json output": reasoning before the JSON); `google/gemma-4-12b` works.
   A 3 segment overview (28 clips, about 7 minutes of audio) took about 10 minutes on CPU: about 7 minutes for the
   outline and transcript, about 2.5 minutes for Kokoro. Hence the 90 minute default timeout.
+- `google/gemma-4-12b` is a thinking model as well (about 7 tokens per second on this machine, almost all of them reasoning): a transcript segment that runs away hits `max_tokens` and is retried once, so the duration varies from about 10 to 40 minutes. The setup script sets the profile's `max_tokens` to 4096 to bound one attempt. A non-thinking model would make generation much faster; it is a `--podcast-model` setting.
 - Open Notebook fetches link sources itself, so the gateway filters URLs before they are forwarded.
 - Open points: the voice quality is the owner's call (SC-002); NotebookLM needs a driver the owner brings.

@@ -41,7 +41,7 @@ class SetupOptions:
     speaker_profile: str = "pkpipe_duo"
     episode_profile: str = "pkpipe_overview"
     segments: int = 3  # Open Notebook accepts 3 to 20
-    max_tokens: int = 8192
+    max_tokens: int = 4096  # a runaway segment is cut after minutes, not an hour (it is retried once)
     language: str = "en"
     api_key: str = "not-needed"  # LM Studio and Speaches ignore it; Open Notebook wants a non-empty value
 

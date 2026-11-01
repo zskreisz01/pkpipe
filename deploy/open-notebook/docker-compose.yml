@@ -40,6 +40,8 @@ services:
       - SURREAL_PASSWORD=${SURREAL_PASSWORD}
       - SURREAL_NAMESPACE=open_notebook
       - SURREAL_DATABASE=open_notebook
+      # fetch link sources with the built-in extractor only: the default 'auto' first sends the URL to r.jina.ai
+      - CCORE_URL_ENGINE=simple
     volumes: ["./data/notebook:/app/data"]
     depends_on: [surrealdb, speaches]
     restart: unless-stopped
