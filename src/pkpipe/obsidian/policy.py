@@ -28,6 +28,7 @@ TOOLS = (
     "read_notes",
     "read_improvements",
     "update_improvements",
+    "quarantine_note",
 )
 PARA = ("0-INBOX", "1-Projects", "2-Areas", "3-Resources", "4-Archive")
 DEFAULT_ALLOW: dict[str, list[str]] = {
@@ -42,6 +43,8 @@ DEFAULT_ALLOW: dict[str, list[str]] = {
     "read_notes": list(PARA),
     "read_improvements": ["2-Areas"],
     "update_improvements": ["2-Areas"],
+    # source notes that may be quarantined; the quarantine folder itself is fixed (``quarantine_dir``)
+    "quarantine_note": ["0-INBOX"],
 }
 CONFLICT_RE = re.compile(r"\([^)]*conflict[^)]*\)|\.sync-conflict-", re.IGNORECASE)
 
@@ -59,6 +62,8 @@ class VaultPolicy(BaseModel):
     triage_file: str = "0-INBOX/Inbox-Triage.md"
     processing_list: str = "0-INBOX/Manual-Resource-Processing-List.md"
     improvement_file: str = "2-Areas/Self-Improvement/Improvement-Backlog.md"
+    #: Only ``quarantine_note`` writes here (inert form) and only the owner's release moves a note out.
+    quarantine_dir: str = "0-INBOX/_quarantine"
 
     @field_validator("allow")
     @classmethod
@@ -126,6 +131,16 @@ class VaultPolicy(BaseModel):
     def is_managed(self, rel: str) -> bool:
         norm = PurePosixPath(rel).as_posix()
         return norm in self.managed_files
+
+    def in_quarantine(self, absolute: Path) -> bool:
+        """Whether a resolved path lies in the quarantine folder (case-folded, for APFS)."""
+        q = _lexical_parts(self.quarantine_dir, what="quarantine_dir")
+        try:
+            parts = absolute.resolve().relative_to(self.root).parts
+        except ValueError:
+            return False
+        fold = [p.casefold() for p in parts[: len(q)]]
+        return fold == [p.casefold() for p in q]
 
     def rel(self, absolute: Path) -> str:
         return absolute.resolve().relative_to(self.root).as_posix()

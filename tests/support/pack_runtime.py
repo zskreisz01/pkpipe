@@ -61,6 +61,7 @@ def vault_tools(vault_dir: Path, learning: FakeLearning | None = None) -> FakeTo
             "obsidian:read_notes": lambda paths: vault.read_notes(paths),
             "obsidian:read_improvements": lambda: vault.read_improvements(),
             "obsidian:update_improvements": lambda rows: vault.update_improvements(rows),
+            "obsidian:quarantine_note": vault.quarantine_note,
             "learning:create": learning.create,
             "learning:status": learning.status,
             "learning:link": learning.link,

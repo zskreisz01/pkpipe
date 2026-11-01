@@ -1,6 +1,6 @@
 {
   "id": "learning_material",
-  "description": "URL check, then a notebook from the URL and the prompt template only, wait for the generation result (poll + deadline above the gateway timeout), fetch audio and link, update the list. A URL the gateway refuses (DNS, deny list) is quarantined; any other create error leaves the item released for the next run. Output guard of derived text: spec 009.",
+  "description": "URL check, then a notebook from the URL and the prompt template only, wait for the generation result (poll + deadline above the gateway timeout), fetch audio and link, update the list. A URL the gateway refuses (DNS, deny list) goes to handle_security_flag (log, deny-list, quarantine, alert); any other create error leaves the item released for the next run. No session runs and no derived text is written to the vault (only notebook id, link and audio path), so there is no output to guard.",
   "bpmn": "process-learning-material",
   "start": "read",
   "nodes": [
@@ -28,14 +28,11 @@
       }
     },
     {
-      "id": "quarantine",
-      "type": "code",
+      "id": "security_flag",
+      "type": "subflow",
       "bpmn_element": "Handle security flag",
       "config": {
-        "function": "item.set",
-        "args": {
-          "state": "quarantined"
-        }
+        "flow": "handle_security_flag"
       }
     },
     {
@@ -178,7 +175,7 @@
     },
     {
       "from": "prepare",
-      "to": "quarantine",
+      "to": "security_flag",
       "when": {
         "path": "prepare.status",
         "eq": "blocked"
@@ -208,7 +205,7 @@
     },
     {
       "from": "create_failed",
-      "to": "quarantine"
+      "to": "security_flag"
     },
     {
       "from": "wait_generation",

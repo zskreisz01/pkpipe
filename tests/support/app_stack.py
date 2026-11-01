@@ -26,6 +26,7 @@ from tests.support.evals import (
     IDS,
     SECURE_FETCH_CASES,
     ProfileModel,
+    fake_classifier,
     mini_evals,
     reader_reply,
     triage_case,
@@ -175,7 +176,11 @@ def make_stack(
         synthetic_vault,
         run_service=runs,
         gate_factory=gate_factory
-        or (lambda snapshot: PublishGate(model=_Delegate(), paths=paths, identities=IDS)),
+        or (
+            lambda snapshot: PublishGate(
+                model=_Delegate(), paths=paths, identities=IDS, options={"classifier": fake_classifier()}
+            )
+        ),
     )
     tokens = Tokens(OWNER_TOKEN, AGENT_TOKEN)
     web = create_app(services, tokens)

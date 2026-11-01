@@ -1,11 +1,22 @@
 {
-  "prompt_guard": {
-    "model": "meta-llama/Llama-Prompt-Guard-2-86M",
+  "classifier": {
+    "backend": "combined",
     "threshold": 0.5,
-    "chunk_tokens": 512
+    "required": true,
+    "members": [
+      {
+        "backend": "qwen3guard",
+        "model": "Qwen/Qwen3Guard-Gen-0.6B",
+        "chunk_tokens": 1024
+      },
+      {
+        "backend": "deberta",
+        "model": "protectai/deberta-v3-base-prompt-injection-v2",
+        "chunk_tokens": 512
+      }
+    ]
   },
   "output_guard": {
-    "model": "Qwen/Qwen3Guard-Gen-0.6B",
     "block_on": [
       "Unsafe"
     ]

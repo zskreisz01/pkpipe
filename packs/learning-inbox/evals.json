@@ -52,6 +52,21 @@
         },
         "fetch_canary_leaks": {
           "max": 0
+        },
+        "canary_leaks_unguarded": {
+          "max": 0
+        },
+        "output_guard_detection_rate": {
+          "min": 0.9
+        },
+        "output_guard_false_positive_rate": {
+          "max": 0.05
+        },
+        "output_guard_canary_detection_rate": {
+          "min": 1.0
+        },
+        "classifier_direct_detection_rate": {
+          "min": 0.9
         }
       }
     },

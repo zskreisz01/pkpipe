@@ -10,7 +10,9 @@ from pkpipe.ports import ClassifierUnavailable
 class FakeClassifier:
     """``rules`` maps a lower-case substring to a score; a chunk scores the highest matching rule (else
     ``default``). Chunks are ``chunk_chars`` characters, so long texts are scanned piecewise like the
-    512-token chunks of Prompt Guard 2. ``available=False`` raises :class:`ClassifierUnavailable`."""
+    token chunks of the real classifiers. ``labels`` maps a lower-case substring to a safety label and
+    categories (Qwen3Guard style: ``{"bomb": ("Unsafe", ["Violent"])}``); a chunk without a match is
+    ``Safe``. ``available=False`` raises :class:`ClassifierUnavailable`."""
 
     def __init__(
         self,
@@ -19,8 +21,10 @@ class FakeClassifier:
         default: float = 0.01,
         chunk_chars: int = 2000,
         available: bool = True,
+        labels: dict[str, tuple[str, list[str]]] | None = None,
     ):
         self.rules = {k.lower(): v for k, v in (rules or {}).items()}
+        self.labels = {k.lower(): v for k, v in (labels or {}).items()}
         self.default = default
         self.chunk_chars = chunk_chars
         self.available = available
@@ -34,4 +38,19 @@ class FakeClassifier:
         scores = [
             max([v for k, v in self.rules.items() if k in c.lower()], default=self.default) for c in chunks
         ]
-        return {"model": "fake", "max_score": max(scores), "chunks": len(chunks), "scores": scores}
+        out: dict[str, Any] = {
+            "model": "fake",
+            "max_score": max(scores),
+            "chunks": len(chunks),
+            "scores": scores,
+        }
+        if self.labels:
+            severity = {"Safe": 0, "Controversial": 1, "Unsafe": 2}
+            label, categories = "Safe", []
+            for key, (lab, cats) in self.labels.items():
+                if key in text.lower():
+                    if severity[lab] > severity[label]:
+                        label = lab
+                    categories += [c for c in cats if c not in categories]
+            out.update(label=label, categories=categories)
+        return out

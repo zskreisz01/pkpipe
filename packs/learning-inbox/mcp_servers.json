@@ -11,7 +11,8 @@
       "upsert_processing_list",
       "read_notes",
       "read_improvements",
-      "update_improvements"
+      "update_improvements",
+      "quarantine_note"
     ]
   },
   "websearch": {

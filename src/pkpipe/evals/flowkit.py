@@ -7,6 +7,7 @@ decisions, and the expected end state; nothing here talks to a network or a mode
 
 from __future__ import annotations
 
+import json
 import re
 import tempfile
 import threading
@@ -106,6 +107,7 @@ class VaultTools:
             "obsidian:read_notes": vault.read_notes,
             "obsidian:read_improvements": vault.read_improvements,
             "obsidian:update_improvements": vault.update_improvements,
+            "obsidian:quarantine_note": vault.quarantine_note,
             "learning:create": learning.create,
             "learning:status": learning.status,
             "learning:link": learning.link,
@@ -130,6 +132,7 @@ class ScriptedModel:
     * ``fields`` – the requested output schema requires (at least) these fields, e.g. ``["title", "note"]``,
       so a rule keeps matching when the session's instruction text is edited.
 
+    ``{canary}`` in a reply string becomes the canary of the system prompt (a scripted prompt leak).
     No match is a ``ModelError`` (a case must script every call)."""
 
     def __init__(self, rules: list[dict[str, Any]]):
@@ -150,8 +153,40 @@ class ScriptedModel:
         self.calls += 1
         for rule in self.rules:
             if self._matches(rule, system, user, json_schema):
-                return dict(rule["reply"])
+                reply = json.dumps(rule["reply"])
+                if "{canary}" in reply:
+                    found = re.search(r"CNY-[0-9a-f]{16}", system)
+                    reply = reply.replace("{canary}", found.group(0) if found else "no-canary-in-prompt")
+                return json.loads(reply)
         raise ModelError("flow case has no scripted model reply for this prompt")
+
+
+class ScriptedClassifier:
+    """``ClassifierPort`` of flow cases: ``rules`` maps a lower-case substring to a score, ``labels`` to a
+    Qwen3Guard-style ``[label, [categories]]``; anything else is clean (the deterministic detectors of the
+    output guard, canary, markup and heuristics, still run for real)."""
+
+    model = "scripted"
+
+    def __init__(self, rules: dict[str, float] | None = None, labels: dict[str, list[Any]] | None = None):
+        self.rules = {k.lower(): float(v) for k, v in (rules or {}).items()}
+        self.labels = {k.lower(): v for k, v in (labels or {}).items()}
+
+    def scan(self, text: str) -> dict[str, Any]:
+        low = (text or "").lower()
+        score = max([v for k, v in self.rules.items() if k in low], default=0.0)
+        label, cats = "Safe", []
+        for key, (lab, categories) in self.labels.items():
+            if key in low:
+                label, cats = lab, list(categories)
+        return {
+            "model": self.model,
+            "max_score": score,
+            "chunks": 1,
+            "scores": [score],
+            "label": label,
+            "categories": cats,
+        }
 
 
 class VirtualClock:

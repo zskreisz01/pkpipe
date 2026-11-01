@@ -1,6 +1,6 @@
 ---
 spec_id: 008-secure-fetch
-status: Active
+status: Completed
 description: Tasks for Secure fetch
 updated: 2026-11-01
 ---
@@ -24,7 +24,7 @@ Format: `- [x] T001 [USx] Description` · `[USx]` = user story
 ## Phase: User Story 2 (P1)
 
 - [x] T005 [US2] Sanitizer with tests on fixtures
-- [x] T006 [US2] Prompt Guard 2 wrapper (chunking); live check with the real model pending its installation (spec status_reason)
+- [x] T006 [US2] Classifier wrapper (chunking): Qwen3Guard + ProtectAI DeBERTa (owner decision, decision 0001), live tests in `tests/integration/security`
 - [x] T007 [US2] Security eval runner
 
 ## Phase: Polish & cross-cutting

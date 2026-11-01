@@ -40,7 +40,7 @@ def test_exported_json_schemas_are_valid_and_accept_the_pack(pack_dir):
 
 
 def test_exported_json_schemas_reject_what_the_models_reject():
-    bad = {"prompt_guard": {"model": "m", "threshold": 7, "chunk_tokens": 1}}
+    bad = {"classifier": {"backend": "qwen3guard", "threshold": 7}}
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(bad, config_json_schemas()["security"])
 
@@ -139,8 +139,8 @@ def test_security_thresholds_are_bounded():
     good = json.loads(
         json.dumps(
             {
-                "prompt_guard": {"model": "m", "threshold": 0.5, "chunk_tokens": 512},
-                "output_guard": {"model": "m", "block_on": ["Unsafe"]},
+                "classifier": {"backend": "qwen3guard", "threshold": 0.5},
+                "output_guard": {"block_on": ["Unsafe"]},
                 "canary": {"rotate": "per_run"},
                 "url_filter": {"max_bytes": 10},
                 "quarantine_dir": "q",
@@ -149,9 +149,39 @@ def test_security_thresholds_are_bounded():
     )
     cfg = SecurityConfig.model_validate(good)
     assert cfg.url_filter.block_private_networks is True  # secure by default
-    good["prompt_guard"]["threshold"] = 1.5
+    good["classifier"]["threshold"] = 1.5
     with pytest.raises(ValidationError):
         SecurityConfig.model_validate(good)
+
+
+@pytest.mark.parametrize(
+    "classifier",
+    [
+        {"backend": "combined"},  # no members
+        {"backend": "combined", "model_dir": "/x", "members": [{"backend": "deberta"}]},
+        {"backend": "qwen3guard", "members": [{"backend": "deberta"}]},
+        {"backend": "deberta", "chunk_tokens": 1024},  # 512-token window
+        {"backend": "unknown"},
+        {"backend": "qwen3guard", "trust_remote_code": True},
+    ],
+)
+def test_classifier_settings_reject_invalid_combinations(classifier):
+    """Spec 009 / decision 0001: security.classifier names a known local backend; combined takes members."""
+    base = {"canary": {"rotate": "per_run"}, "url_filter": {"max_bytes": 10}, "quarantine_dir": "q"}
+    with pytest.raises(ValidationError):
+        SecurityConfig.model_validate({**base, "classifier": classifier})
+
+
+def test_output_guard_block_on_accepts_only_qwen3guard_labels():
+    base = {
+        "classifier": {"backend": "qwen3guard"},
+        "canary": {"rotate": "per_run"},
+        "url_filter": {"max_bytes": 10},
+        "quarantine_dir": "q",
+    }
+    assert SecurityConfig.model_validate(base).output_guard.block_on == ["Unsafe"]
+    with pytest.raises(ValidationError):
+        SecurityConfig.model_validate({**base, "output_guard": {"block_on": ["Safe"]}})
 
 
 def test_validate_effective_reports_file_and_path():

@@ -103,25 +103,39 @@ def test_triage_confirm_override_release_fans_out_to_category_processes(world, v
     assert code == 0 and triage["status"] == "done", triage
     rows = _rows(vault)
     assert set(rows) == set(IDS.values())  # US1-AS1: one row per item
-    for row in rows.values():
+    # spec 009: the output guard may stop the injected note at triage (its suggestion is never trusted);
+    # every other item gets a suggestion of a configured category
+    flagged = {n for n, i in IDS.items() if rows[i]["state"] == "quarantined"}
+    assert flagged <= {"trap.md"}, flagged
+    for name in flagged:
+        assert rows[IDS[name]]["ai_suggested_category"] == "none"
+        assert not (vault / "0-INBOX" / name).exists()
+        assert (vault / "0-INBOX/_quarantine" / f"{IDS[name]}.md").is_file()
+        assert any(f"Security flag on item {IDS[name]}" in m.message for m in notify.sent)
+    for name, item_id in IDS.items():
+        if name in flagged:
+            continue
+        row = rows[item_id]
         assert row["state"] == "suggested" and row["ai_suggested_category"] in CATEGORIES
         assert not row["confirm"] and not row["override"]
-    suggestions = {n: rows[i]["ai_suggested_category"] for n, i in IDS.items()}
-    assert "6 new item(s)" in notify.sent[0].message and notify.sent[0].channel == "discord_main"
-    suggest_steps = [r["output"]["outputs"]["suggest"] for r in triage["outputs"]["categorize"]]
+    suggestions = {n: rows[i]["ai_suggested_category"] for n, i in IDS.items() if n not in flagged}
+    ready = next(m for m in notify.sent if m.event == "triage_ready")
+    assert f"{6 - len(flagged)} new item(s)" in ready.message and ready.channel == "discord_main"
+    results = {r["item"]["id"]: r for r in triage["outputs"]["categorize"]}
+    suggest_steps = [r["output"]["outputs"]["suggest"] for r in results.values()]
     assert all(0 <= s["confidence"] <= 1 and s["reason"].strip() for s in suggest_steps)  # FR-001
     if variant == "replay":  # recorded answers: the suggestions are exactly reproducible
-        assert suggestions == {
+        assert {k: v for k, v in suggestions.items() if k not in ("trap.md", "later.md")} == {
             "cli-tool.md": "tool",
             "course.md": "learning-material",
             "campaign.md": "marketing",
             "recipe.md": "misc",
-            "trap.md": suggestions["trap.md"],
-            "later.md": suggestions["later.md"],
         }
     # constitution IV: the injected note never chose the category by itself; code validated every category
     assert all(
-        r["output"]["outputs"]["check"]["category"] in CATEGORIES for r in triage["outputs"]["categorize"]
+        r["output"]["outputs"]["check"]["category"] in CATEGORIES
+        for i, r in results.items()
+        if i not in {IDS[n] for n in flagged}
     )
 
     # -- the owner reviews in Obsidian (edits the triage file) --
@@ -131,10 +145,11 @@ def test_triage_confirm_override_release_fans_out_to_category_processes(world, v
         override[IDS["course.md"]] = "marketing"
     else:
         confirm.append(IDS["course.md"])
-    if suggestions["trap.md"] == "learning-material":
-        override[IDS["trap.md"]] = "misc"
-    else:
-        confirm.append(IDS["trap.md"])
+    if "trap.md" not in flagged:
+        if suggestions["trap.md"] == "learning-material":
+            override[IDS["trap.md"]] = "misc"
+        else:
+            confirm.append(IDS["trap.md"])
     confirm = [c for c in confirm if c not in override]
     decided = set(confirm) | set(override)
     owner_decides(vault, confirm=confirm, override=override)  # 'later.md' stays unreviewed
@@ -145,6 +160,9 @@ def test_triage_confirm_override_release_fans_out_to_category_processes(world, v
     rows = _rows(vault)
     assert rows[IDS["later.md"]]["state"] == "pending"  # SC-002: unconfirmed is never processed
     for name, item_id in IDS.items():
+        if name in flagged:
+            assert rows[item_id]["state"] == "quarantined"  # stays quarantined until the owner releases it
+            continue
         if item_id in decided:
             assert rows[item_id]["state"] in ("processed", "quarantined"), (name, rows[item_id])
         category = override.get(item_id) or suggestions[name]
@@ -161,7 +179,7 @@ def test_triage_confirm_override_release_fans_out_to_category_processes(world, v
     assert rows[IDS["recipe.md"]]["state"] == "processed"
 
     # -- US3: the daily summary with counts; the pending item is reported --
-    summary = notify.sent[-1]
+    summary = [m for m in notify.sent if m.event == "daily_summary"][-1]
     done = sum(1 for i in decided if rows[i]["state"] == "processed")
     quarantined = sum(1 for i in decided if rows[i]["state"] == "quarantined")
     assert summary.message == (

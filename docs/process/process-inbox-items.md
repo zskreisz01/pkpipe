@@ -5,14 +5,15 @@ sidebar_position: 2
 
 # Process Inbox Items
 
-At 20:00 the agent reads the new INBOX items through the vault port (the `obsidian-vault` MCP server or a plain file-system adapter). Reading is a deterministic code step, not a model decision: the categorization session itself has no tools and receives each item's URL, title and note as datamarked input. It suggests a category per item and the owner is notified. At 06:00 only confirmed or overridden items are released; the rest stays pending and is listed again in the next notification. Each released item runs in its own instance; a security flag in one item quarantines only that item.
+At 20:00 the agent reads the new INBOX items through the vault port (the `obsidian-vault` MCP server or a plain file-system adapter). Reading is a deterministic code step, not a model decision: the categorization session itself has no tools and receives each item's URL, title and note as datamarked input. It suggests a category per item (the session carries the run's canary) and the output guard checks the reply before the triage file is written: a flagged item goes to Handle Security Flag and its row is written as `quarantined` without a trusted category, while the other items continue; the owner is notified. At 06:00 only confirmed or overridden items are released; the rest stays pending and is listed again in the next notification. Each released item runs in its own instance; a security flag in one item quarantines only that item.
 
 ![Process Inbox Items](../img/bpmn/process-inbox-items.png)
 
 ```mermaid
 flowchart LR
     inb[(0-INBOX)] -.-> read
-    s((20:00)) --> read[Read new INBOX items<br/>vault port, code] --> cat[Categorize each item<br/>isolated session, no tools] --> ntf[Notify: triage ready] --> par{{+}}
+    s((20:00)) --> read[Read new INBOX items<br/>vault port, code] --> cat[Categorize each item<br/>isolated session, no tools, run canary<br/>+ output guard] --> ntf[Notify: triage ready] --> par{{+}}
+    cat -. security flag .-> tq[[Handle security flag]] --> tqe((Quarantined))
     par --> tm((06:00)) --> sel[Select confirmed /<br/>overridden items]
     par --> rev[Owner: confirm or override] --> rd((Reviewed))
     rev -. "06:00 boundary" .-> rc((Window closed,<br/>items stay pending))

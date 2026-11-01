@@ -10,6 +10,8 @@
 Prompts contain random datamarking tokens (``<<<DATA 1a2b3c4d5e6f>>>``, constitution IV) that differ on every
 call; the cassette key normalises them, so the same logical request always finds its recording. Model errors
 (``SchemaError``, ...) are recorded too and replayed as the same exception type.
+
+:class:`CassetteClassifier` does the same for the local ``ClassifierPort`` of the security suite (spec 009).
 """
 
 from __future__ import annotations
@@ -22,7 +24,15 @@ import threading
 from pathlib import Path
 from typing import Any, Literal
 
-from pkpipe.ports import ContextOverflow, ModelError, ModelPort, ModelUnavailable, SchemaError
+from pkpipe.ports import (
+    ClassifierPort,
+    ClassifierUnavailable,
+    ContextOverflow,
+    ModelError,
+    ModelPort,
+    ModelUnavailable,
+    SchemaError,
+)
 
 Mode = Literal["record", "replay", "auto"]
 FORMAT = 1
@@ -165,3 +175,73 @@ class CassetteModel:
     def keys(self) -> set[str]:
         with self._lock:
             return set(self._entries)
+
+
+class ClassifierMiss(ClassifierUnavailable):
+    """Replay mode and no recorded classifier result for this text (text or classifier config changed)."""
+
+
+class CassetteClassifier:
+    """``ClassifierPort`` backed by a cassette (spec 009): the security suite measures the local classifier
+    (Qwen3Guard, DeBERTa) live and replays the recorded results in CI, where the models are not installed.
+
+    The key is the classifier configuration plus the text, so a changed model, chunk size or text is a miss
+    (``ClassifierMiss``, which the suite reports as an error, never as a pass). Only results are stored."""
+
+    def __init__(self, path: Path, mode: Mode, inner: ClassifierPort | None, *, identity: str):
+        if mode != "replay" and inner is None:
+            raise ValueError(f"cassette mode '{mode}' needs the real classifier to record from")
+        self.path, self.mode, self.inner, self.identity = path, mode, inner, identity
+        self._lock = threading.Lock()
+        self._entries: dict[str, dict[str, Any]] = {}
+        self._dirty = False
+        self.hits = self.misses = self.recorded = 0
+        self.used: set[str] = set()
+        if path.is_file():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if data.get("format") != FORMAT:
+                raise ValueError(f"{path}: unsupported cassette format {data.get('format')!r}")
+            self._entries = {e["key"]: e for e in data.get("entries", [])}
+
+    def key(self, text: str) -> str:
+        return hashlib.sha256(f"{self.identity}\n{text}".encode()).hexdigest()
+
+    def scan(self, text: str) -> dict[str, Any]:
+        key = self.key(text or "")
+        with self._lock:
+            self.used.add(key)
+            entry = self._entries.get(key) if self.mode != "record" else None
+            if entry is not None:
+                self.hits += 1
+                return copy.deepcopy(entry["result"])
+            if self.mode == "replay":
+                self.misses += 1
+                raise ClassifierMiss(f"no classifier recording in {self.path.name} for this text")
+        assert self.inner is not None
+        result = self.inner.scan(text)
+        with self._lock:
+            self._entries[key] = {"key": key, "result": result}
+            self._dirty = True
+            self.recorded += 1
+        return copy.deepcopy(result)
+
+    def save(self, *, prune_to: set[str] | None = None) -> bool:
+        with self._lock:
+            entries = self._entries
+            if prune_to is not None:
+                entries = {k: v for k, v in entries.items() if k in prune_to}
+                self._dirty = self._dirty or len(entries) != len(self._entries)
+                self._entries = entries
+            if not self._dirty:
+                return False
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "format": FORMAT,
+                "classifier": self.identity,
+                "entries": [entries[k] for k in sorted(entries)],
+            }
+            tmp = self.path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(payload, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+            tmp.replace(self.path)
+            self._dirty = False
+            return True

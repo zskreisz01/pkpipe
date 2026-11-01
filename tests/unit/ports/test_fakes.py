@@ -13,6 +13,7 @@ from tests.fakes import (
     FakeClock,
     FakeModel,
     FakeNotify,
+    FakeSecurityLog,
     FakeTools,
     InMemoryConfig,
     InMemoryRunStore,
@@ -32,6 +33,7 @@ FAKES = {
     "StatePort": InMemoryState(),
     "ConfigPort": InMemoryConfig(),
     "ClassifierPort": FakeClassifier(),
+    "SecurityLogPort": FakeSecurityLog(),
 }
 
 
@@ -143,3 +145,20 @@ def test_recording_tracer_marks_failed_spans_and_carries_flow_attributes():
     step = t.of("step")[0]
     assert step.failed == "RuntimeError"
     assert step.attributes["flow.id"] == "f" and step.attributes["item.id"] == "i1"
+
+
+def test_fake_security_log_deny_lists_a_domain_once_and_counts():
+    """Spec 009 edge case: the same domain flagged twice is one deny-list entry with a counter."""
+    log = FakeSecurityLog("denied.example\n")
+    assert log.deny_domain("evil.example", day="2026-11-01") == {
+        "domain": "evil.example",
+        "added": True,
+        "count": 1,
+    }
+    assert log.deny_domain("evil.example", day="2026-11-02")["count"] == 2
+    assert log.deny_domain("a.denied.example", day="2026-11-02") == {
+        "domain": "a.denied.example",
+        "added": False,
+        "count": 1,
+    }
+    assert log.denied_domains() == {"denied.example", "evil.example"}

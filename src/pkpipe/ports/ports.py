@@ -44,13 +44,32 @@ class ClassifierUnavailable(Exception):
 
 @runtime_checkable
 class ClassifierPort(Protocol):
-    """Prompt-injection / jailbreak classifier (Prompt Guard 2 in the reference deployment, spec 008 FR-004).
+    """Prompt-injection / jailbreak / harm classifier (spec 008 FR-004, spec 009 FR-002); in the reference
+    deployment Qwen3Guard-Gen combined with ProtectAI's DeBERTa injection classifier (docs/decisions/0001).
 
     ``scan`` splits the text into model-sized chunks and returns ``{"model": str, "max_score": float,
-    "chunks": int, "scores": list[float]}`` with scores in [0, 1] (1 = malicious). Raises
-    :class:`ClassifierUnavailable` when the model cannot run."""
+    "chunks": int, "scores": list[float]}`` with scores in [0, 1] (1 = malicious). A safety moderator adds
+    ``label`` (``Safe`` / ``Controversial`` / ``Unsafe``) and ``categories`` (for example ``Violent``,
+    ``Jailbreak``); a combination adds ``members`` (one result per model). The classifier only reports;
+    code decides what is a flag. Raises :class:`ClassifierUnavailable` when the model cannot run."""
 
     def scan(self, text: str) -> dict[str, Any]: ...
+
+
+@runtime_checkable
+class SecurityLogPort(Protocol):
+    """The security log of the flag handler (spec 009 US2): ``malicious_urls.jsonl`` and the deny-list.
+
+    ``log_malicious_url`` appends one ``MaliciousUrlEntry`` row (see :mod:`pkpipe.security.quarantine`).
+    ``deny_domain`` adds a domain to the deny-list once; flagging it again increments its counter
+    (``{"domain", "added", "count"}``). ``denied_domains`` is what the handler has deny-listed so far (the URL
+    filter merges it with the config's deny-list file)."""
+
+    def log_malicious_url(self, entry: dict[str, Any]) -> None: ...
+
+    def deny_domain(self, domain: str, *, day: str) -> dict[str, Any]: ...
+
+    def denied_domains(self) -> frozenset[str]: ...
 
 
 @runtime_checkable

@@ -122,8 +122,8 @@ def test_test_loopback_env_value_accepts_only_loopback_literals_with_port(bad):
 def test_pack_config_cannot_enable_the_test_allowance():
     """The allowance has no config key: security.url_filter rejects unknown keys (constitution IV)."""
     base = {
-        "prompt_guard": {"model": "m", "threshold": 0.5, "chunk_tokens": 512},
-        "output_guard": {"model": "g", "block_on": ["Unsafe"]},
+        "classifier": {"backend": "qwen3guard", "threshold": 0.5},
+        "output_guard": {"block_on": ["Unsafe"]},
         "canary": {"rotate": "per_run"},
         "quarantine_dir": "q",
     }

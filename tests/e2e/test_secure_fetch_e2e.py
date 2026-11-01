@@ -1,9 +1,10 @@
 """Spec 008 end to end: ``pkpipe run secure_fetch`` through the CLI with the real composition root, the real
 web-fetch MCP server (subprocess, Lightpanda behind the filtering proxy) and the local fixture site.
 
-Swapped at the composition root: the classifier (Prompt Guard 2 is gated and not installed here) and, in the
-non-live tests, the model. The test-only loopback allowance for the fixture port is added to the run's ports
-by the test and to the server by its environment: no config file is involved.
+Swapped at the composition root: the classifier (a fake; the real Qwen3Guard + DeBERTa classifier is
+covered by tests/integration/security) and, in the non-live tests, the model. The test-only loopback
+allowance for the fixture port is added to the run's ports by the test and to the server by its
+environment: no config file is involved.
 """
 
 from __future__ import annotations
@@ -45,8 +46,8 @@ def served(site, tmp_path, write_json, monkeypatch):
         monkeypatch.delenv("PKPIPE_OVERLAY_DIR", raising=False)
         real_ports = app.ports_for
 
-        def ports(snapshot):
-            p = real_ports(snapshot)
+        def ports(snapshot, *args, **kwargs):
+            p = real_ports(snapshot, *args, **kwargs)
             p.extra[CLASSIFIER_PORT] = FakeClassifier()
             p.extra[TEST_LOOPBACK_PORT] = site.allowance
             return p
@@ -157,18 +158,24 @@ def test_live_reader_flags_a_visible_injection(site, served, capsys):
     assert read["summary"].strip().upper() != "PWNED" and "sourdough" in json.dumps(read).lower()
 
 
+@pytest.mark.real_classifier
 @pytest.mark.live("lightpanda")
-def test_without_prompt_guard_the_real_composition_root_fails_closed(
-    site, served, capsys, monkeypatch, tmp_path
+def test_without_the_classifier_model_the_real_composition_root_fails_closed(
+    site, served, capsys, monkeypatch, tmp_path, write_json
 ):
-    """FR-004 + constitution V through the real ``app.make_classifier``: no Prompt Guard model installed means
-    the clean page is still flagged (``classifier_unavailable``) and no extract leaves secure fetch."""
+    """FR-004 + constitution V through the real ``app.make_classifier``: a classifier whose model files are
+    missing means the clean page is still flagged (``classifier_unavailable``) and no extract leaves."""
     overlay, db = served
-    monkeypatch.setenv("PKPIPE_PROMPT_GUARD_DIR", str(tmp_path / "no-model-here"))
+    missing = str(tmp_path / "no-model-here")
+    write_json(
+        overlay,
+        "security.json",
+        {"classifier": {"members": [{"backend": "qwen3guard", "model_dir": missing}]}},
+    )
     # the fixture put a fake classifier in; put the one of the real factory back
 
-    def ports(snapshot, _swapped=app.ports_for):
-        p = _swapped(snapshot)
+    def ports(snapshot, *args, _swapped=app.ports_for, **kwargs):
+        p = _swapped(snapshot, *args, **kwargs)
         p.extra[CLASSIFIER_PORT] = app.make_classifier(snapshot)
         return p
 

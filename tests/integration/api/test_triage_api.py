@@ -89,3 +89,58 @@ def test_triage_requires_a_configured_vault(stack):
     stack.services.vault = None
     resp = api_client(stack).get("/api/triage")
     assert resp.status_code == 409 and "no vault" in resp.json()["error"]
+
+
+def _quarantined(stack, name="odd"):
+    """A note the handle_security_flag flow moved into quarantine (the vault tool the flow calls)."""
+    from pkpipe.domain.triage import item_id_for
+
+    note = "---\nsource: https://example.invalid/odd\n---\nA false positive about prompt injection talks.\n"
+    (stack.vault / "0-INBOX" / f"{name}.md").write_text(note, encoding="utf-8")
+    resource = f"0-INBOX/{name}.md"
+    item = item_id_for(resource)
+    stack.services.vault.update_triage(
+        [{"resource": resource, "ai_suggested_category": "none", "state": "quarantined"}]
+    )
+    flags = [
+        {"flag": "injection_or_jailbreak", "detector": "heuristic", "reason_code": "heuristic:prompt_leak"}
+    ]
+    stack.services.vault.quarantine_note(item, resource, flags, run_id="r1", flagged_at="2026-11-01T06:00")
+    return item, resource, note
+
+
+def test_release_restores_the_note_requeues_it_and_exports_an_eval_candidate(stack):
+    """Spec 009 US3: the owner releases a false positive; the note is back in the INBOX exactly as it was,
+    the row is pending (the next triage suggests a category again) and the text is a security eval
+    candidate in the overlay. The response never carries the note text."""
+    import json
+
+    item, resource, note = _quarantined(stack)
+    client = api_client(stack)
+    resp = client.post(f"/api/triage/{item}/release-quarantine")
+    body = resp.json()
+    assert resp.status_code == 200, body
+    assert body["state"] == "pending" and body["requeued"] is True and body["restored"] == resource
+    assert "content" not in body and "prompt injection talks" not in json.dumps(body)
+    assert (stack.vault / resource).read_text(encoding="utf-8") == note
+    assert not (stack.vault / "0-INBOX/_quarantine" / f"{item}.md").exists()
+    cand = stack.overlay / "evals" / "candidates" / "security.jsonl"
+    case = json.loads(cand.read_text(encoding="utf-8").splitlines()[0])
+    assert case["id"] == body["eval_candidate"] and case["source"] == "release"
+    assert case["expected"] == {
+        "label": "benign",
+        "type": "released_false_positive",
+        "flags": ["injection_or_jailbreak"],
+    }
+    assert "prompt injection talks" in case["input"]["text"]
+    audit = client.get("/api/audit").json()["audit"][0]
+    assert audit["action"] == "release_quarantine" and audit["target"] == item
+
+
+def test_release_is_refused_when_the_inbox_path_is_taken_again(stack):
+    item, resource, _ = _quarantined(stack)
+    (stack.vault / resource).write_text("a new note with the same name", encoding="utf-8")
+    client = api_client(stack)
+    resp = client.post(f"/api/triage/{item}/release-quarantine")
+    assert resp.status_code == 409 and "cannot restore" in resp.json()["error"]
+    assert _rows(stack)[item]["state"] == "quarantined"

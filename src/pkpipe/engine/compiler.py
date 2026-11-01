@@ -152,6 +152,7 @@ def validate_flow(
                 errors.append(f"{where}: node '{node.id}' config {loc}: {err['msg']}")
             continue
         e, w = executor.check(node, cfg, snapshot)
+        e += executor.check_flow(flow, node, cfg)
         errors += [f"{where}: {m}" for m in e]
         warnings += [f"{where}: {m}" for m in w]
         refs = list(node.inputs) + references_in(node.config) + ([node.for_each] if node.for_each else [])

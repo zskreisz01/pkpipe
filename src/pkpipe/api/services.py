@@ -121,6 +121,8 @@ class AppServices:
     vault: Vault | None
     gate_factory: Callable[[ConfigSnapshot], PublishGate]
     on_config_change: Callable[[], None] | None = None
+    #: Where released quarantine items become eval candidates (spec 009); None = not exported.
+    candidates_dir: Path | None = None
 
     # -- runs -----------------------------------------------------------------------------------------------
     def flows(self) -> list[str]:
@@ -200,13 +202,35 @@ class AppServices:
         return self._decide(actor, "override_item", item_id, override=category)
 
     def release_quarantine(self, item_id: str, *, actor: str) -> dict[str, Any]:
+        """Owner decision (spec 009 US3): the item is re-queued (``pending``, its note back in the INBOX, so
+        the next triage run suggests a category again) and its text becomes a candidate case of the
+        security eval dataset (``<overlay>/evals/candidates/security.jsonl``). The note text is never
+        returned (an agent token may call this tool's sibling resources)."""
         try:
-            row = self._vault().owner_release_quarantine(item_id)
+            result = self._vault().owner_release_quarantine(item_id)
         except VaultError as exc:
             self.store.audit(actor, "release_quarantine_refused", item_id, reason=str(exc))
             raise Refused(str(exc)) from None
-        self.store.audit(actor, "release_quarantine", item_id, state=ItemState.PENDING.value)
-        return row
+        content = result.pop("content", None)
+        flags = result.pop("flags", None) or []
+        candidate = None
+        if content and self.candidates_dir is not None:
+            from pkpipe.adapters.security_log_files import append_eval_candidate
+            from pkpipe.security.quarantine import release_candidate
+
+            day = time.strftime("%Y-%m-%d", time.gmtime())
+            case = release_candidate(item_id=item_id, text=content, flags=flags, day=day)
+            append_eval_candidate(self.candidates_dir / "security.jsonl", case)
+            candidate = case["id"]
+        self.store.audit(
+            actor,
+            "release_quarantine",
+            item_id,
+            state=ItemState.PENDING.value,
+            restored=result.get("restored"),
+            eval_candidate=candidate,
+        )
+        return {**result, "requeued": True, "eval_candidate": candidate}
 
     # -- config drafts --------------------------------------------------------------------------------------
     def open_draft(self) -> dict[str, Any]:

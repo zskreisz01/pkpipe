@@ -29,7 +29,7 @@ The binding rules are in the constitution (`.specify/memory/constitution.md`). I
 | Tools | MCP over Streamable HTTP (`langchain-mcp-adapters`, FastMCP) |
 | Web fetch | Lightpanda (headless, MCP), Playwright + Chromium fallback |
 | Learning backend | Open Notebook (REST) with local TTS (Speaches / Kokoro); NotebookLM as optional backend |
-| Guards | Llama Prompt Guard 2 (injection / jailbreak), Qwen3Guard (harmful content) |
+| Guards | Local classifiers: Qwen3Guard-Gen-0.6B (harmful content, jailbreak) + ProtectAI DeBERTa (prompt injection), [decision 0001](decisions/0001-injection-classifier.md); canary, heuristics and verdicts in code |
 | Observability | OpenTelemetry (OpenInference, FastAPI, httpx) → Langfuse or Phoenix |
 | Docs | Docusaurus, GitHub Pages |
 

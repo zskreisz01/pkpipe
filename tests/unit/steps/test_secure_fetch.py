@@ -1,5 +1,5 @@
 """Spec 008 US1/US2 on the pack flow ``secure_fetch`` with fakes: FakeTools stands in for the web-fetch MCP,
-FakeModel for the Reader, FakeClassifier for Prompt Guard 2, a fake resolver for DNS."""
+FakeModel for the Reader, FakeClassifier for the classifier, a fake resolver for DNS."""
 
 from __future__ import annotations
 
@@ -71,8 +71,7 @@ def run(
     tools = FakeTools({"webfetch:fetch_page": tool or fetch_tool()})
     model = FakeModel(reply if callable(reply) else (lambda s, u: copy.deepcopy(reply)))
     ports_extra = {RESOLVER_PORT: resolver, **extra}
-    if classifier is not None:
-        ports_extra[CLASSIFIER_PORT] = FakeClassifier() if classifier == "default" else classifier
+    ports_extra[CLASSIFIER_PORT] = FakeClassifier() if classifier == "default" else classifier
     ports = make_ports(model=model, tools=tools, tracer=tracer or RecordingTracer(), **ports_extra)
     outcome = make_service(snapshot, ports).start("secure_fetch", inputs={"url": url})
     assert outcome.ok, outcome.error
@@ -214,7 +213,7 @@ def test_classifier_score_raises_a_flag(snapshot):
 
 
 def test_missing_classifier_fails_closed_by_default(snapshot):
-    """FR-004 + constitution V: without Prompt Guard the verdict cannot be clean unless the owner opts out."""
+    """FR-004 + constitution V: without a classifier the verdict is never clean unless the owner opts out."""
     out, _, _ = run(snapshot, classifier=None)
     assert out["verdict"]["flags"] == ["classifier"]
     assert out["verdict"]["flag_reasons"]["classifier"] == "classifier_unavailable"
@@ -224,7 +223,7 @@ def test_missing_classifier_fails_closed_by_default(snapshot):
 
 def test_owner_can_opt_out_of_the_classifier_requirement(snapshot):
     data = copy.deepcopy(snapshot.data)
-    data["security"]["prompt_guard"]["required"] = False
+    data["security"]["classifier"]["required"] = False
     snap = ConfigSnapshot(snapshot_version(data, snapshot.assets), data, snapshot.assets)
     out, _, _ = run(snap, classifier=None)
     assert out["verdict"]["status"] == "clean"

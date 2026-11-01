@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import uuid
 from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime
@@ -16,7 +17,7 @@ from opentelemetry.trace import StatusCode
 from pkpipe import telemetry
 from pkpipe.engine.config_models import EvalsConfig
 from pkpipe.engine.snapshot import ConfigSnapshot
-from pkpipe.evals.cassette import CassetteModel
+from pkpipe.evals.cassette import CassetteClassifier, CassetteModel
 from pkpipe.evals.datasets import DatasetError, EvalPaths
 from pkpipe.evals.judge import Judge, JudgeUnavailable
 from pkpipe.evals.models import EvalRun, Level, Status, SuiteReport
@@ -94,6 +95,8 @@ class EvalRunner:
         self.options = options or {}
         self.config = evals_config(snapshot)
         self.cassettes: dict[str, CassetteModel] = {}
+        self.classifier_cassette: CassetteClassifier | None = None
+        self._classifier: Any = None
 
     # -- model / judge per suite -----------------------------------------------------------------------------
     def model_for(self, suite: str) -> ModelPort | None:
@@ -107,6 +110,33 @@ class EvalRunner:
                 identities=self.identities,
             )
         return self.cassettes[suite]
+
+    def classifier_for(self) -> tuple[Any, str | None]:
+        """The security suite's classifier: the real one (``live``), its cassette (``replay``) or the real
+        one behind a recording cassette (``record``, ``auto``). (classifier or None, note)."""
+        if "classifier" in self.options:
+            return self.options["classifier"], None
+        if self._classifier is not None or self.classifier_cassette is not None:
+            return self._classifier or self.classifier_cassette, None
+        from pkpipe.adapters.classifiers import build_classifier, describe, is_available
+
+        cfg = (self.snapshot.data.get("security") or {}).get("classifier") or {}
+        identity = json.dumps(cfg, sort_keys=True)
+        real = None
+        if self.mode != "replay":
+            real = build_classifier(cfg)
+            if not is_available(real):
+                return None, f"classifier not available ({describe(real)}); measured without it"
+        if self.mode == "live":
+            self._classifier = real
+            return real, None
+        self.classifier_cassette = CassetteClassifier(
+            self.paths.cassette("classifier"),
+            self.mode,  # type: ignore[arg-type]
+            real,
+            identity=identity,
+        )
+        return self.classifier_cassette, None
 
     def judge_for(self, model: ModelPort | None) -> tuple[Judge | None, str | None]:
         profile = self.config.judge_profile
@@ -168,6 +198,11 @@ class EvalRunner:
             span.set_attribute(attrs.CONFIG_VERSION, self.snapshot.version)
             model = self.model_for(name) if (suite.uses_model or suite.uses_judge) else None
             judge, judge_error = self.judge_for(model) if suite.uses_judge else (None, None)
+            options = dict(self.options)
+            if getattr(suite, "uses_classifier", False):
+                options["classifier"], note = self.classifier_for()
+                if note:
+                    options["classifier_note"] = note
             ctx = SuiteContext(
                 snapshot=self.snapshot,
                 paths=self.paths,
@@ -177,7 +212,7 @@ class EvalRunner:
                 workers=self.workers,
                 limit=self.limit,
                 case_span=case_span,
-                options=self.options,
+                options=options,
             )
             try:
                 report = suite.run(ctx)
@@ -206,6 +241,17 @@ class EvalRunner:
             if self.mode in ("record", "auto"):
                 full = self.mode == "record" and self.limit is None and report.status is not Status.ERROR
                 cassette.save(prune_to=cassette.used if full else None)
+        cc = self.classifier_cassette
+        if cc is not None and getattr(SUITES.get(name), "uses_classifier", False):
+            report.notes.append(
+                f"cassette {cc.path.name}: {cc.hits} replayed, {cc.recorded} recorded, {cc.misses} missing"
+            )
+            if cc.misses and report.status is Status.PASSED:  # an unmeasured text is never a pass
+                report.status = Status.ERROR
+                report.reason = f"{cc.misses} classifier result(s) missing from {cc.path.name}: re-record"
+            if self.mode in ("record", "auto"):
+                full = self.mode == "record" and self.limit is None and report.status is not Status.ERROR
+                cc.save(prune_to=cc.used if full else None)
         crashed = [c for c in report.cases if c.details.get("crashed")]
         if report.cases and len(crashed) == len(report.cases) and report.status is Status.PASSED:
             report.status, report.reason = Status.ERROR, f"no case could run: {crashed[0].error}"

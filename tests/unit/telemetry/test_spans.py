@@ -124,14 +124,14 @@ def test_security_flag_is_a_span_event_and_a_metric_without_offending_text(otel)
     """FR-005 and flags_total{detector}."""
     with flow_span("learning", trigger="manual", config_version="c"):
         with step_span("guard", "Task_Guard") as span:
-            record_security_flag("prompt_guard", action="quarantine", reason_code="injection_pattern")
+            record_security_flag("classifier", action="quarantine", reason_code="injection_pattern")
             record_security_flag("url_filter")
     (guard,) = otel.spans("step ")
     events = [e for e in guard.events if e.name == "security.flag"]
-    assert [e.attributes["detector"] for e in events] == ["prompt_guard", "url_filter"]
+    assert [e.attributes["detector"] for e in events] == ["classifier", "url_filter"]
     assert events[0].attributes["action"] == "quarantine"
     assert events[0].attributes["reason_code"] == "injection_pattern"
-    assert otel.metric_value("pkpipe.flags_total", detector="prompt_guard") == 1
+    assert otel.metric_value("pkpipe.flags_total", detector="classifier") == 1
     assert span is not None
 
 

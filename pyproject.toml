@@ -31,8 +31,9 @@ dependencies = [
 [project.optional-dependencies]
 # web-fetch MCP server fallback browser (spec 008): `uv sync --extra webfetch && uv run playwright install chromium`
 webfetch = ["playwright>=1.64.1"]
-# Prompt Guard 2 classifier (spec 008): `uv sync --extra promptguard`; the gated model is read from a local dir
-promptguard = ["transformers>=4.57", "torch>=2.8"]
+# Local classifiers (spec 008/009, docs/decisions/0001): Qwen3Guard-Gen and ProtectAI DeBERTa, read from local
+# directories only: `uv sync --extra guard`
+guard = ["transformers>=4.57", "torch>=2.8"]
 
 [project.scripts]
 pkpipe = "pkpipe.cli:main"
@@ -60,6 +61,7 @@ addopts = "-ra --strict-markers -p pytester"
 markers = [
     "live: needs a real local service (LM Studio, Docker, Lightpanda); auto-skipped when unreachable, see tests/README.md",
     "docs: builds the Docusaurus site with npm (slow); skipped when website/node_modules is missing",
+    "real_classifier: e2e test keeps the real app.make_classifier (else tests/e2e/conftest.py swaps in a fake)",
 ]
 
 [tool.ruff.lint]

@@ -70,10 +70,25 @@ Webhook and Apprise URLs contain secrets, so the config accepts only `env:NAME` 
 | `url_filter.block_private_networks` | Refuse private, loopback, link-local and CGNAT targets (after DNS) | `true` |
 | `url_filter.max_bytes` | Size limit of a page; larger pages are blocked (security flag) | 2000000 |
 | `url_filter.deny_list` | Deny-list file in the config layers (`security/deny_list.txt`) | none |
-| `prompt_guard.model`, `chunk_tokens` (≤ 512), `threshold` | Prompt Guard 2 model name, chunk size, flag threshold | pack: 86M, 512, 0.5 |
-| `prompt_guard.model_dir` | Local model directory (may be `env:NAME`); else `$PKPIPE_PROMPT_GUARD_DIR`, else `~/tools/prompt-guard-2/<model name>` | none |
-| `prompt_guard.required` | Without a usable classifier every fetch is flagged (fail closed) | `true` |
+| `classifier.backend` | `qwen3guard`, `deberta` or `combined` (maximum over `members`); see [decision 0001](decisions/0001-injection-classifier.md) | pack: `combined` |
+| `classifier.members[]` | `{backend, model, model_dir, chunk_tokens}` per model of `combined` | pack: Qwen3Guard-Gen-0.6B (1024 tokens) + ProtectAI DeBERTa (512) |
+| `classifier.model_dir` (also per member) | Local model directory (may be `env:NAME\|default`); else `~/tools/qwen3guard/<model name>` or `~/tools/protectai-deberta-pi-v2` | none |
+| `classifier.chunk_tokens` (also per member) | Tokens per scanned chunk (≤ 4096; DeBERTa ≤ 512) | 1024 / 512 |
+| `classifier.threshold` | Score that raises a flag (secure fetch and output guard) | 0.5 |
+| `classifier.required` | Without a usable classifier every fetch and every guarded output is flagged (fail closed) | `true` |
 | `heuristics.threshold` | Heuristic score that raises a flag | 1.0 |
+
+## Output guard and security flags
+
+`security.json` keys of spec 009:
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `output_guard.block_on` | Qwen3Guard safety labels that make a harm category a `malicious_content` flag (`Unsafe`, `Controversial`) | `["Unsafe"]` |
+| `canary.rotate` | The canary of sessions with `canary: true`: `per_run` (from the run id), `daily`, `never` | `per_run` |
+| `quarantine_dir` | Quarantine folder of the vault (the vault server's `quarantine_dir` policy must match) | `0-INBOX/_quarantine` |
+
+An `llm` / `llm_tools` step over external content sets `"canary": true`; validation then requires that every successor is an `output_guard` step whose `input` lists it. The `output_guard` step (`{"input": ["summarize"], "canary": true}`) sets `item.flagged` and the flow routes the item to the `handle_security_flag` subflow. That flow writes `security/malicious_urls.jsonl` and the deny-list in the overlay (`<overlay>/security/`, the deny-list file of `url_filter.deny_list`, started from the pack's list) or, without an overlay, in `$PKPIPE_DATA_DIR/security/`. Owner releases write eval candidates to `<overlay>/evals/candidates/security.jsonl` (else `$PKPIPE_DATA_DIR/candidates/`).
 
 The `webfetch` entry of `mcp_servers.json` points at the web-fetch MCP server (`python -m pkpipe.webfetch.server`, 127.0.0.1:8704, allow list `fetch_page`). The server reads the same layered config (`--pack`, `--overlay` or `PKPIPE_OVERLAY_DIR`) and re-reads the URL filter and deny-list for every fetch.
 

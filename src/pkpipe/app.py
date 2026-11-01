@@ -1,7 +1,8 @@
 """Composition root: wires the core (run service, compiler, steps) to the real adapters.
 
 Used by the CLI (``pkpipe run``) and later by ``serve`` (API, app MCP, scheduler). The factory functions
-``make_model``, ``make_tools``, ``make_notify`` and ``make_classifier`` are module attributes on purpose:
+``make_model``, ``make_tools``, ``make_notify``, ``make_classifier`` and ``make_security_log`` are module
+attributes on purpose:
 they are the single place where an adapter is chosen, and the place an e2e test swaps in a fake.
 """
 
@@ -20,7 +21,7 @@ from pkpipe.engine.registry import load_effective
 from pkpipe.engine.runs import RunService
 from pkpipe.engine.runtime_defaults import SystemClock
 from pkpipe.engine.snapshot import ConfigSnapshot
-from pkpipe.ports import ClassifierPort, ModelPort, NotifyPort, ToolPort
+from pkpipe.ports import ClassifierPort, ModelPort, NotifyPort, SecurityLogPort, ToolPort
 from pkpipe.steps import StepPorts
 
 DB_ENV = "PKPIPE_DB"
@@ -49,20 +50,55 @@ def make_notify(snapshot: ConfigSnapshot) -> NotifyPort:
     return ChannelNotifier(snapshot.data.get("channels"), snapshot.assets)
 
 
-_CLASSIFIERS: dict[tuple[str, int, str], ClassifierPort] = {}
+_CLASSIFIERS: dict[str, ClassifierPort] = {}
 
 
 def make_classifier(snapshot: ConfigSnapshot) -> ClassifierPort:
-    """Prompt Guard 2 from ``security.prompt_guard`` (spec 008). Loaded lazily on the first scan and kept per
-    model directory, so a run does not reload the model; a missing model fails the scan closed."""
-    from pkpipe.adapters.classifier_promptguard import PromptGuardClassifier
+    """The classifier of ``security.classifier`` (Qwen3Guard, DeBERTa or both; spec 008, 009). Loaded lazily
+    on the first scan and kept per configuration, so a run does not reload the models; a missing model
+    fails the scan closed."""
+    import json
 
-    clf = PromptGuardClassifier.from_config(snapshot.data.get("security"))
-    key = (str(clf.directory), clf.chunk_tokens, clf.model)
-    return _CLASSIFIERS.setdefault(key, clf)
+    from pkpipe.adapters.classifiers import build_classifier
+
+    cfg = (snapshot.data.get("security") or {}).get("classifier") or {}
+    key = json.dumps(cfg, sort_keys=True)
+    if key not in _CLASSIFIERS:
+        _CLASSIFIERS[key] = build_classifier(cfg)
+    return _CLASSIFIERS[key]
 
 
-def ports_for(snapshot: ConfigSnapshot) -> StepPorts:
+def data_dir() -> Path:
+    return Path(os.environ.get(DATA_DIR_ENV) or "~/.local/share/pkpipe").expanduser()
+
+
+def security_dir(overlay_dir: Path | None) -> Path:
+    """Where ``malicious_urls.jsonl`` and the handler's deny-list live: ``<overlay>/security`` (the private
+    config repo, so the URL filter of every process reads the same deny-list), else the data directory."""
+    return (overlay_dir / "security") if overlay_dir is not None else data_dir() / "security"
+
+
+def candidates_dir(overlay_dir: Path | None) -> Path:
+    """Eval candidates from owner releases (spec 009): ``<overlay>/evals/candidates``, else the data dir."""
+    return (overlay_dir / "evals" / "candidates") if overlay_dir is not None else data_dir() / "candidates"
+
+
+def make_security_log(snapshot: ConfigSnapshot, overlay_dir: Path | None = None) -> SecurityLogPort:
+    """The security-flag handler's log and deny-list (spec 009). With an overlay the deny-list is the
+    overlay's copy of ``security.url_filter.deny_list`` (started from the pack's list); without one it is
+    ``<data dir>/security/deny_list.txt``, which the in-process URL filter merges."""
+    from pkpipe.adapters.security_log_files import FileSecurityLog
+    from pkpipe.engine.registry import overlay_dir_from_env
+
+    overlay = overlay_dir if overlay_dir is not None else overlay_dir_from_env()
+    deny_rel = ((snapshot.data.get("security") or {}).get("url_filter") or {}).get("deny_list")
+    directory = security_dir(overlay)
+    if overlay is not None and deny_rel:
+        return FileSecurityLog(directory, overlay / deny_rel, seed=snapshot.asset(deny_rel))
+    return FileSecurityLog(directory)
+
+
+def ports_for(snapshot: ConfigSnapshot, overlay_dir: Path | None = None) -> StepPorts:
     """Adapters for one pinned config (model profiles and tool servers come from that version)."""
     return StepPorts(
         clock=SystemClock(),
@@ -70,7 +106,10 @@ def ports_for(snapshot: ConfigSnapshot) -> StepPorts:
         model=make_model(snapshot),
         tools=make_tools(snapshot),
         notify=make_notify(snapshot),
-        extra={"classifier": make_classifier(snapshot)},
+        extra={
+            "classifier": make_classifier(snapshot),
+            "security_log": make_security_log(snapshot, overlay_dir),
+        },
     )
 
 
@@ -86,7 +125,7 @@ def build_run_service(
         store=SqliteRunStore(db),
         checkpointer=open_checkpointer(db),
         config=lambda: load_effective(pack_dir, overlay_dir).snapshot(),
-        ports_for=ports or ports_for,
+        ports_for=ports or (lambda snapshot: ports_for(snapshot, overlay_dir)),
     )
 
 

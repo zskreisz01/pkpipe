@@ -97,7 +97,7 @@ def test_journal_flow_over_otlp_never_leaks_note_text_or_canary(synthetic_vault,
         with flow_span("journal-reflect", trigger="manual", config_version="c", data_classes=("journal",)):
             with item_context("journal-entry", "journal"), step_span("reflect", "Task_Reflect") as span:
                 span.set_attribute("input.value", journal.read_text(encoding="utf-8"))
-                record_security_flag("prompt_guard", action="flag", reason_code="injection_pattern")
+                record_security_flag("classifier", action="flag", reason_code="injection_pattern")
                 try:
                     raise RuntimeError(journal.read_text(encoding="utf-8"))
                 except RuntimeError:

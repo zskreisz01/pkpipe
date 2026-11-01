@@ -68,7 +68,7 @@ An overlay can change one node of a pack flow by id (`{"nodes": [{"id": "notify"
 
 | Type | Does | Config |
 | --- | --- | --- |
-| `llm` | One isolated session: system prompt, instruction, at most one context pack, declared inputs only, optional JSON-schema output | `system`, `instruction`, `context`, `output_schema`, `profile` |
+| `llm` | One isolated session: system prompt, instruction, at most one context pack, declared inputs only, optional JSON-schema output. `canary: true` (a session over external content) places the run's canary in the system prompt and requires an `output_guard` on every path after it | `system`, `instruction`, `context`, `output_schema`, `profile`, `canary` |
 | `llm_tools` | Session that may call tools: the model proposes a call, code checks the allow list and calls it. Sees only validated JSON: never raw item text (`item`, `item.body`, `item.content`, `item.raw`, `item.text`, `*`) and never the output of a `tool`, `wait` or `llm_tools` node or of an `llm` node without `output_schema` | as `llm` + `tools`, `max_turns` |
 | `tool` | One tool call, no model | `tool` (`server:tool`), `arguments` |
 | `code` | A registered deterministic function (gates, state changes, row building) | `function`, `args` |
@@ -76,11 +76,14 @@ An overlay can change one node of a pack flow by id (`{"nodes": [{"id": "notify"
 | `subflow` | Runs another flow for the current item; its checkpoints nest under the run | `flow` (id or `${item.subflow}`) |
 | `wait` | Polls a status tool until a condition holds; each poll is a checkpoint, the deadline is absolute | `tool`, `arguments`, `until`, `poll_s`, `deadline_s` |
 | `guard` | Flags from regular expressions and classifier scores (code decides); sets `item.flagged` | `input`, `patterns`, `checks` |
+| `output_guard` | Output guard (spec 009): the run's canary, active markup, heuristics and the classifier of `security.classifier` on the listed outputs; flags `canary_leak`, `injection_or_jailbreak`, `malicious_content`; sets `item.flagged`, `item.security_flags`; output holds codes and scores only | `input` (list of refs), `canary` |
 | `fetch` | Secure fetch (spec 008): URL filter again, then one `webfetch:fetch_page` call; `status` `ok`, `blocked` (flag) or `failed`. Raw output | `url`, `tool`, `max_bytes` |
 | `sanitize` | Visible text of a fetched page; metadata only for PDF, video, image. Raw output | `input`, `max_chars` |
 | `reader` | The Reader: an `llm` session without tools and context pack, with a per-run canary; output plus `canary_leaked` | as `llm` (`output_schema` required) |
 
 Prompts and schemas are files of the layered config: `prompts/system/<system>.md`, `instructions/<instruction>`, `contexts/<context>.md`, `schemas/<output_schema>.json`. Every input is wrapped in random delimiters (datamarking) and the system prompt says that text inside them is data.
+
+Flagged items go to the `handle_security_flag` subflow (log URL, deny-list, inert quarantine, state, alert; [Handle Security Flag](process/handle-security-flag.md)); the item ends there and the other items of the run continue.
 
 Raw external text never reaches a session with tools: `fetch`, `sanitize` and `reader` outputs (like `tool`, `wait`, `llm_tools` and `subflow` outputs) are refused as `llm_tools` inputs; take the secure-fetch verdict's `extract` (`item.extract`) instead.
 

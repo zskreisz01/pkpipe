@@ -1,7 +1,7 @@
 {
   "id": "learning-url-blocked",
   "source": "synthetic",
-  "description": "Learning branch: the source URL points at a private address; the URL check flags the item, the notebook backend is never called and the item is quarantined.",
+  "description": "Learning branch: the source URL points at a private address; the URL check flags the item, the notebook backend is never called and the item is quarantined. handle_security_flag logs the URL and alerts (spec 009).",
   "input": {
     "vault": {
       "0-INBOX/talk.md": "---\nsource: http://127.0.0.1:8080/admin\n---\nA recorded conference talk worth a notebook.\n"
@@ -50,6 +50,23 @@
     },
     "processing": {
       "0-INBOX/talk.md": null
-    }
+    },
+    "malicious_urls": [
+      {
+        "domain": "127.0.0.1",
+        "flag": "url_filter"
+      }
+    ],
+    "files": {
+      "0-INBOX/_quarantine/{id:0-INBOX/talk.md}.md": {
+        "contains": [
+          "url_filter",
+          "private_network"
+        ]
+      }
+    },
+    "notify_contains": [
+      "Security flag on item {id:0-INBOX/talk.md}"
+    ]
   }
 }
