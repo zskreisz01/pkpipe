@@ -1,0 +1,39 @@
+{
+  "id": "invented-category-falls-back",
+  "source": "synthetic",
+  "description": "The model invents a category; code records misc instead (constitution V).",
+  "input": {
+    "vault": {
+      "0-INBOX/bread.md": "Sourdough bread recipe from a friend.\n"
+    },
+    "model": [
+      {
+        "when": "Sourdough",
+        "reply": {
+          "category": "recipes",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/bread.md": {
+        "ai_suggested_category": "misc",
+        "state": "suggested"
+      }
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "id": "already-triaged-not-repeated",
+  "source": "synthetic",
+  "description": "A second triage run does not re-triage known items and makes no model call for them.",
+  "input": {
+    "vault": {
+      "0-INBOX/cli-tool.md": "A fictional CLI tool for formatting tables.\n"
+    },
+    "model": [
+      {
+        "when": "formatting tables",
+        "reply": {
+          "category": "tool",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "override": {
+            "0-INBOX/cli-tool.md": "misc"
+          }
+        }
+      },
+      {
+        "run": "triage"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/cli-tool.md": {
+        "ai_suggested_category": "tool",
+        "override": "misc",
+        "state": "suggested"
+      }
+    },
+    "notify_contains": [
+      "Triage ready: 1 new item(s)"
+    ]
+  }
+}

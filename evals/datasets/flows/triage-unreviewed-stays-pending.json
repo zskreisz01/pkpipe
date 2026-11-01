@@ -1,0 +1,67 @@
+{
+  "id": "triage-unreviewed-stays-pending",
+  "source": "synthetic",
+  "description": "Triage suggests a category per new INBOX item; without the owner's decision nothing is released at 06:00.",
+  "input": {
+    "vault": {
+      "0-INBOX/cli-tool.md": "---\nsource: https://example.invalid/cli\n---\nA fictional CLI tool for formatting tables.\n",
+      "0-INBOX/talk.md": "---\nsource: https://example.invalid/talk\n---\nA recorded conference talk worth a notebook.\n"
+    },
+    "model": [
+      {
+        "when": "formatting tables",
+        "reply": {
+          "category": "tool",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      },
+      {
+        "when": "conference talk",
+        "reply": {
+          "category": "learning-material",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/cli-tool.md": {
+        "ai_suggested_category": "tool",
+        "state": "pending"
+      },
+      "0-INBOX/talk.md": {
+        "ai_suggested_category": "learning-material",
+        "state": "pending"
+      }
+    },
+    "processing": {
+      "0-INBOX/cli-tool.md": null,
+      "0-INBOX/talk.md": null
+    },
+    "notify_contains": [
+      "Triage ready: 2 new item(s)",
+      "2 item(s) still pending"
+    ]
+  }
+}

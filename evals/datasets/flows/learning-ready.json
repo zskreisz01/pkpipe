@@ -1,0 +1,61 @@
+{
+  "id": "learning-ready",
+  "source": "synthetic",
+  "description": "Learning branch: the owner confirms; the notebook becomes ready after polling and is linked.",
+  "input": {
+    "vault": {
+      "0-INBOX/talk.md": "---\nsource: https://example.invalid/talk\n---\nA recorded conference talk worth a notebook.\n"
+    },
+    "model": [
+      {
+        "when": "conference talk",
+        "reply": {
+          "category": "learning-material",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "learning": {
+      "ready_after": 3
+    },
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/talk.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/talk.md": {
+        "state": "processed"
+      }
+    },
+    "processing": {
+      "0-INBOX/talk.md": {
+        "status": "ready",
+        "category": "learning-material"
+      }
+    },
+    "notify_contains": [
+      "Processed 1, quarantined 0, failed 0"
+    ]
+  }
+}

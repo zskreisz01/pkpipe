@@ -1,0 +1,54 @@
+{
+  "id": "learning-failed",
+  "source": "synthetic",
+  "description": "Learning branch: the backend reports a failed generation; the item is recorded as failed for manual processing.",
+  "input": {
+    "vault": {
+      "0-INBOX/talk.md": "---\nsource: https://example.invalid/talk\n---\nA recorded conference talk worth a notebook.\n"
+    },
+    "model": [
+      {
+        "when": "conference talk",
+        "reply": {
+          "category": "learning-material",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "learning": {
+      "fail": [
+        "0-INBOX/talk.md"
+      ]
+    },
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/talk.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "processing": {
+      "0-INBOX/talk.md": {
+        "status": "failed"
+      }
+    }
+  }
+}

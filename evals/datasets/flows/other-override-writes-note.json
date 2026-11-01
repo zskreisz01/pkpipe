@@ -1,0 +1,76 @@
+{
+  "id": "other-override-writes-note",
+  "source": "synthetic",
+  "description": "Other branch: the owner overrides misc -> tool; the summarize session's note is written into the category's PARA folder.",
+  "input": {
+    "vault": {
+      "0-INBOX/thing.md": "---\nsource: https://example.invalid/thing\n---\nSome page about a fictional key-value store.\n"
+    },
+    "model": [
+      {
+        "reply": {
+          "title": "minikv",
+          "note": "An embeddable key-value store."
+        },
+        "fields": [
+          "title",
+          "note"
+        ]
+      },
+      {
+        "when": "key-value store",
+        "reply": {
+          "category": "misc",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "override": {
+            "0-INBOX/thing.md": "tool"
+          }
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/thing.md": {
+        "ai_suggested_category": "misc",
+        "override": "tool",
+        "state": "processed"
+      }
+    },
+    "files": {
+      "3-Resources/Tools/{id:0-INBOX/thing.md}.md": {
+        "contains": [
+          "# minikv",
+          "pkpipe_item: {id:0-INBOX/thing.md}",
+          "category: tool"
+        ]
+      }
+    },
+    "processing": {
+      "0-INBOX/thing.md": {
+        "category": "tool",
+        "status": "done"
+      }
+    }
+  }
+}
