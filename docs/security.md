@@ -56,3 +56,16 @@ Runs on every session output that originates from external content, before anyth
 ## Private data
 
 Journals and context packs are processed only by local sessions without tools, are never sent to web search or the learning service, are excluded from trace content capture, and never appear in this repository.
+
+## UI and app MCP access
+
+The config UI and the app MCP server (spec 014) can publish config and release triage items, so they are guarded like a local admin console:
+
+- **Network**: loopback by default; only loopback and Tailscale addresses are accepted as listen address. A token is always required, also on loopback.
+- **Tokens**: an owner token (UI and every MCP tool) and an agent token (MCP `run_flow`, `get_run`, `list_triage`). Compared in constant time; stored in a 0600 file or the environment, never in config. Failed logins are throttled.
+- **Browser**: login sets an HttpOnly, SameSite=Strict cookie. State-changing cookie requests need an `X-CSRF-Token` header (an HMAC of the session) and a same-origin `Origin`/`Sec-Fetch-Site`. A cookie never authorizes `/mcp`.
+- **DNS rebinding**: the `Host` header must be on the allowlist, otherwise HTTP 421.
+- **Headers**: CSP `default-src 'self'` with no inline script or style, `frame-ancestors 'none'`, `X-Content-Type-Options`, `Referrer-Policy: same-origin`, `Cache-Control: no-store`. HTMX is vendored (no CDN) with eval disabled.
+- **Owner decisions** (confirm, override, quarantine release) are separate from the pipeline's own triage writer: the vault MCP server that sessions can reach still refuses to change `confirm` / `override`. Decisions follow the triage domain rules (quarantined and processed items cannot be confirmed; overrides must name a configured category) and are audited.
+- **Raw external content** never reaches the chat agent through MCP: `get_run` returns step names only and triage resources are length-capped identifiers returned as data.
+- **Config editing** is confined to known config paths below the overlay (no `..`, absolute paths or hidden folders), size-capped, and publish commits only the draft's files.

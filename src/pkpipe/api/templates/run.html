@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Run {{ run.run_id[:8] }}{% endblock %}
+{% block body %}
+<h1>Run <code>{{ run.run_id }}</code></h1>
+<div class="card">
+  <p>Flow <strong>{{ run.flow_id }}</strong> · <span class="pill {{ run.status }}">{{ run.status }}</span> · trigger {{ run.trigger }}</p>
+  <p class="muted">Config version <code>{{ run.config_version[:12] }}</code> · started {{ run.started_at[:19] }}{% if run.ended_at %} · ended {{ run.ended_at[:19] }}{% endif %}</p>
+  {% if run.error %}<p class="err">{{ run.error }}</p>{% endif %}
+</div>
+<h2>Finished steps</h2>
+{% if run.steps_done %}<p>{% for s in run.steps_done %}<code>{{ s }}</code> {% endfor %}</p>{% else %}<p class="muted">No step output recorded.</p>{% endif %}
+<p class="muted">Step outputs can hold raw external content and are not shown here; open the trace for details.</p>
+{% endblock %}

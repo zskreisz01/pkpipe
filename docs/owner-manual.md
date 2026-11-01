@@ -6,7 +6,7 @@ title: Owner manual
 
 This page lists only what **you**, the owner, have to do by hand. Everything else runs on its own. pkpipe never processes, releases or adopts anything without you (constitution VI). If you skip a task, nothing breaks: items wait in a pending or proposed state until you get to them.
 
-> **Status:** pkpipe is pre-alpha. This manual describes the designed behaviour (see `docs/` and `specs/`); file names and UI views may still change while the specs are implemented.
+> **Status:** pkpipe is pre-alpha (the config UI, `pkpipe serve` and the app MCP server exist; see [Operations](operations.md#config-ui-and-app-mcp)). This manual describes the designed behaviour (see `docs/` and `specs/`); file names and UI views may still change while the specs are implemented.
 
 Times are the defaults from `schedules.json`. If you change a schedule, the matching task moves with it.
 
@@ -61,7 +61,7 @@ flowchart LR
 - **How**, one of:
   - **Obsidian:** open `0-INBOX/Inbox-Triage.md`. For each row, tick the **confirm** checkbox if the suggestion is right, or write a category id into **override**. Leave a row alone to keep it pending.
   - **UI:** the triage view in the pkpipe web UI.
-  - **Chat agent:** ask your MCP chat client to `list_triage`, then `confirm_item` / `override_item`.
+  - **Chat agent:** ask your MCP chat client to `list_triage`, then `confirm_item` / `override_item`. These are owner actions: the client must use the owner token (the agent token can only list and run flows). Each decision is logged on the UI audit page.
 - **Tips:** the notification shows confidence and reason per item; look closely at low-confidence ones. Every override becomes a training signal for the triage eval, so overriding is better than confirming a wrong category.
 - **If you skip it:** unreviewed items stay `pending` and appear again in the next notification. Nothing is processed by default.
 

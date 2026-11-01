@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Publish {{ p.publish_id }}{% endblock %}
+{% block body %}
+<h1>{{ p.summary }}</h1>
+<p class="muted">{{ p.kind }} · commit <code>{{ p.commit_sha }}</code> · {{ p.created_at[:19] }} · gate {{ p.decision.get("status", "n/a") }}</p>
+<pre data-testid="publish-diff">{{ diff }}</pre>
+{% if p.kind == "publish" and not p.reverted_by %}
+<button class="danger" hx-post="/ui/publishes/{{ p.publish_id }}/rollback" hx-target="#rollback-msg" hx-confirm="Roll back this publish?">Roll back</button>
+<span id="rollback-msg"></span>
+{% elif p.reverted_by %}<p class="muted">Rolled back by <a href="/publishes/{{ p.reverted_by }}">{{ p.reverted_by }}</a>.</p>{% endif %}
+{% endblock %}

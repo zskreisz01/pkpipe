@@ -75,3 +75,39 @@ def release(items: list[TriageItem]) -> tuple[list[TriageItem], list[TriageItem]
             item.state = ItemState.PENDING
             pending.append(item)
     return released, pending
+
+
+class OwnerDecisionError(ValueError):
+    """An owner decision (confirm, override, quarantine release) the rules do not allow."""
+
+
+#: states in which the owner may still confirm or override an item
+DECIDABLE = frozenset({ItemState.SUGGESTED, ItemState.PENDING, ItemState.RELEASED})
+
+
+def check_owner_decision(
+    state: ItemState,
+    *,
+    confirm: bool | None = None,
+    override: str | None = None,
+    categories: frozenset[str] | set[str] | None = None,
+) -> None:
+    """Raise :class:`OwnerDecisionError` unless the owner may confirm or override an item in ``state``.
+
+    Used by the owner channels (UI, app MCP; spec 014 FR-002). Quarantined and processed items cannot be
+    confirmed (a quarantined item first needs :func:`check_quarantine_release`), and an override must name
+    a configured category (constitution V: code decides what is valid).
+    """
+    if state not in DECIDABLE:
+        raise OwnerDecisionError(f"an item in state '{state.value}' cannot be confirmed or overridden")
+    if override is not None and override.strip():
+        if categories is not None and override.strip() not in categories:
+            raise OwnerDecisionError(f"unknown category '{override.strip()}'")
+    elif confirm is None:
+        raise OwnerDecisionError("nothing to decide: give confirm or an override category")
+
+
+def check_quarantine_release(state: ItemState) -> None:
+    """Only a quarantined item can be released from quarantine (back to ``pending`` for a new decision)."""
+    if state is not ItemState.QUARANTINED:
+        raise OwnerDecisionError(f"item is '{state.value}', not quarantined")

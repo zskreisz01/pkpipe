@@ -41,12 +41,6 @@ def test_no_command_prints_help(capsys):
     assert "usage: pkpipe" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("argv", [["serve"]])
-def test_unwired_commands_fail_loudly_not_silently(argv, capsys):
-    assert main(argv) == 1
-    assert "not implemented" in capsys.readouterr().err
-
-
 def test_later_specs_can_replace_a_handler(monkeypatch):
     monkeypatch.setitem(HANDLERS, "run", lambda args: 0 if args.flow == "triage" else 3)
     assert main(["run", "triage"]) == 0 and main(["run", "x"]) == 3
@@ -113,3 +107,10 @@ def test_schema_command_exports_triage_and_processing_row_schemas(tmp_path):
     assert set(proc["required"]) == {"item_id", "category", "obsidian_link"}
     assert set(triage["$defs"]["ItemState"]["enum"]) == {s.value for s in ItemState}
     assert set(proc["$defs"]["ProcessingStatus"]["enum"]) == {s.value for s in ProcessingStatus}
+
+
+def test_serve_is_wired_with_loopback_defaults():
+    """Spec 014 FR-001: ``serve`` is a real command that listens on 127.0.0.1 unless told otherwise."""
+    args = build_parser().parse_args(["serve"])
+    assert args.host == "127.0.0.1" and args.port == 8787 and args.no_scheduler is False
+    assert HANDLERS["serve"].__name__ == "_serve"
