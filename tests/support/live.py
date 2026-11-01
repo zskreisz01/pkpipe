@@ -21,6 +21,10 @@ REPO_DEPLOY = Path(__file__).resolve().parents[2] / "deploy" / "open-notebook"
 DEFAULT_BASE_URL = "http://127.0.0.1:1234/v1"
 DEFAULT_MODEL = "qwen3.5-9b-mlx"
 DEFAULT_JUDGE_MODEL = "google/gemma-4-12b"
+#: Eval requests in flight in live tests (``EvalRunner(concurrency=...)``): LM Studio serves them with
+#: parallel predictions (``scripts/lmstudio-test-setup.sh`` loads both models with ``--parallel 4``).
+#: Production runs default to ``evals.concurrency`` = 1.
+LIVE_EVAL_CONCURRENCY = 4
 
 
 def model_base_url() -> str:

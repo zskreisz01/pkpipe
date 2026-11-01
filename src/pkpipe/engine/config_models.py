@@ -376,6 +376,13 @@ class EvalsConfig(_Strict):
     suites: dict[str, SuiteGate] = Field(default_factory=dict)
     pairwise: PairwiseSettings = Field(default_factory=PairwiseSettings)
     calibration: CalibrationSettings = Field(default_factory=CalibrationSettings)
+    concurrency: int = Field(
+        default=1,
+        ge=1,
+        le=16,
+        description="Eval cases (model and judge requests) in flight at once; > 1 needs a model server with "
+        "parallel predictions (LM Studio: docs/evaluation.md). `pkpipe eval --concurrency N` overrides it",
+    )
 
 
 # registry --------------------------------------------------------------------------------------------------

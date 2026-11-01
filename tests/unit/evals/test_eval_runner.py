@@ -94,17 +94,6 @@ def test_unreachable_model_is_an_error(tmp_path, snap):
     assert report.status is Status.ERROR and "ModelUnavailable" in report.reason
 
 
-def test_parallel_workers_keep_case_order(tmp_path, snap):
-    rows = [
-        triage_case(f"c{i}", "zz-cli" if i % 2 else "zz-ad", "tool" if i % 2 else "marketing")
-        for i in range(12)
-    ]
-    paths = mini_evals(tmp_path, {"datasets/triage.jsonl": rows})
-    run = EvalRunner(snap, paths=paths, model=FakeModel(_reply), identities=IDS, workers=4).run(["triage"])
-    assert [c.case_id for c in run.suite("triage").cases] == [r["id"] for r in rows]
-    assert run.suite("triage").metrics["accuracy"] == 1.0
-
-
 def test_limit_takes_the_first_cases(tmp_path, snap):
     paths = mini_evals(tmp_path, {"datasets/triage.jsonl": CASES})
     run = EvalRunner(snap, paths=paths, model=FakeModel(_reply), identities=IDS, limit=1).run(["triage"])

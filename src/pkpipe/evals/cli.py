@@ -51,7 +51,7 @@ def eval_command(args: argparse.Namespace) -> int:
             paths=paths,
             model=model,
             mode=mode,
-            workers=args.workers,
+            concurrency=args.concurrency,
             limit=args.limit,
             options={"db": args.db, "vault": args.vault, "fetch_stats": args.fetch_stats},
         )
@@ -71,6 +71,13 @@ def eval_command(args: argparse.Namespace) -> int:
     return 0 if run.ok else 1
 
 
+def _positive(value: str) -> int:
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError("must be >= 1")
+    return n
+
+
 def add_arguments(ev: argparse.ArgumentParser) -> None:
     ev.add_argument("--suite", default="all", help="suite name, comma list, or 'all' (default)")
     ev.add_argument("--pack", help="pack directory (default: packs/learning-inbox or PKPIPE_PACK_DIR)")
@@ -84,7 +91,14 @@ def add_arguments(ev: argparse.ArgumentParser) -> None:
         "model and (re)write cassettes; auto = replay what exists, record the rest",
     )
     ev.add_argument("--cassette-dir", help="cassette directory (default: <evals>/cassettes)")
-    ev.add_argument("--workers", type=int, default=1, help="cases evaluated in parallel")
+    ev.add_argument(
+        "--concurrency",
+        "--workers",
+        dest="concurrency",
+        type=_positive,
+        help="eval cases (model + judge requests) in flight at once; default evals.concurrency (1). Results "
+        "and metrics are the same for every value; > 1 needs parallel predictions in LM Studio",
+    )
     ev.add_argument("--limit", type=int, help="only the first N cases per dataset (smoke run)")
     ev.add_argument("--out", help="report directory (default: $PKPIPE_DATA_DIR/evals)")
     ev.add_argument("--db", help="production suite: app DB to read runs from")

@@ -16,6 +16,7 @@ from pkpipe import app
 from pkpipe.evals import EvalPaths, PublishGate
 from tests.conftest import REPO
 from tests.support.app_stack import api_client, git, make_stack
+from tests.support.live import LIVE_EVAL_CONCURRENCY
 
 CASSETTES = REPO / "evals" / "cassettes" / "ui_publish"
 INSTRUCTION = "instructions/triage/categorize.md"
@@ -26,7 +27,10 @@ def _stack(tmp_path, synthetic_vault, pack_dir, mode, cassette_dir):
     def gate(snapshot):
         model = None if mode == "replay" else app.make_model(snapshot)
         return PublishGate(
-            model=model, paths=EvalPaths.create(REPO / "evals", None, cassette_dir), mode=mode, workers=4
+            model=model,
+            paths=EvalPaths.create(REPO / "evals", None, cassette_dir),
+            mode=mode,
+            concurrency=LIVE_EVAL_CONCURRENCY,
         )
 
     return make_stack(tmp_path, synthetic_vault, pack_dir, gate_factory=gate)

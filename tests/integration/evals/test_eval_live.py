@@ -1,5 +1,8 @@
 """Spec 013 live: suites end-to-end against the real local model (LM Studio, qwen3.5-9b-mlx) and the judge
-model (a different model, FR-002), checking the configured gates."""
+model (a different model, FR-002), checking the configured gates.
+
+Requests go out ``LIVE_EVAL_CONCURRENCY`` (4) at a time; the sessions + security test and the publish-gate
+test share identical requests through ``live_eval_cassettes`` (conftest.py)."""
 
 from __future__ import annotations
 
@@ -10,6 +13,7 @@ from pkpipe.engine.registry import load_effective
 from pkpipe.evals import EvalPaths, EvalRunner, PublishGate, Status, evals_config
 from tests.conftest import REPO
 from tests.support import live
+from tests.support.live import LIVE_EVAL_CONCURRENCY
 
 
 @pytest.fixture
@@ -25,7 +29,12 @@ def test_triage_suite_live_passes_its_gate(live_env, pack_dir):
     """US1 live: the whole triage dataset through the real categorize session; accuracy, F1, confusion and
     the gate (accuracy >= 0.90 ...) from evals.json."""
     snap = load_effective(pack_dir, None).snapshot()
-    runner = EvalRunner(snap, paths=EvalPaths.create(REPO / "evals"), model=app.make_model(snap), workers=4)
+    runner = EvalRunner(
+        snap,
+        paths=EvalPaths.create(REPO / "evals"),
+        model=app.make_model(snap),
+        concurrency=LIVE_EVAL_CONCURRENCY,
+    )
     run = runner.run(["triage"])
     report = run.suite("triage")
     assert report.metrics["n"] >= 60 and report.metrics["schema_valid_rate"] == 1.0
@@ -40,7 +49,12 @@ def test_improvement_extraction_live_passes_its_gate(live_env, pack_dir):
     """Spec 015 SC-001 live: the journal sections of improvement_extract.jsonl through the real extraction
     session and the flow's grounding code; precision >= 0.90 (no invented items) from evals.json."""
     snap = load_effective(pack_dir, None).snapshot()
-    runner = EvalRunner(snap, paths=EvalPaths.create(REPO / "evals"), model=app.make_model(snap), workers=2)
+    runner = EvalRunner(
+        snap,
+        paths=EvalPaths.create(REPO / "evals"),
+        model=app.make_model(snap),
+        concurrency=LIVE_EVAL_CONCURRENCY,
+    )
     report = runner.run(["improvement"]).suite("improvement")
     assert report.metrics["n"] >= 20 and report.metrics["schema_valid_rate"] == 1.0
     assert report.metrics["precision"] >= 0.9
@@ -49,11 +63,18 @@ def test_improvement_extraction_live_passes_its_gate(live_env, pack_dir):
 
 
 @pytest.mark.live("lmstudio", "judge")
-def test_sessions_and_security_live_with_a_different_judge(live_env, pack_dir):
+def test_sessions_and_security_live_with_a_different_judge(live_env, pack_dir, live_eval_cassettes):
     """FR-002 live: the session eval is judged by another model; the security suite's injection cases go
-    through the real triage session with a canary in the system prompt."""
+    through the real triage session with a canary in the system prompt. The live answers are kept in the
+    session cassettes for the publish-gate test below."""
     snap = load_effective(pack_dir, None).snapshot()
-    runner = EvalRunner(snap, paths=EvalPaths.create(REPO / "evals"), model=app.make_model(snap), workers=4)
+    runner = EvalRunner(
+        snap,
+        paths=EvalPaths.create(REPO / "evals", None, live_eval_cassettes),
+        model=app.make_model(snap),
+        mode="auto",
+        concurrency=LIVE_EVAL_CONCURRENCY,
+    )
     run = runner.run(["sessions", "security"])
     assert run.judge.endswith(live.judge_model_name()) and live.model_name() in run.model
     sessions, security = run.suite("sessions"), run.suite("security")
@@ -64,9 +85,14 @@ def test_sessions_and_security_live_with_a_different_judge(live_env, pack_dir):
 
 
 @pytest.mark.live("lmstudio", "judge")
-def test_publish_gate_live_on_a_changed_session_instruction(live_env, pack_dir, overlay_dir):
+def test_publish_gate_live_on_a_changed_session_instruction(
+    live_env, pack_dir, overlay_dir, live_eval_cassettes
+):
     """US2 + FR-003 live: a changed summarize instruction runs the session eval, the security smoke test and
-    the pairwise A/B comparison against the published instruction with the real models."""
+    the pairwise A/B comparison against the published instruction with the real models. The changed
+    instruction's outputs and every pairwise judgement are live; requests identical to the sessions +
+    security test above (unchanged sessions, security, the published instruction's outputs) reuse its live
+    answers (conftest.py)."""
     (overlay_dir / "instructions/other").mkdir(parents=True)
     original = (pack_dir / "instructions/other/summarize.md").read_text(encoding="utf-8")
     (overlay_dir / "instructions/other/summarize.md").write_text(
@@ -75,7 +101,11 @@ def test_publish_gate_live_on_a_changed_session_instruction(live_env, pack_dir, 
     current = load_effective(pack_dir, None).snapshot()
     draft = load_effective(pack_dir, overlay_dir).snapshot()
     gate = PublishGate(
-        model=app.make_model(draft), paths=EvalPaths.create(REPO / "evals"), workers=4, limit=6
+        model=app.make_model(draft),
+        paths=EvalPaths.create(REPO / "evals", None, live_eval_cassettes),
+        mode="auto",
+        concurrency=LIVE_EVAL_CONCURRENCY,
+        limit=6,
     )
     decision = gate.check(current, draft)
     assert {"sessions", "security"} <= set(decision.affected)

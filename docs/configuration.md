@@ -26,7 +26,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
 | `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir ([Secure fetch](#secure-fetch)) |
 | `security/deny_list.txt` | Deny-list of the URL filter: one domain per line (subdomains included), `#` comments |
-| `evals.json` | Eval gates per suite (`min` / `max` per metric), judge profile, pairwise and calibration limits ([Evaluation](evaluation.md)). Thresholds only move upwards |
+| `evals.json` | Eval gates per suite (`min` / `max` per metric), judge profile, pairwise and calibration limits, `concurrency` (eval requests in flight, default 1; `pkpipe eval --concurrency N` overrides it) ([Evaluation](evaluation.md)). Thresholds only move upwards |
 | `telemetry.json` | Prompt/response content capture per flow (`capture_content.flows`); journal and context flows are always off. Exporters come from `OTEL_*` env ([operations](operations.md)) |
 | `flows/*.json` | Graph: nodes, edges, conditions, subflow calls ([Flows](flows.md)) |
 | `steps/*.json` | Defaults per step type: model profile, output schema, retry |

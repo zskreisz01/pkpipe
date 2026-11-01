@@ -23,5 +23,5 @@ production monitoring. Everything here is synthetic; real datasets live in the p
 Re-record after changing a prompt, instruction, schema, model profile or dataset:
 
 ```bash
-uv run pkpipe eval --suite triage,sessions,calibration,improvement,security --cassette record --workers 4
+uv run pkpipe eval --suite triage,sessions,calibration,improvement,security --cassette record --concurrency 4
 ```
