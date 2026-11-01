@@ -45,7 +45,6 @@ IMPROVEMENT_PREAMBLE = (
     "dropped) yourself. Evidence, verdict, reason and next are the agent's weekly proposal.\n\n"
 )
 _OWNER_FIELDS = tuple(f for f in ImprovementItem.model_fields if f not in AGENT_FIELDS)
-MAX_NOTES = 60
 
 
 def item_to_cells(item: ImprovementItem) -> dict[str, str]:

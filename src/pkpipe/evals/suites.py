@@ -570,10 +570,24 @@ class ImprovementSuite(Suite):
     def fingerprint(self, snapshot):
         return step_fingerprint(snapshot, self.flow, self.node)
 
-    @staticmethod
-    def _match(predicted: str, wanted: str) -> bool:
+    #: a statement matches when one contains the other and the shorter one is either at least this share of
+    #: the longer one (a full stop may differ) or whole sentences of it (the owner's improvement without the
+    #: criterion sentence they appended). A fragment such as "Stretch" of "Stretch for ten minutes every
+    #: morning." is not the owner's improvement and counts as a miss and a false positive.
+    MIN_OVERLAP = 0.8
+
+    @classmethod
+    def _match(cls, predicted: str, wanted: str) -> bool:
         p, w = imp.normalize(predicted), imp.normalize(wanted)
-        return bool(p) and (p in w or w in p)
+        short, long = sorted((p, w), key=len)
+        if not short or short not in long:
+            return False
+        if len(short) >= cls.MIN_OVERLAP * len(long):
+            return True
+        start = long.index(short)
+        before, after = long[:start].rstrip(), long[start + len(short) :]
+        whole = short[-1] in ".!?" and (not before or before[-1] in ".!?")
+        return whole and (not after or after[0] == " ")
 
     def _case(self, ctx: SuiteContext, case: EvalCase) -> CaseResult:
         expected = (case.expected or {}).get("items", [])

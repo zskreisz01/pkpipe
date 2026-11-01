@@ -157,11 +157,13 @@ def review_rows(ctx: StepContext, results: list[dict[str, Any]]) -> dict[str, An
 
 @register_code("improvement.proposal_rows")
 def proposal_rows(ctx: StepContext, results: list[dict[str, Any]]) -> dict[str, Any]:
-    """Link every written system-change proposal note from its backlog row."""
+    """Link every written system-change proposal note from its backlog row. A note that already exists (an
+    earlier run wrote it but could not link it, or the owner made it) is linked as it is, never replaced."""
     rows, failed = [], 0
     for r in results or []:
         item = r.get("item") or {}
-        if r.get("status") != "done" or not item.get("path"):
+        exists = "note exists" in str((r.get("error") or {}).get("message", "")).lower()
+        if (r.get("status") != "done" and not exists) or not item.get("path"):
             failed += 1
             continue
         rows.append({"id": item["id"], "proposal": item["path"]})

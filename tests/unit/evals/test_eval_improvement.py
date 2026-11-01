@@ -103,6 +103,19 @@ def test_a_real_but_wrong_line_lowers_precision_and_a_miss_lowers_recall(snap, t
     assert not report.cases[0].passed
 
 
+def test_a_verbatim_fragment_of_the_statement_is_not_a_hit(snap, tmp_path):
+    """SC-001: grounding accepts any verbatim passage, so the score must not: a fragment ("Stop coffee") is
+    not the owner's improvement. Whole sentences without the appended criterion sentence still match."""
+    want = "Stop coffee after 14:00. I will know it works when I sleep by 23:00."
+    cases = [_case("c", f"- {want}", [_want(want)])]
+    fragment = _run(snap, tmp_path, _model(lambda user: [_it("Stop coffee")]), cases)
+    assert fragment.metrics["precision"] == 0.0 and fragment.metrics["recall"] == 0.0
+    sentence = _run(snap, tmp_path / "s", _model(lambda user: [_it("Stop coffee after 14:00.")]), cases)
+    assert sentence.metrics["precision"] == 1.0 and sentence.metrics["recall"] == 1.0
+    no_stop = _run(snap, tmp_path / "n", _model(lambda user: [_it(want.rstrip("."))]), cases)
+    assert no_stop.metrics["precision"] == 1.0
+
+
 def test_area_type_and_invented_criterion_are_measured(snap, tmp_path):
     cases = [_case("c", "- Walk daily. Aim: 5 km.", [_want("Walk daily. Aim: 5 km.")])]
     report = _run(

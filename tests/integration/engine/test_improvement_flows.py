@@ -161,6 +161,19 @@ def test_nothing_to_extract_means_no_model_call_and_no_backlog(vault, pack_dir, 
     assert not (vault / BACKLOG).exists()
 
 
+def test_a_run_with_the_model_pointed_off_the_machine_stops_before_any_session(vault, pack_dir, monkeypatch):
+    """FR-002 at run time: an environment that points the default profile at a remote host makes the run
+    fail at compile time; no journal text reaches the model and nothing is written."""
+    write_journal(vault, DAY, journal_with(f"- {STRETCH}\n"))
+    monkeypatch.setenv("PKPIPE_MODEL_BASE_URL", "https://api.example.invalid/v1")
+    svc, fake, *_ = _runtime(vault, pack_dir, ImprovementModel(extract=_extract_all))
+
+    run = svc.start("improvement_extract", inputs={"date": DAY})
+
+    assert not run.ok and "non-loopback" in str(run.error)
+    assert fake.calls == [] and not (vault / BACKLOG).exists()
+
+
 def test_extraction_defaults_to_the_clock_day(vault, pack_dir):
     write_journal(vault, RUN_DAY.isoformat(), journal_with(f"- {STRETCH}\n"))
     svc, *_ = _runtime(vault, pack_dir, ImprovementModel(extract=_extract_all))
@@ -303,6 +316,24 @@ def test_kept_system_item_gets_a_change_proposal_for_the_eval_gate(vault, pack_d
 
     again = svc.start("improvement_review")
     assert again.ok and len(notify.sent) == 1  # nothing new: quiet
+
+
+def test_an_existing_proposal_note_is_linked_and_never_replaced(vault, pack_dir):
+    """US2.2 recovery: the note was written but the link was not (crash between the two writes, or the
+    owner wrote it); the next review links it instead of failing every week, and keeps its text."""
+    ids = _seed_backlog(vault, pack_dir, [ZEN])
+    owner_sets_status(vault, ids[ZEN], "kept")
+    path = f"2-Areas/Self-Improvement/System-Changes/{ids[ZEN]}.md"
+    (vault / path).parent.mkdir(parents=True)
+    (vault / path).write_text("# My own notes on this change\n", encoding="utf-8")
+    svc, _, notify, _ = _runtime(vault, pack_dir, ImprovementModel())
+
+    run = svc.start("improvement_review")
+
+    assert run.ok, run.error
+    assert backlog(vault)[ids[ZEN]]["proposal"] == path
+    assert (vault / path).read_text(encoding="utf-8") == "# My own notes on this change\n"
+    assert run.outputs["proposal_rows"]["failed"] == 0
 
 
 def test_personal_kept_items_get_no_system_proposal(vault, pack_dir):

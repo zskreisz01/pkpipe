@@ -100,3 +100,40 @@ def test_journal_flows_only_start_journal_subflows():
     assert any("not a journal flow" in e for e in _errors(_flow(sub), other))
     journal_other = _flow(_llm(), fid="other")
     assert _errors(_flow(sub), journal_other) == []
+
+
+def _runtime_errors(flow, environ, models=None):
+    from pkpipe.engine.compiler import private_data_errors
+
+    snap = make_snapshot(flow, assets=ASSETS, models=models or {"default": LOCAL})
+    return private_data_errors(snap.flow(flow["id"]), snap, environ)
+
+
+@pytest.mark.parametrize("value", ["https://api.example.invalid/v1", "http://192.168.1.20:1234/v1"])
+def test_an_environment_value_pointing_the_profile_off_the_machine_is_refused_at_run_time(monkeypatch, value):
+    """FR-002 at run time: the configured default is local, but the environment variable of the ``env:``
+    chain points at another host. Config validation still passes (other flows may use that host), the
+    run-time check (every run's compile) refuses the journal flow."""
+    monkeypatch.setenv("PKPIPE_MODEL_BASE_URL", value)
+    assert _errors(_flow(_llm())) == []
+    errors = _runtime_errors(_flow(_llm()), {"PKPIPE_MODEL_BASE_URL": value})
+    assert len(errors) == 1 and "resolves to a non-loopback address" in errors[0]
+    assert value not in errors[0]  # the address itself (it may carry credentials) is not echoed
+
+
+def test_a_remote_fallback_resolved_from_the_environment_is_refused_at_run_time():
+    models = {
+        "default": {**LOCAL, "fallback": "alt"},
+        "alt": {**LOCAL, "base_url": "env:ALT|http://[::1]:1/v1"},
+    }
+    assert _runtime_errors(_flow(_llm()), {}, models) == []
+    errors = _runtime_errors(_flow(_llm()), {"ALT": "https://hosted.example.invalid"}, models)
+    assert len(errors) == 1 and "profile 'alt'" in errors[0]
+
+
+@pytest.mark.parametrize("environ", [{}, {"PKPIPE_MODEL_BASE_URL": "http://localhost:8080/v1"}])
+def test_an_environment_value_on_the_loopback_passes_at_run_time(environ):
+    assert _runtime_errors(_flow(_llm()), environ) == []
+    assert (
+        _runtime_errors(_flow(_llm(), data_classes=()), {"PKPIPE_MODEL_BASE_URL": "https://x.invalid"}) == []
+    )

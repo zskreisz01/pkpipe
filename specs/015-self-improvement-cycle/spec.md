@@ -87,7 +87,7 @@ The owner reviews evidence and proposed verdicts every Sunday.
   (`System-Changes/<id>.md`, `awaiting-eval-gate`) is written; applying it is a draft config change that
   `PublishGate` (spec 013) must pass. The pipeline never edits config.
 - Q: How is "local only" (FR-002) enforced? → A: `pkpipe validate` rejects journal-class flows with tool sessions,
-  non-loopback model profiles (including fallbacks), calls to MCP servers marked `egress`, or non-journal subflows;
+  non-loopback model profiles (including fallbacks; the value an `env:` variable resolves to is checked again when each run compiles the flow), calls to MCP servers marked `egress`, or non-journal subflows;
   traces never capture their content.
 - Q: Enabled by default? → A: No. The flows ship in the public pack; an overlay `schedules.json` entry enables them.
 - Status: Completed. Live results (qwen3.5-9b-mlx, judge gemma-4-12b) in docs/evaluation.md.
