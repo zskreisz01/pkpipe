@@ -75,3 +75,20 @@ def release(items: list[TriageItem]) -> tuple[list[TriageItem], list[TriageItem]
             item.state = ItemState.PENDING
             pending.append(item)
     return released, pending
+
+
+def needs_retriage(
+    state: ItemState, suggested: str, override: str | None, valid_categories: frozenset[str] | set[str]
+) -> bool:
+    """An unfinished item whose AI suggestion names a category that is no longer configured, and which has
+    no valid owner override, is flagged for re-triage (the category was removed from the config)."""
+    if state not in (ItemState.SUGGESTED, ItemState.PENDING):
+        return False
+    if override and override in valid_categories:
+        return False
+    return not override and suggested not in valid_categories
+
+
+def is_unreviewed(state: ItemState, confirm: bool, override: str | None) -> bool:
+    """Waiting for the owner: not finished, not confirmed, not overridden."""
+    return state in (ItemState.SUGGESTED, ItemState.PENDING) and not confirm and not override

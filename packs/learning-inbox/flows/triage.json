@@ -70,12 +70,29 @@
       }
     },
     {
+      "id": "backlog",
+      "type": "code",
+      "bpmn_element": "Notify: triage ready",
+      "config": {
+        "function": "triage.backlog",
+        "args": {
+          "triage": "${read_triage}",
+          "new_rows": "${rows.rows}"
+        }
+      }
+    },
+    {
       "id": "notify",
       "type": "notify",
       "bpmn_element": "Notify: triage ready",
       "config": {
         "event": "triage_ready",
-        "message": "Triage ready: ${rows.count} new item(s) to confirm or override in 0-INBOX/Inbox-Triage.md."
+        "message": "${backlog.message}",
+        "payload": {
+          "new": "${backlog.new}",
+          "backlog": "${backlog.backlog}",
+          "awaiting": "${backlog.awaiting}"
+        }
       }
     }
   ],
@@ -111,6 +128,10 @@
     },
     {
       "from": "write_triage",
+      "to": "backlog"
+    },
+    {
+      "from": "backlog",
       "to": "notify"
     }
   ]

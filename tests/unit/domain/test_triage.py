@@ -54,3 +54,26 @@ def test_release_rule_output_is_always_an_allowed_transition():
             item = TriageItem("i", "r", "misc", confirm, override, state)
             release([item])
             assert check_transition(state, item.state, owner_decided=confirm or bool(override)) is None
+
+
+def test_needs_retriage_only_for_open_items_with_a_removed_suggested_category():
+    """Spec 007 T005 edge case: category removed from config while pending -> flagged for re-triage."""
+    from pkpipe.domain.triage import needs_retriage
+
+    valid = {"tool", "misc"}
+    assert needs_retriage(ItemState.PENDING, "gone", None, valid)
+    assert needs_retriage(ItemState.SUGGESTED, "gone", None, valid)
+    assert not needs_retriage(ItemState.PENDING, "tool", None, valid)
+    assert not needs_retriage(ItemState.PENDING, "gone", "misc", valid)  # a valid override decides
+    assert not needs_retriage(ItemState.PENDING, "gone", "also-gone", valid)  # owner's choice, not the AI's
+    for final in (ItemState.PROCESSED, ItemState.QUARANTINED, ItemState.RELEASED):
+        assert not needs_retriage(final, "gone", None, valid)
+
+
+def test_is_unreviewed_means_waiting_for_the_owner():
+    from pkpipe.domain.triage import is_unreviewed
+
+    assert is_unreviewed(ItemState.PENDING, False, None)
+    assert not is_unreviewed(ItemState.PENDING, True, None)
+    assert not is_unreviewed(ItemState.SUGGESTED, False, "misc")
+    assert not is_unreviewed(ItemState.PROCESSED, False, None)

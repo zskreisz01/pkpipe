@@ -79,7 +79,13 @@ An overlay can change one node of a pack flow by id (`{"nodes": [{"id": "notify"
 
 Prompts and schemas are files of the layered config: `prompts/system/<system>.md`, `instructions/<instruction>`, `contexts/<context>.md`, `schemas/<output_schema>.json`. Every input is wrapped in random delimiters (datamarking) and the system prompt says that text inside them is data.
 
-Built-in `code` functions: `item.set`, `inbox.select_new`, `triage.category_menu`, `triage.check_category`, `triage.suggested_rows`, `triage.release`, `triage.finalize`.
+Built-in `code` functions: `item.set`, `inbox.select_new`, `triage.category_menu`, `triage.check_category`, `triage.suggested_rows`, `triage.backlog`, `triage.release`, `triage.finalize`.
+
+### Triage and release (spec 007)
+
+- **20:00 `triage`**: `inbox.select_new` selects INBOX notes that are not in the triage file (id = hash of the resource, so a resource captured twice is one item). Each item runs in its own `categorize_item` instance: the `suggest` session has no tools and sees only the category menu, the resource, front matter and note, datamarked; `triage.check_category` accepts only a configured category. New rows start `suggested`; the `triage_ready` notification carries `new`, `backlog` (older items still waiting for the owner) and `awaiting`.
+- **Re-triage**: an open item (`suggested` or `pending`) whose suggested category was removed from the config, and which has no valid override, is selected again by the next triage run and suggested anew. An owner override naming an unknown category is never released and stays `pending`. The owner's confirm tick stays in the file, so review re-triaged rows again.
+- **06:00 `process_released`**: `triage.release` releases only confirmed or overridden items (override wins), everything else stays `pending` and is counted in the daily summary; each released item runs in its own `process_item` instance and a security flag quarantines only that item. `processed` and `quarantined` items are skipped.
 
 ## References and templates
 

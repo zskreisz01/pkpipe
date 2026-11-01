@@ -1,7 +1,7 @@
 ---
 spec_id: 007-triage-and-release
 title: Daily triage and morning release
-status: Draft
+status: Completed
 description: The 20:00 triage flow suggests a category per new INBOX item in an isolated session and notifies the owner; the 06:00 flow releases only confirmed or overridden items and fans them out to the category processes.
 relevant_when:
   - triage
@@ -11,14 +11,14 @@ relevant_when:
   - process_released
   - pending
 related: [004-obsidian-vault-mcp, 005-flow-engine, 006-notifications]
-updated: 2026-10-31
+updated: 2026-11-01
 ---
 
 # Feature Specification: Daily triage and morning release
 
 **Feature Branch**: `spec/007-triage-and-release`
 **Created**: 2026-10-31
-**Status**: Draft
+**Status**: Completed
 **Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
 
 ## User Scenarios & Testing *(mandatory)*
@@ -83,6 +83,10 @@ After processing, the owner gets counts of processed, pending and quarantined it
 ### Session 2026-10-31
 
 - Q: Is this spec part of the public engine? → A: Yes; private categories, contexts and datasets stay in the overlay.
+
+### Session 2026-11-01
+
+- Q: What happens when a category is removed while an item is open? → A: The next triage run selects the item again and suggests a category from the remaining ones; an override naming an unknown category is never released.
 
 ## Out of Scope
 
