@@ -106,6 +106,16 @@ A chat agent lists triage items and confirms them over MCP.
 - Q: Does this change the BPMN process? → A: No. Confirm/override/release in the UI or chat are additional
   channels for the owner decisions already in the model.
 
+### Session 2026-11-01 (review)
+
+- Q: Is triage text returned over MCP raw external content? → A: Yes, a resource is an INBOX file name or URL, so
+  every `resource` (and a failed run's `error`) in an app MCP result is datamarked with random delimiters per call
+  (constitution IV); refused owner actions of the agent token are audited.
+- Q: Does the scheduler of `pkpipe serve` follow the one-active-run rule? → A: Yes, cron ticks go through the same
+  check as the UI and MCP and are skipped while the flow runs.
+- Q: What if the draft changes while its gate runs? → A: Publish is refused; only what was gated is committed. The
+  publish record keeps every measured gate metric.
+
 ## Out of Scope
 
 - Multi-user access.

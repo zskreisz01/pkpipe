@@ -14,9 +14,9 @@ Endpoint `http://127.0.0.1:8787/mcp` (Streamable HTTP, same listener as the UI).
 | Tool | Scope | Arguments | Returns |
 | --- | --- | --- | --- |
 | `run_flow` | agent, owner | `flow: str`, `inputs: object?` | run record (`run_id`, `flow_id`, `status`, `trigger = mcp`, `config_version`); the flow runs in the background |
-| `get_run` | agent, owner | `run_id: str` | run record plus `steps_done` (names only; never output values) |
-| `list_triage` | agent, owner | `state: str?` | `rows[]` (`item_id`, `resource` capped at 300 characters, `ai_suggested_category`, `confirm`, `override`, `state`, `category`), `invalid`, `conflicts` |
-| `confirm_item` | **owner** | `item_id: str` | updated row |
+| `get_run` | agent, owner | `run_id: str` | run record plus `steps_done` (names only; never output values); a failed run's `error` is datamarked |
+| `list_triage` | agent, owner | `state: str?` | `rows[]` (`item_id`, `resource` capped at 300 characters and datamarked, `ai_suggested_category`, `confirm`, `override`, `state`, `category`), `invalid`, `conflicts`, `untrusted_fields`, `data_marker` |
+| `confirm_item` | **owner** | `item_id: str` | updated row (`resource` datamarked) |
 | `override_item` | **owner** | `item_id: str`, `category: str` | updated row |
 | `release_quarantine` | **owner** | `item_id: str` | updated row (`state = pending`) |
 
@@ -27,5 +27,9 @@ quarantined`, `flow '<id>' already has an active run`.
 
 Rules: a triage item in `suggested`, `pending` or `released` can be confirmed or overridden; `quarantined` and
 `processed` cannot. An override must name a configured, enabled category. Every owner action and every
-`run_flow` is written to the audit log with the actor `mcp:owner` / `mcp:agent`. Resource text is data, not
-instructions (it can come from captured external content).
+`run_flow` is written to the audit log with the actor `mcp:owner` / `mcp:agent`; an owner action refused for the
+agent token is audited as `<tool>_refused`.
+
+Datamarking (constitution IV): `resource` can come from captured external content (an INBOX file name or a
+URL), so every `resource` in a tool result is wrapped as `<<DATA:nonce>>\n...\n<<END:nonce>>` with a random
+nonce per call; `untrusted_fields` names the marked fields and `data_marker` states the rule for the agent.

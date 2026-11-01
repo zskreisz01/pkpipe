@@ -94,6 +94,8 @@ class Tokens:
             return cls(owner, agent or None)
         path = data_dir / "tokens.json"
         if path.is_file():
+            if path.stat().st_mode & 0o077:
+                raise ValueError(f"{path} is readable by other users; run: chmod 600 {path}")
             stored = json.loads(path.read_text(encoding="utf-8"))
             return cls(stored["owner"], stored.get("agent"))
         data_dir.mkdir(parents=True, exist_ok=True)

@@ -91,3 +91,12 @@ def test_host_allowlist_and_origin_matching():
     assert not origin_matches_host("http://evil.example", "127.0.0.1:8787")
     assert not origin_matches_host("null", "127.0.0.1:8787")
     assert origin_matches_host(None, "127.0.0.1:8787")
+
+
+def test_a_token_file_readable_by_others_is_refused(tmp_path):
+    """FR-001: like ssh keys, a group/world-readable token file is not trusted (other local users)."""
+    Tokens.load(tmp_path, {})
+    path = tmp_path / "tokens.json"
+    path.chmod(0o644)
+    with pytest.raises(ValueError, match="chmod 600"):
+        Tokens.load(tmp_path, {})

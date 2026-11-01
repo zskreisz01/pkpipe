@@ -75,3 +75,37 @@ def test_run_detail_never_exposes_step_output_values(stack):
     stack.services.launcher.wait(run["run_id"])
     text = client.get(f"/api/runs/{run['run_id']}").text
     assert "synthetic note" not in text and "fictional CLI" not in text
+
+
+def test_a_scheduled_tick_skips_a_flow_that_already_runs_from_the_ui(stack, monkeypatch):
+    """Edge case across channels: the cron trigger of `pkpipe serve` follows the same one-active-run rule,
+    so a schedule never starts a second run next to a UI- or chat-started one."""
+    started, release = threading.Event(), threading.Event()
+    store, calls = stack.services.runs.store, []
+
+    def slow_start(flow_id, *, trigger, inputs=None, run_id=None):
+        calls.append(trigger)
+        if trigger == "schedule":
+            return None
+        store.create_run(
+            {
+                "run_id": run_id,
+                "flow_id": flow_id,
+                "config_version": "v",
+                "trigger": trigger,
+                "status": "running",
+                "started_at": "2026-01-01T00:00:00+00:00",
+            }
+        )
+        started.set()
+        release.wait(20)
+        store.update_run(run_id, status="done")
+
+    monkeypatch.setattr(stack.services.runs, "start", slow_start)
+    launcher = stack.services.launcher
+    first = api_client(stack).post("/api/runs", json={"flow": "triage"})
+    assert first.status_code == 202 and started.wait(5)
+    assert launcher.run_scheduled("triage") is False and calls == ["ui"]
+    release.set()
+    launcher.wait(first.json()["run_id"])
+    assert launcher.run_scheduled("triage") is True and calls == ["ui", "schedule"]

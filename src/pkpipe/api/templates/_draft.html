@@ -35,6 +35,7 @@
     <p>Eval gate: <span class="pill {{ result.status }}" data-testid="gate-status">{{ result.status }}</span>
       {% if result.affected %}suites: {{ result.affected|join(", ") }}{% endif %}</p>
     {% for f in result.failures %}<p class="err">{{ f }}</p>{% endfor %}
+    {% with metrics = result.metrics %}{% include "_metrics.html" %}{% endwith %}
   {% endif %}
 {% endif %}
 </div>

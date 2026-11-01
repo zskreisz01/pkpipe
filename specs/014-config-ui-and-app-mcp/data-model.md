@@ -49,7 +49,7 @@ Editable paths: `<models|mcp_servers|channels|schedules|categories|security|tele
 ## Publish
 
 `decision` is the gate report at publish time (`status` passed / overridden / unchanged, `affected`, `failures`,
-`override_reason`, `eval_run_id`). A rollback row has `kind = rollback` and `decision = {"status": "rollback"}`;
+`override_reason`, `eval_run_id`, `metrics` = measured value, operator and threshold of every gated metric per suite). A rollback row has `kind = rollback` and `decision = {"status": "rollback"}`;
 the reverted publish gets `reverted_by`.
 
 ## Tokens

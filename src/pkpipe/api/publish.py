@@ -108,6 +108,12 @@ class Publisher:
                 raise PublishError(
                     "the overlay repository has uncommitted changes to these files; commit or discard them"
                 )
+            root = overlay.resolve()
+            for rel in rels:  # never write through a symlink that leaves the overlay
+                if not (overlay / rel).resolve().is_relative_to(root) or (overlay / rel).is_symlink():
+                    raise PublishError(
+                        f"'{rel}' resolves outside the overlay (symlink); refusing to write it"
+                    )
             backup = {r: self.workspace.overlay_text(r) for r in rels}
             parent = repo.head()
             try:

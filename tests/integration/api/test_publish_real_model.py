@@ -59,7 +59,10 @@ def test_publish_gate_replays_the_recorded_real_model_responses(tmp_path, synthe
         pytest.skip("no recorded cassettes yet (run the live test with PKPIPE_UPDATE_CASSETTES=1)")
     stack = _stack(tmp_path, synthetic_vault, pack_dir, "replay", CASSETTES)
     _, _, resp = _publish(stack, pack_dir)
-    _assert_published(stack, resp)
+    body = _assert_published(stack, resp)
+    assert (
+        body["metrics"]["triage"]["accuracy"]["value"] >= body["metrics"]["triage"]["accuracy"]["threshold"]
+    )
 
 
 @pytest.mark.live("lmstudio", "judge")
@@ -77,7 +80,10 @@ def test_publish_gate_with_the_live_model_and_cassette_recording(
     _, _, resp = _publish(stack, pack_dir)
     body = _assert_published(stack, resp)
     assert (recording / "triage.json").is_file() and (recording / "security.json").is_file()
-    print("LIVE GATE", {k: body[k] for k in ("status", "affected", "failures")})
+    print("LIVE GATE", {k: body[k] for k in ("status", "affected", "failures", "metrics")})
+    for suite in ("triage", "security"):  # every gated metric was measured, none missing
+        checks = {m: c for m, c in body["metrics"][suite].items() if m != "status"}
+        assert checks and all(c["value"] is not None for c in checks.values()), suite
     if os.environ.get("PKPIPE_UPDATE_CASSETTES") == "1":
         shutil.rmtree(CASSETTES, ignore_errors=True)
         shutil.copytree(recording, CASSETTES)

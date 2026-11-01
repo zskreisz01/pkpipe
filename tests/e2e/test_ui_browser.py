@@ -92,6 +92,7 @@ def test_new_category_end_to_end_from_the_ui_then_rollback(stack, browser_page):
     page.wait_for_selector('[data-testid="validate-status"]:has-text("Valid")')
     page.get_by_role("button", name="Smoke eval").click()
     page.wait_for_selector('[data-testid="gate-status"]:has-text("passed")')
+    assert "accuracy" in page.locator('[data-testid="gate-metrics"]').inner_text()  # measured values shown
     assert git(stack.overlay, "rev-list", "--count", "HEAD") == "1"  # smoke never commits
 
     page.fill("#summary", "Add gardening category")

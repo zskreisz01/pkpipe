@@ -56,11 +56,7 @@ class RunLauncher:
             self.runs.config().flow(flow_id)
         except KeyError as exc:
             raise NotFound(str(exc.args[0])) from None
-        with self._lock:
-            active = [r for r in self.runs.list(flow_id=flow_id) if r.status in ACTIVE]
-            if flow_id in self._starting or active:
-                raise Refused(f"flow '{flow_id}' already has an active run")
-            self._starting.add(flow_id)
+        self._claim(flow_id)
         run_id = str(uuid.uuid4())
 
         def work() -> None:
@@ -81,6 +77,29 @@ class RunLauncher:
                 future.result()  # raises the start error (for example an invalid config)
             time.sleep(0.02)
         raise Refused("the run did not start in time")
+
+    def _claim(self, flow_id: str) -> None:
+        """Reserve ``flow_id`` for one new run, or raise Refused while another run of it is active."""
+        with self._lock:
+            active = [r for r in self.runs.list(flow_id=flow_id) if r.status in ACTIVE]
+            if flow_id in self._starting or active:
+                raise Refused(f"flow '{flow_id}' already has an active run")
+            self._starting.add(flow_id)
+
+    def run_scheduled(self, flow_id: str) -> bool:
+        """Scheduler entry (blocking, on the scheduler's thread): the same one-active-run rule as the UI and
+        MCP, so a cron tick never starts a second run next to a UI- or chat-started one. False = skipped."""
+        try:
+            self._claim(flow_id)
+        except Refused:
+            log.warning("scheduled run of '%s' skipped: the flow already has an active run", flow_id)
+            return False
+        try:
+            self.runs.start(flow_id, trigger="schedule")
+        finally:
+            with self._lock:
+                self._starting.discard(flow_id)
+        return True
 
     def wait(self, run_id: str, timeout: float = 60.0) -> None:
         """Block until a launched run finished (tests, shutdown)."""
@@ -272,7 +291,12 @@ class AppServices:
         snapshot = self.workspace.draft_snapshot(draft["files"])
         gate = self.gate_factory(snapshot)
         decision = gate.check(self.workspace.current(), snapshot, override_reason=override_reason)
-        return decision, {"stage": "gate", **decision.to_dict(), "warnings": result.warnings}
+        return decision, {
+            "stage": "gate",
+            **decision.to_dict(),
+            "metrics": gate_metrics(decision),
+            "warnings": result.warnings,
+        }
 
     def smoke_eval(self, draft_id: str) -> dict[str, Any]:
         """Dry run of the publish gate: validation, then the affected evals. Nothing is written."""
@@ -294,6 +318,10 @@ class AppServices:
         if decision is None or not decision.allowed:
             self.store.audit(actor, "publish_blocked", draft_id, stage=report["stage"])
             return {"published": False, **report}
+        latest = self._draft(draft_id)
+        if latest["rev"] != draft["rev"]:  # edited in another tab while the evals ran: gate what is committed
+            self.store.audit(actor, "publish_refused", draft_id, reason="draft changed during the gate")
+            raise Refused("the draft changed while the eval gate ran; publish again to gate the new version")
         try:
             record = self.publisher.publish(draft_id, draft["files"], summary=summary, decision=report)
         except (PublishError, WorkspaceError) as exc:
@@ -335,6 +363,19 @@ class AppServices:
             return self.publisher.diff(publish_id)
         except KeyError as exc:
             raise NotFound(str(exc.args[0])) from None
+
+
+def gate_metrics(decision: GateDecision) -> dict[str, dict[str, Any]]:
+    """Measured value of every gated metric per suite (kept with the publish record, shown in the UI)."""
+    if decision.run is None:
+        return {}
+    return {
+        s.suite: {
+            "status": s.status.value,
+            **{g.metric: {"value": g.value, "op": g.op, "threshold": g.threshold} for g in s.gate},
+        }
+        for s in decision.run.suites
+    }
 
 
 def default_vault(vault_dir: Path | None) -> Vault | None:

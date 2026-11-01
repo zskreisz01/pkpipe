@@ -351,3 +351,47 @@ def test_publish_and_rollback_resync_the_scheduler(stack):
         assert str(sched.scheduler.get_job("flow:triage").trigger) == before
     finally:
         sched.shutdown(wait=False)
+
+
+def test_publish_report_and_record_carry_the_measured_gate_metrics(stack):
+    """FR-004: the publish keeps its gate decision including every gated metric value (shown in the UI)."""
+    client = api_client(stack)
+    d = _edit(client, _draft(client)).json()
+    body = client.post(f"/api/drafts/{d['draft_id']}/publish", json={"summary": "m"}).json()
+    triage = body["metrics"]["triage"]
+    assert triage["status"] == "passed" and triage["accuracy"]["value"] == 1.0
+    assert triage["accuracy"]["op"] == ">=" and isinstance(triage["accuracy"]["threshold"], float)
+    stored = client.get("/api/publishes").json()["publishes"][0]["decision"]
+    assert stored["metrics"]["triage"]["accuracy"]["value"] == 1.0
+
+
+def test_a_draft_edited_while_the_gate_runs_is_not_published(stack):
+    """Edge case (two tabs): the commit must contain exactly what the gate evaluated."""
+    client = api_client(stack)
+    d = _edit(client, _draft(client)).json()
+    services = stack.services
+    real_gate = services._gate
+
+    def gate_then_other_tab_saves(draft, override_reason):
+        result = real_gate(draft, override_reason)
+        services.edit_file(d["draft_id"], INSTRUCTION, "Edited in tab two.\n", base_hash=None, rev=None)
+        return result
+
+    services._gate = gate_then_other_tab_saves
+    before = git(stack.overlay, "rev-parse", "HEAD")
+    resp = client.post(f"/api/drafts/{d['draft_id']}/publish", json={"summary": "race"})
+    assert resp.status_code == 409 and "changed while the eval gate ran" in resp.json()["error"]
+    assert git(stack.overlay, "rev-parse", "HEAD") == before and not (stack.overlay / INSTRUCTION).exists()
+    assert client.get(f"/api/drafts/{d['draft_id']}").json()["status"] == "open"
+
+
+def test_publish_never_writes_through_a_symlink_out_of_the_overlay(stack, tmp_path):
+    """Security: a symlinked config folder in the overlay cannot redirect a publish outside it."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (stack.overlay / "instructions").symlink_to(outside, target_is_directory=True)
+    client = api_client(stack)
+    d = _edit(client, _draft(client)).json()
+    resp = client.post(f"/api/drafts/{d['draft_id']}/publish", json={"summary": "x"})
+    assert resp.status_code == 409 and "outside the overlay" in resp.json()["error"]
+    assert list(outside.rglob("*")) == []

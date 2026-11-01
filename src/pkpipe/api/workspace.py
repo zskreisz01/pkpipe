@@ -185,11 +185,14 @@ class ConfigWorkspace:
             shutil.copytree(
                 overlay,
                 root,
-                symlinks=True,
+                symlinks=False,  # a real copy: draft files below must never be written through a link
+                ignore_dangling_symlinks=True,
                 ignore=shutil.ignore_patterns(".*", "evals", "__pycache__"),
             )
             for rel, ch in files.items():
                 target = root / editable_path(rel)
+                if not target.resolve().is_relative_to(root.resolve()):
+                    raise WorkspaceError(f"'{rel}' resolves outside the draft copy")
                 if ch["content"] is None:
                     target.unlink(missing_ok=True)
                 else:

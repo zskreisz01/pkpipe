@@ -119,7 +119,7 @@ def serve_command(args: argparse.Namespace) -> int:
     services = build_services(pack, overlay, db, Path(args.vault).expanduser() if args.vault else None)
     scheduler = None
     if not args.no_scheduler:
-        scheduler = FlowScheduler(lambda flow: services.runs.start(flow, trigger="schedule"), db_path=db)
+        scheduler = FlowScheduler(services.launcher.run_scheduled, db_path=db)
 
         def sync() -> None:
             snap = services.runs.config()
