@@ -32,7 +32,7 @@ See the [documentation site](https://zskreisz01.github.io/pkpipe/) for C4 diagra
 
 ```bash
 uv sync
-uv run pytest
+uv run pytest -n auto -m 'not live'   # fast, parallel; live tests: tests/README.md
 uv run pkpipe --help
 ```
 

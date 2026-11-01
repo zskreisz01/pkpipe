@@ -11,7 +11,32 @@ tests/
   e2e/               full flows through the CLI / API / MCP entry points on a synthetic temp vault
 ```
 
-Run everything: `uv run pytest`. One level: `uv run pytest tests/unit`.
+## Running
+
+The suite has two parts that run differently:
+
+```bash
+uv run pytest -q -n auto -m 'not live'                 # everything that needs no live service, in parallel (~30 s)
+PKPIPE_REQUIRE_LIVE=1 uv run pytest -q -m live         # live tests, serially (LM Studio, judge, Lightpanda, Docker, ...)
+scripts/lmstudio-test-setup.sh                         # once before live tests: both models loaded, no TTL, parallel 4
+```
+
+- **Non-live, parallel.** `-n auto` (pytest-xdist, a dev dependency; `--dist worksteal` is set in `pyproject.toml`)
+  starts one worker per CPU. Tests stay parallel-safe: temporary files only under `tmp_path`, each xdist worker
+  gets its own `PKPIPE_DATA_DIR` (`tests/conftest.py`), and test servers take ports from
+  `tests.support.ports.free_port`, a separate port block per worker, never `bind(0)`-then-close. Do not mutate
+  `os.environ` or module globals without `monkeypatch`. One level only: `uv run pytest -n auto tests/unit`.
+- **Live, serial.** Live tests share one LM Studio (and Lightpanda, Docker, Open Notebook); parallel workers
+  would only queue behind each other and trigger "Model unloaded" errors while LM Studio swaps models. A live
+  test in an xdist worker is therefore skipped (a failure with `PKPIPE_REQUIRE_LIVE=1`). The speed of the live
+  part comes from inside the tests instead: the eval tests send `LIVE_EVAL_CONCURRENCY` (4) requests at once
+  (`EvalRunner(..., concurrency=4)`, LM Studio parallel predictions), and work that several tests need is done
+  once per session (`tests/integration/evals/conftest.py`).
+- **LM Studio.** `scripts/lmstudio-test-setup.sh` loads the model under test and the judge together with no
+  idle TTL and 4 parallel predictions (`--check` only reports; other loaded models are left alone). Without
+  it, a TTL unload or a JIT load of one model while the other is serving shows up as "Model unloaded" (HTTP
+  400); rerun that test alone before calling it a failure.
+- Plain `uv run pytest` still runs everything serially.
 
 ## Rules
 

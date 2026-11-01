@@ -8,7 +8,6 @@ of the unit under test.
 from __future__ import annotations
 
 import contextlib
-import socket
 import threading
 import time
 from typing import Any
@@ -16,6 +15,8 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, Header, HTTPException, Response
 from pydantic import BaseModel
+
+from tests.support.ports import free_port
 
 
 class Notebook(BaseModel):
@@ -113,12 +114,6 @@ class FakeOpenNotebook:
             return Response(self.audio, media_type="audio/mpeg")
 
         return app
-
-
-def free_port() -> int:
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
 
 
 @contextlib.contextmanager
