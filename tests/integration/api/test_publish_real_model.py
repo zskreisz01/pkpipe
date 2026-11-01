@@ -71,16 +71,21 @@ def test_publish_gate_replays_the_recorded_real_model_responses(tmp_path, synthe
 
 @pytest.mark.live("lmstudio", "judge")
 def test_publish_gate_with_the_live_model_and_cassette_recording(
-    tmp_path, synthetic_vault, pack_dir, lmstudio, monkeypatch
+    tmp_path, synthetic_vault, pack_dir, lmstudio, monkeypatch, live_eval_cassettes
 ):
-    """US1 live (qwen3.5-9b-mlx): triage accuracy/F1 and the security suite gate a real publish."""
+    """US1 live (qwen3.5-9b-mlx): triage accuracy/F1 and the security suite gate a real publish. The changed
+    triage instruction makes every triage and injection request new (live); the secure-fetch Reader pages and
+    classifier texts it shares with the other live eval tests are sent once per session."""
     from tests.support import live
 
     monkeypatch.setenv("PKPIPE_MODEL_BASE_URL", lmstudio["base_url"])
     monkeypatch.setenv("PKPIPE_MODEL_NAME", lmstudio["model"])
     monkeypatch.setenv("PKPIPE_JUDGE_MODEL", live.judge_model_name())
-    recording = tmp_path / "cassettes"
-    stack = _stack(tmp_path, synthetic_vault, pack_dir, "record", recording)
+    if os.environ.get("PKPIPE_UPDATE_CASSETTES") == "1":  # a full, pruned recording of this test only
+        recording, mode = tmp_path / "cassettes", "record"
+    else:  # reuse identical live requests of the other live eval tests (tests/conftest.py)
+        recording, mode = live_eval_cassettes, "auto"
+    stack = _stack(tmp_path, synthetic_vault, pack_dir, mode, recording)
     _, _, resp = _publish(stack, pack_dir)
     body = _assert_published(stack, resp)
     assert (recording / "triage.json").is_file() and (recording / "security.json").is_file()

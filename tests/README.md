@@ -30,8 +30,10 @@ scripts/lmstudio-test-setup.sh                         # once before live tests:
   would only queue behind each other and trigger "Model unloaded" errors while LM Studio swaps models. A live
   test in an xdist worker is therefore skipped (a failure with `PKPIPE_REQUIRE_LIVE=1`). The speed of the live
   part comes from inside the tests instead: the eval tests send `LIVE_EVAL_CONCURRENCY` (4) requests at once
-  (`EvalRunner(..., concurrency=4)`, LM Studio parallel predictions), and work that several tests need is done
-  once per session (`tests/integration/evals/conftest.py`).
+  (`EvalRunner(..., concurrency=4)`, LM Studio parallel predictions), and identical requests of several live
+  eval tests are sent once per session: they run in cassette `auto` mode on the session fixture
+  `live_eval_cassettes` (`tests/conftest.py`), so the first test records the live answer and a later test
+  with the same prompt replays it, while every changed request still reaches the model.
 - **LM Studio.** `scripts/lmstudio-test-setup.sh` loads the model under test and the judge together with no
   idle TTL and 4 parallel predictions (`--check` only reports; other loaded models are left alone). Without
   it, a TTL unload or a JIT load of one model while the other is serving shows up as "Model unloaded" (HTTP

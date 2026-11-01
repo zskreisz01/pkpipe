@@ -44,9 +44,9 @@ Live run against LM Studio with `qwen3.5-9b-mlx` (temperature 0.2) as the model 
 
 ```bash
 uv run pkpipe eval --suite triage                 # live model, one suite
-uv run pkpipe eval --suite all --workers 4         # every suite except production
+uv run pkpipe eval --suite all --concurrency 4     # every suite except production, 4 requests in flight
 uv run pkpipe eval --suite triage --cassette replay  # recorded responses only: no network, no model (CI)
-uv run pkpipe eval --suite all --cassette record --workers 4  # call the model and rewrite the cassettes
+uv run pkpipe eval --suite all --cassette record --concurrency 4  # call the model and rewrite the cassettes
 uv run pkpipe eval --suite production --db ~/.local/share/pkpipe/pkpipe.db --vault ~/Vault
 ```
 
@@ -54,7 +54,7 @@ uv run pkpipe eval --suite production --db ~/.local/share/pkpipe/pkpipe.db --vau
 | --- | --- |
 | `--suite` | `all` (default), one suite or a comma list: `deterministic`, `triage`, `sessions`, `calibration`, `improvement`, `flows`, `security`, `production` |
 | `--cassette` | `off` (live model, default), `replay` (only recordings; a missing recording is an error), `record` (call the model, rewrite and prune the cassette), `auto` (replay, record what is missing) |
-| `--workers N` | Cases in parallel (LM Studio serves several requests at once) |
+| `--concurrency N` | Eval cases in flight at once (model and judge requests; `--workers` is the older spelling). Default `evals.concurrency` in `evals.json`, which defaults to 1. Reports, case order, metrics and recorded cassettes are the same for every N; see [Concurrency](#concurrency) |
 | `--limit N` | First N cases per dataset (smoke run) |
 | `--pack`, `--overlay` | Config layers; `<overlay>/evals/` adds or replaces datasets per path |
 | `--evals-dir`, `--cassette-dir` | Public evals directory (default `evals/` or `PKPIPE_EVALS_DIR`), cassette directory |
@@ -65,6 +65,21 @@ uv run pkpipe eval --suite production --db ~/.local/share/pkpipe/pkpipe.db --vau
 The command prints a Markdown report (metrics, gate table, per-category F1, confusion matrix, failed cases) and writes it as `eval-<time>-<run>.md` and `.json`. Exit code 0 means every requested suite passed its gate; 1 means a red gate, a skipped suite (no dataset, no judge) or an error; 2 is a usage error.
 
 Every run is traced: an `eval run` span, one `eval <suite>` span per suite and one `eval.case <id>` span per case, all with `eval.run_id`, `eval.suite` and `config.version`; each evaluated session is a `step <node>` span with `flow.id`, `step.id`, `bpmn.element`, `config.version` and `run.trigger` = `eval`, and the model call below it is an ordinary LLM span (content capture off). Filter on `eval.run_id` in Phoenix or Langfuse to see one run.
+
+## Concurrency
+
+`pkpipe eval --concurrency N` (or `evals.concurrency` in `evals.json`) keeps up to N eval cases in flight: each case's model call and judge call run in a worker thread, and the pairwise A/B comparison of the publish gate runs N cases at once too. Results are collected in dataset order, so the report, the case list, every metric and a recorded cassette (sorted by request key) are the same for every N; cassettes are thread-safe. Production runs default to 1, so a scheduled or UI-triggered eval never competes with pipeline runs for the model; live tests use 4 (`tests.support.live.LIVE_EVAL_CONCURRENCY`).
+
+N > 1 only helps when the model server runs predictions in parallel. In LM Studio this is the per-model "parallel" setting; `scripts/lmstudio-test-setup.sh` loads the model under test and the judge together with `--parallel 4` and no idle TTL, so neither is unloaded while the other serves (the "Model unloaded" HTTP 400 seen when LM Studio swaps models under load). `--check` only reports; other loaded models are never touched. Model reasoning stays on.
+
+Measured 2026-11-01 on the reference machine (Apple silicon, LM Studio MLX, qwen3.5-9b-mlx with reasoning on, `parallel` 4), `pkpipe eval --suite triage --limit 16` (wall time including CLI start; same metrics in every run: accuracy 1.0, macro F1 1.0, schema 1.0):
+
+| `--concurrency` | 1 | 2 | 4 | 8 |
+| --- | --- | --- | --- | --- |
+| Wall time | 83 s | 68 s | 62 s | 62 s |
+| Cases per minute | 11.6 | 14.1 | 15.5 | 15.5 |
+
+Parallel predictions raise throughput by about a third on this machine, not by N: the GPU is already busy with one long reasoning answer, so 4 is the useful maximum. The larger saving in the live tests comes from not sending the same request twice (`tests/README.md`).
 
 ## Datasets
 

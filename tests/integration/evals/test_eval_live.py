@@ -2,7 +2,7 @@
 model (a different model, FR-002), checking the configured gates.
 
 Requests go out ``LIVE_EVAL_CONCURRENCY`` (4) at a time; the sessions + security test and the publish-gate
-test share identical requests through ``live_eval_cassettes`` (conftest.py)."""
+test share identical requests through ``live_eval_cassettes`` (tests/conftest.py)."""
 
 from __future__ import annotations
 
@@ -92,7 +92,7 @@ def test_publish_gate_live_on_a_changed_session_instruction(
     the pairwise A/B comparison against the published instruction with the real models. The changed
     instruction's outputs and every pairwise judgement are live; requests identical to the sessions +
     security test above (unchanged sessions, security, the published instruction's outputs) reuse its live
-    answers (conftest.py)."""
+    answers (tests/conftest.py)."""
     (overlay_dir / "instructions/other").mkdir(parents=True)
     original = (pack_dir / "instructions/other/summarize.md").read_text(encoding="utf-8")
     (overlay_dir / "instructions/other/summarize.md").write_text(

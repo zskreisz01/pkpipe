@@ -105,6 +105,20 @@ def synthetic_vault(tmp_path: Path) -> Path:
     return vault
 
 
+@pytest.fixture(scope="session")
+def live_eval_cassettes(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """One cassette directory per pytest session for live eval tests in ``auto`` mode (tests/README.md).
+
+    Several live tests send identical requests: the publish-gate tests change one instruction, yet the
+    security suite's secure-fetch Reader pages, the classifier texts, the unchanged sessions and the "before"
+    side of a pairwise comparison are exactly what the sessions + security test sends with the pack config.
+    The first test that sends a request gets the live answer and records it here; a later test with the
+    identical request (same prompt, schema and profile) gets that live answer back. Every changed request
+    still reaches the real model, and a test run on its own (``-k``) records everything itself.
+    """
+    return tmp_path_factory.mktemp("live-eval-cassettes")
+
+
 @pytest.fixture
 def lmstudio() -> dict[str, str]:
     """Base URL and model name of the live local model server; use together with @pytest.mark.live."""
