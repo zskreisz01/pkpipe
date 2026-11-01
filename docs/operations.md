@@ -32,6 +32,12 @@ The app DB is one SQLite file: `$PKPIPE_DB`, else `$PKPIPE_DATA_DIR/pkpipe.db`, 
 
 A resumed run uses the config version it started with, even if a newer one was published. See [Flows](flows.md) for the flow format.
 
+## Learning gateway and Open Notebook
+
+`uv run python -m pkpipe.learning.server` serves `learning:create|status|link|audio` on `127.0.0.1:8703` (loopback only, launchd/systemd like the vault server). Jobs live in `$PKPIPE_DATA_DIR/learning/jobs.db` and survive a restart; downloaded podcasts are in `.../learning/audio`. A failed job keeps its reason (`select job_id, item_id, status, json_extract(data, '$.reason') from notebook_jobs`). Items whose service was down stay `released` and are retried by the next 06:00 run; a URL the gateway refuses (deny list, a host that resolves to a private address) quarantines the item like the first URL check; failed or timed-out generations are listed as `failed` in the processing list.
+
+The default backend is Open Notebook with Speaches (Kokoro voice): `cd deploy/open-notebook && cp .env.example .env`, fill the three values, `docker compose up -d`, then `uv run python -m pkpipe.learning.open_notebook_setup` (idempotent; downloads the voice model once, registers LM Studio and Speaches, creates the `pkpipe_overview` / `pkpipe_duo` profiles). Images are pinned by digest; update tag and digest together. A 3 segment overview takes about 10 minutes on a CPU with a 12B model (outline and transcript are written by `google/gemma-4-12b`, not Qwen3.5, whose reasoning breaks the JSON). Live tests: `PKPIPE_REQUIRE_LIVE=1 uv run pytest tests/integration/learning/test_open_notebook_live.py` (starts the stack when it is down and stops it afterwards; notebook, link, Kokoro speech, failure and filter checks take seconds). The full generation of a short podcast is opt-in with `PKPIPE_LIVE_AUDIO=1` because a thinking model writing the transcript takes 10 to 40 minutes on CPU.
+
 ## Evals
 
 `pkpipe eval --suite <suite|all>` runs the eval suites and exits 1 when a gate is red ([Evaluation](evaluation.md)). Reports (JSON + Markdown) go to `$PKPIPE_DATA_DIR/evals`; every eval span carries `eval.run_id`. CI replays recorded model responses (`--cassette replay`); after a prompt, instruction or model change, re-record them against the real model with `--cassette record --workers 4` and commit the changed `evals/cassettes/*.json`. The weekly health check is `pkpipe eval --suite production --db <app DB> --vault <vault>`: it alerts on failed runs, override, quarantine and learning-failure rates above the gates in `evals.json`.
@@ -87,7 +93,8 @@ Metric names: `pkpipe.items_total{category}`, `pkpipe.backlog_size`, `pkpipe.fla
 `pkpipe.learning_timeouts_total`, `pkpipe.learning_generation_seconds`, `pkpipe.step_errors_total{step.id,error.type}`,
 `pkpipe.tokens_per_second{llm.model_name}`, `pkpipe.telemetry_export_failures_total`
 (recorders: `Metrics.item_processed`, `set_backlog`, `flag`, `learning_timeout`, `learning_generation`, `step_error`,
-`generation`).
+`generation`). The two learning metrics are recorded by the learning gateway process, which reads the same `OTEL_*`
+variables as the app.
 
 ### Where traces are stored
 

@@ -13,3 +13,7 @@ node_modules/
 website/build/
 website/.docusaurus/
 pkpipe-docs-specs.tgz
+
+# Open Notebook stack (spec 012)
+deploy/open-notebook/.env
+deploy/open-notebook/data/

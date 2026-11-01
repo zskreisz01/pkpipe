@@ -9,7 +9,7 @@ An MCP server that hides the learning backend (Open Notebook with local TTS by d
 ## Technical Context
 
 **Language/Version**: Python 3.12+ (`uv`)
-**Primary Dependencies**: Open Notebook REST (`/api/notebooks`, `/api/sources`, `/api/podcasts/generate`, `/api/podcasts/jobs/{id}`), Speaches or Kokoro-FastAPI TTS, notebooklm-mcp for the browser backend.
+**Primary Dependencies**: httpx, FastMCP; Open Notebook REST (`/api/notebooks`, `/api/sources`, `/api/podcasts/generate`, `/api/podcasts/jobs/{id}`), Speaches or Kokoro-FastAPI TTS, notebooklm-mcp for the browser backend.
 **Testing**: pytest with port fakes, eval suite
 **Target**: single machine, local model server
 
@@ -32,7 +32,7 @@ An MCP server that hides the learning backend (Open Notebook with local TTS by d
 
 ## Project Structure
 
-`mcp_servers/learning_gateway/{server.py,backends/{open_notebook.py,notebooklm_browser.py,fake.py}}`, `packs/learning-inbox/flows/learning_material.json`.
+`src/pkpipe/learning/` (`gateway.py` service, `backend.py` interface, `backends/{open_notebook,notebooklm_browser,fake}.py`, `store.py`, `urlcheck.py`, `config.py`, `server.py`, `open_notebook_setup.py`), `src/pkpipe/domain/urlfilter.py` (pure URL rules, also used by the flow), `src/pkpipe/steps/learning_code.py` (`learning.prepare`), `mcp_servers/learning_gateway/server.py` (entry point), `packs/learning-inbox/flows/learning_material.json`, `deploy/open-notebook/` (compose, `.env.example`, README).
 
 ## Complexity Tracking
 

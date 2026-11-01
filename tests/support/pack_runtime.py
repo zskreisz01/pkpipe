@@ -17,26 +17,32 @@ PROCESSING_LIST = "0-INBOX/Manual-Resource-Processing-List.md"
 
 
 class FakeLearning:
-    """learning:create/status/link: each notebook reports 'running' ``polls_until_ready`` times."""
+    """``learning:*`` tools: the real gateway (URL filter, job store, timeout) over the fake backend.
+    Each notebook reports 'generating' ``polls_until_ready`` times before it is ready."""
 
-    def __init__(self, polls_until_ready: int = 2, fail: set[str] | None = None):
-        self.polls_until_ready = polls_until_ready
-        self.fail = fail or set()
-        self.polls: dict[str, int] = {}
-        self.created: list[str] = []
+    def __init__(self, polls_until_ready: int = 2, fail: set[str] | None = None, workdir: Path | None = None):
+        import tempfile
 
-    def create(self, resource: str, item_id: str) -> dict[str, Any]:
-        self.created.append(item_id)
-        return {"nb_id": f"nb-{item_id}"}
+        from pkpipe.learning import LearningGateway
+        from pkpipe.learning.backends import FakeBackend
+        from pkpipe.learning.gateway import GatewayConfig
+        from pkpipe.learning.store import JobStore
 
-    def status(self, nb_id: str) -> dict[str, Any]:
-        self.polls[nb_id] = self.polls.get(nb_id, 0) + 1
-        if nb_id.removeprefix("nb-") in self.fail:
-            return {"status": "failed"}
-        return {"status": "ready" if self.polls[nb_id] > self.polls_until_ready else "running"}
+        self.backend = FakeBackend(ready_after=polls_until_ready + 1, fail=fail or set())
+        audio = (workdir or Path(tempfile.mkdtemp(prefix="pkpipe-test-learning-"))) / "audio"
+        self.gateway = LearningGateway(
+            self.backend, JobStore(":memory:"), GatewayConfig(audio_dir=audio), resolver=lambda host: []
+        )
+        self.create, self.status = self.gateway.create, self.gateway.status
+        self.link, self.audio = self.gateway.link, self.gateway.audio
 
-    def link(self, nb_id: str) -> dict[str, Any]:
-        return {"url": f"https://example.invalid/notebook/{nb_id}"}
+    @property
+    def created(self) -> list[str]:
+        return [c["item_id"] for c in self.backend.created]
+
+    @property
+    def polls(self) -> dict[str, int]:
+        return {k.replace("job-", "nb-", 1): v for k, v in self.backend.polls.items()}
 
 
 def vault_tools(vault_dir: Path, learning: FakeLearning | None = None) -> FakeTools:
@@ -58,6 +64,7 @@ def vault_tools(vault_dir: Path, learning: FakeLearning | None = None) -> FakeTo
             "learning:create": learning.create,
             "learning:status": learning.status,
             "learning:link": learning.link,
+            "learning:audio": learning.audio,
         }
     )
 

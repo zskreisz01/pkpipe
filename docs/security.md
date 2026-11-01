@@ -12,7 +12,7 @@ All external content is untrusted data and never reaches a session that has tool
 | --- | --- | --- | --- |
 | Reader | The fetched, sanitized page | None | JSON only: extract, facts, `injection_suspected`, `evidence` |
 | Research agent | Only the Reader's validated JSON | `websearch:search`, `webfetch:fetch` | Research notes (JSON) |
-| Notebook agent | Only the URL and a prompt template | `learning:create`, `status`, `link` | `nb_id`, status, link |
+| Notebook agent (the `learning_material` flow, no model involved) | Only the URL and a prompt template; the gateway filters the URL (http(s), no private networks, deny list) before the backend fetches it | `learning:create`, `status`, `link`, `audio` | `nb_id`, status, link, audio path |
 | Synthesizer | The research output | None | Markdown note (JSON) |
 
 "Without tools" refers to the LLM session, not to the step. The inputs of a tool-less session are loaded by deterministic code through a port (vault, fetch, state) and passed in as datamarked text; the model cannot ask for more, read other files or write anywhere. This is how the triage session reads INBOX items and the improvement extraction reads the journal.

@@ -1,0 +1,55 @@
+{
+  "id": "learning-backend-down",
+  "source": "synthetic",
+  "description": "Learning branch: the learning service is down; the item fails with a reason and stays released, so the next run retries it.",
+  "input": {
+    "vault": {
+      "0-INBOX/talk.md": "---\nsource: https://example.invalid/talk\n---\nA recorded conference talk worth a notebook.\n"
+    },
+    "model": [
+      {
+        "when": "conference talk",
+        "reply": {
+          "category": "learning-material",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "learning": {
+      "down": true
+    },
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/talk.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/talk.md": {
+        "state": "released"
+      }
+    },
+    "processing": {
+      "0-INBOX/talk.md": null
+    }
+  }
+}

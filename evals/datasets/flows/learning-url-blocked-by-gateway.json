@@ -1,0 +1,62 @@
+{
+  "id": "learning-url-blocked-by-gateway",
+  "source": "synthetic",
+  "description": "Learning branch: the note's URL looks public, but the gateway resolves the host to a private address (DNS) and refuses it; the item is quarantined, not retried, and no notebook is created.",
+  "input": {
+    "vault": {
+      "0-INBOX/talk.md": "---\nsource: https://intranet.example.test/talk\n---\nA recorded conference talk worth a notebook.\n"
+    },
+    "model": [
+      {
+        "when": "conference talk",
+        "reply": {
+          "category": "learning-material",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "learning": {
+      "resolve": {
+        "intranet.example.test": [
+          "10.0.0.7"
+        ]
+      }
+    },
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/talk.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/talk.md": {
+        "state": "quarantined"
+      }
+    },
+    "processing": {
+      "0-INBOX/talk.md": null
+    },
+    "notify_contains": [
+      "quarantined 1"
+    ]
+  }
+}

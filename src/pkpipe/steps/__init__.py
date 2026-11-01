@@ -37,6 +37,7 @@ BUILTIN_MODULES = (
     "pkpipe.steps.triage_code",
     "pkpipe.steps.improvement_code",
     "pkpipe.steps.secure_fetch",
+    "pkpipe.steps.learning_code",
 )
 
 for _module in BUILTIN_MODULES:

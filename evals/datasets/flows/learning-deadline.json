@@ -1,0 +1,55 @@
+{
+  "id": "learning-deadline",
+  "source": "synthetic",
+  "description": "Learning branch: the gateway timeout is far away, so the flow's own wait deadline ends the wait and the item takes the failed path.",
+  "input": {
+    "vault": {
+      "0-INBOX/talk.md": "---\nsource: https://example.invalid/talk\n---\nA recorded conference talk worth a notebook.\n"
+    },
+    "model": [
+      {
+        "when": "conference talk",
+        "reply": {
+          "category": "learning-material",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "learning": {
+      "never": [
+        "0-INBOX/talk.md"
+      ],
+      "timeout_s": 1000000
+    },
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/talk.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "processing": {
+      "0-INBOX/talk.md": {
+        "status": "failed"
+      }
+    }
+  }
+}

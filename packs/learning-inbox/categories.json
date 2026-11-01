@@ -13,7 +13,8 @@
         "tools": [
           "learning:create",
           "learning:status",
-          "learning:link"
+          "learning:link",
+          "learning:audio"
         ]
       }
     ]

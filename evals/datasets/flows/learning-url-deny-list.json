@@ -1,0 +1,60 @@
+{
+  "id": "learning-url-deny-list",
+  "source": "synthetic",
+  "description": "Learning branch: the URL's host is on the gateway's deny list; the item is quarantined and no notebook is created.",
+  "input": {
+    "vault": {
+      "0-INBOX/talk.md": "---\nsource: https://video.blocked.example.test/talk\n---\nA recorded conference talk worth a notebook.\n"
+    },
+    "model": [
+      {
+        "when": "conference talk",
+        "reply": {
+          "category": "learning-material",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "learning": {
+      "deny": [
+        "blocked.example.test"
+      ]
+    },
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/talk.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/talk.md": {
+        "state": "quarantined"
+      }
+    },
+    "processing": {
+      "0-INBOX/talk.md": null
+    },
+    "notify_contains": [
+      "quarantined 1"
+    ]
+  }
+}

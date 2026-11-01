@@ -37,8 +37,12 @@
     "allow": [
       "create",
       "status",
-      "link"
+      "link",
+      "audio"
     ],
-    "egress": true
+    "egress": true,
+    "options": {
+      "timeout_s": 5400
+    }
   }
 }

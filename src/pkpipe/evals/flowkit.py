@@ -8,6 +8,7 @@ decisions, and the expected end state; nothing here talks to a network or a mode
 from __future__ import annotations
 
 import re
+import tempfile
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -29,29 +30,61 @@ def expand_ids(text: str) -> str:
 
 
 class ScriptedLearning:
-    """``learning:create/status/link``. Per resource: ready after ``ready_after`` polls (default 1),
-    ``fail`` -> status failed, ``never`` -> stays running (the wait hits its deadline)."""
+    """The real learning gateway (spec 012: URL filter, job store, timeout, failure reasons) over the fake
+    backend. Per resource: ready after ``ready_after`` polls (default 1), ``fail`` -> the generation fails,
+    ``never`` -> stays generating (the gateway timeout or the wait deadline ends it), ``down`` -> the
+    service is unreachable, ``timeout_s`` -> gateway timeout (default: the pack's 90 minutes),
+    ``deny`` -> the gateway's deny list, ``resolve`` -> synthetic DNS (host -> addresses; unknown hosts do
+    not resolve)."""
 
-    def __init__(self, ready_after: int = 1, fail: list[str] | None = None, never: list[str] | None = None):
-        self.ready_after = ready_after
-        self.fail = {item_id_for(r) for r in fail or []}
-        self.never = {item_id_for(r) for r in never or []}
-        self.polls: dict[str, int] = {}
+    def __init__(
+        self,
+        ready_after: int = 1,
+        fail: list[str] | None = None,
+        never: list[str] | None = None,
+        down: bool = False,
+        timeout_s: float | None = None,
+        deny: list[str] | None = None,
+        resolve: dict[str, list[str]] | None = None,
+        *,
+        clock: Callable[[], float] | None = None,
+        workdir: Path | None = None,
+    ):
+        from pkpipe.learning import LearningGateway
+        from pkpipe.learning.backends import FakeBackend
+        from pkpipe.learning.gateway import DEFAULT_TIMEOUT_S, GatewayConfig
+        from pkpipe.learning.store import JobStore
 
-    def create(self, resource: str, item_id: str) -> dict[str, Any]:
-        return {"nb_id": f"nb-{item_id}"}
+        self.backend = FakeBackend(
+            ready_after=ready_after,
+            fail={item_id_for(r) for r in fail or []},
+            never={item_id_for(r) for r in never or []},
+            down=down,
+        )
+        config = GatewayConfig(
+            timeout_s=timeout_s or DEFAULT_TIMEOUT_S,
+            deny=[d.lower() for d in deny or []],
+            audio_dir=(workdir or Path(tempfile.mkdtemp(prefix="pkpipe-eval-learning-"))) / "audio",
+        )
+        self.gateway = LearningGateway(
+            self.backend,
+            JobStore(":memory:"),
+            config,
+            resolver=lambda host: list((resolve or {}).get(host, [])),  # no real DNS lookups in an eval
+            **({"clock": clock} if clock else {}),
+        )
 
-    def status(self, nb_id: str) -> dict[str, Any]:
-        item = nb_id.removeprefix("nb-")
-        self.polls[item] = self.polls.get(item, 0) + 1
-        if item in self.fail:
-            return {"status": "failed"}
-        if item in self.never or self.polls[item] < self.ready_after:
-            return {"status": "running"}
-        return {"status": "ready"}
+    def create(self, url: str, template: str, item_id: str = "") -> dict[str, Any]:
+        return self.gateway.create(url, template, item_id)
+
+    def status(self, job_id: str) -> dict[str, Any]:
+        return self.gateway.status(job_id)
 
     def link(self, nb_id: str) -> dict[str, Any]:
-        return {"url": f"https://notebook.example.invalid/{nb_id}"}
+        return self.gateway.link(nb_id)
+
+    def audio(self, job_id: str) -> dict[str, Any]:
+        return self.gateway.audio(job_id)
 
 
 class VaultTools:
@@ -76,6 +109,7 @@ class VaultTools:
             "learning:create": learning.create,
             "learning:status": learning.status,
             "learning:link": learning.link,
+            "learning:audio": learning.audio,
         }
 
     def list_tools(self, allow: list[str]) -> list[str]:
