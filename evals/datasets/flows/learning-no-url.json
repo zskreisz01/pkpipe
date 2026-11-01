@@ -1,0 +1,53 @@
+{
+  "id": "learning-no-url",
+  "source": "synthetic",
+  "description": "Learning branch: the note has no source URL; the item takes the failed path without calling the backend.",
+  "input": {
+    "vault": {
+      "0-INBOX/talk.md": "A recorded conference talk worth a notebook, but nobody saved its link.\n"
+    },
+    "model": [
+      {
+        "when": "conference talk",
+        "reply": {
+          "category": "learning-material",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "learning": {
+      "ready_after": 1
+    },
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/talk.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "processing": {
+      "0-INBOX/talk.md": {
+        "status": "failed",
+        "category": "learning-material"
+      }
+    }
+  }
+}

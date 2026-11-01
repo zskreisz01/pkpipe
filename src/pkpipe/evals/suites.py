@@ -595,11 +595,15 @@ class FlowsSuite(Suite):
                 (vault / rel).parent.mkdir(parents=True, exist_ok=True)
                 (vault / rel).write_text(text, encoding="utf-8")
             notify = flowkit.CollectingNotify()
+            clock = flowkit.VirtualClock()
+            learning = flowkit.ScriptedLearning(
+                **(inp.get("learning") or {}), clock=clock.now, workdir=Path(tmp)
+            )
             ports = StepPorts(
-                clock=flowkit.VirtualClock(),
+                clock=clock,
                 tracer=OtelTracer(),
                 model=flowkit.ScriptedModel(inp.get("model", [])),
-                tools=flowkit.VaultTools(vault, flowkit.ScriptedLearning(**(inp.get("learning") or {}))),
+                tools=flowkit.VaultTools(vault, learning),
                 notify=notify,
             )
             service = RunService(

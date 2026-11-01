@@ -1,9 +1,55 @@
 {
   "id": "learning_material",
-  "description": "Create a notebook from the URL only, wait for the generation result (poll + deadline), link it. Spec 012 adds the URL check and output guard.",
+  "description": "URL check, then a notebook from the URL and the prompt template only, wait for the generation result (poll + deadline above the gateway timeout), fetch audio and link, update the list. Output guard of derived text: spec 009.",
   "bpmn": "process-learning-material",
-  "start": "create",
+  "start": "read",
   "nodes": [
+    {
+      "id": "read",
+      "type": "tool",
+      "bpmn_element": "URL check",
+      "config": {
+        "tool": "obsidian:read_note",
+        "arguments": {
+          "path": "${item.path}"
+        }
+      }
+    },
+    {
+      "id": "prepare",
+      "type": "code",
+      "bpmn_element": "URL check",
+      "config": {
+        "function": "learning.prepare",
+        "args": {
+          "note": "${read}",
+          "instruction": "learning-material/notebook.md"
+        }
+      }
+    },
+    {
+      "id": "quarantine",
+      "type": "code",
+      "bpmn_element": "Handle security flag",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "state": "quarantined"
+        }
+      }
+    },
+    {
+      "id": "no_url",
+      "type": "code",
+      "bpmn_element": "Update list: status failed",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "processing_status": "failed",
+          "failure_reason": "no source URL in the note"
+        }
+      }
+    },
     {
       "id": "create",
       "type": "tool",
@@ -11,7 +57,8 @@
       "config": {
         "tool": "learning:create",
         "arguments": {
-          "resource": "${item.resource}",
+          "url": "${prepare.url}",
+          "template": "${prepare.template}",
           "item_id": "${item.id}"
         }
       }
@@ -23,7 +70,7 @@
       "config": {
         "tool": "learning:status",
         "arguments": {
-          "nb_id": "${create.nb_id}"
+          "job_id": "${create.job_id}"
         },
         "until": {
           "path": "result.status",
@@ -33,7 +80,7 @@
           ]
         },
         "poll_s": 60,
-        "deadline_s": 7200
+        "deadline_s": 6000
       }
     },
     {
@@ -48,6 +95,17 @@
       }
     },
     {
+      "id": "audio",
+      "type": "tool",
+      "bpmn_element": "Get audio + link",
+      "config": {
+        "tool": "learning:audio",
+        "arguments": {
+          "job_id": "${create.job_id}"
+        }
+      }
+    },
+    {
       "id": "ready",
       "type": "code",
       "bpmn_element": "Update list: status ready",
@@ -56,6 +114,7 @@
         "args": {
           "nb_id": "${create.nb_id}",
           "link": "${link.url}",
+          "audio_path": "${audio.audio_path}",
           "processing_status": "ready"
         }
       }
@@ -68,12 +127,65 @@
         "function": "item.set",
         "args": {
           "nb_id": "${create.nb_id}",
-          "processing_status": "failed"
+          "processing_status": "failed",
+          "failure_reason": "${wait_generation.reason}"
+        }
+      }
+    },
+    {
+      "id": "timeout",
+      "type": "code",
+      "bpmn_element": "Update list: status failed",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "nb_id": "${create.nb_id}",
+          "processing_status": "failed",
+          "failure_reason": "no result before the wait deadline"
+        }
+      }
+    },
+    {
+      "id": "audio_failed",
+      "type": "code",
+      "bpmn_element": "Update list: status failed",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "nb_id": "${create.nb_id}",
+          "link": "${link.url}",
+          "processing_status": "failed",
+          "failure_reason": "audio could not be fetched"
         }
       }
     }
   ],
   "edges": [
+    {
+      "from": "read",
+      "to": "prepare"
+    },
+    {
+      "from": "prepare",
+      "to": "quarantine",
+      "when": {
+        "path": "prepare.status",
+        "eq": "blocked"
+      }
+    },
+    {
+      "from": "prepare",
+      "to": "no_url",
+      "when": {
+        "path": "prepare.status",
+        "eq": "no_url"
+      }
+    },
+    {
+      "from": "prepare",
+      "to": "create",
+      "default": true
+    },
     {
       "from": "create",
       "to": "wait_generation"
@@ -93,12 +205,21 @@
     },
     {
       "from": "wait_generation",
-      "to": "failed",
+      "to": "timeout",
       "on": "error"
     },
     {
       "from": "link",
+      "to": "audio"
+    },
+    {
+      "from": "audio",
       "to": "ready"
+    },
+    {
+      "from": "audio",
+      "to": "audio_failed",
+      "on": "error"
     }
   ]
 }

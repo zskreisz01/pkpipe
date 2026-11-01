@@ -32,7 +32,11 @@
     "allow": [
       "create",
       "status",
-      "link"
-    ]
+      "link",
+      "audio"
+    ],
+    "options": {
+      "timeout_s": 5400
+    }
   }
 }
