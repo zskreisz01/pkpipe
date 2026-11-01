@@ -272,8 +272,8 @@ def test_core_defaults_are_the_first_layer_and_the_pack_overrides_them(tmp_path,
         pack,
         "security.json",
         {
-            "prompt_guard": {"model": "pg", "threshold": 0.5, "chunk_tokens": 512},
-            "output_guard": {"model": "og", "block_on": ["Unsafe"]},
+            "classifier": {"backend": "qwen3guard", "threshold": 0.5},
+            "output_guard": {"block_on": ["Unsafe"]},
             "url_filter": {"max_bytes": 1000},
         },
     )

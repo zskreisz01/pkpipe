@@ -96,10 +96,10 @@ flowchart LR
 - **What:** decide whether quarantined items are real attacks or false positives.
 - **When:** after the daily summary, if it reports quarantined items.
 - **How:**
-  1. Open `0-INBOX/_quarantine/`. Each file holds the content in inert form (inside a code block) with `security_flag` front matter: flag, detector, score, evidence.
+  1. Open `0-INBOX/_quarantine/`. Each file `<item id>.md` holds the original note in inert form (inside a code block) with `security_flag` front matter: flags, detectors, reason codes, run id, time. The row in the triage file says `quarantined`; an item flagged at triage has the suggested category `none`.
   2. Read the evidence. **Do not open the original URL** in a normal browser and do not copy the content into another AI tool.
-  3. **Real attack:** leave it. The URL is already in `security/malicious_urls.jsonl` and the domain is on the deny-list. Delete the quarantine file whenever you like.
-  4. **False positive:** release it in the UI or with `release_quarantine(id)`. The item goes back to triage and the case is added to the security eval dataset so the detector can be tuned. If the domain is trustworthy, also remove it from the deny-list in the security settings.
+  3. **Real attack:** leave it. The URL is already in `security/malicious_urls.jsonl` of the overlay and the domain is on the overlay's deny-list (`# pkpipe: flagged N` counts repeats). Delete the quarantine file whenever you like.
+  4. **False positive:** release it on the UI triage page ("Release from quarantine") or with the app MCP tool `release_quarantine(item_id)` (owner token). The note goes back to its INBOX path unchanged, the row becomes `pending` (an item flagged at triage gets a new suggestion at 20:00) and its text is written to `<overlay>/evals/candidates/security.jsonl` as a benign case; review the candidates and move them into `evals/datasets/security.jsonl` so the next eval measures the false positive. The deny-list entry is not removed automatically: if the domain is trustworthy, delete its line from `security/deny_list.txt` in the overlay. A release is refused while a new note occupies the original path.
 
 ### React to a security alert
 

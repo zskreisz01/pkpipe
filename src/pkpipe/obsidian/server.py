@@ -90,6 +90,18 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         fields (evidence, verdict, reason, next_experiment, proposal) may change. All-or-nothing."""
         return _run(vault.update_improvements, rows)
 
+    @mcp.tool
+    def quarantine_note(
+        item_id: str,
+        path: str | None = None,
+        flags: list[dict] | None = None,
+        run_id: str = "",
+        flagged_at: str = "",
+    ) -> dict:
+        """Move a flagged INBOX note to the quarantine folder in inert form (code block, security_flag front
+        matter). The only writer of the quarantine folder; never returns the note text."""
+        return _run(vault.quarantine_note, item_id, path, flags, run_id, flagged_at)
+
     return mcp
 
 

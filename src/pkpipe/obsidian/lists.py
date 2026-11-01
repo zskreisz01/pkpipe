@@ -70,7 +70,8 @@ def _normalise_triage_update(update: dict[str, Any], existing: dict[str, str] | 
     """Merge ``update`` into the file's row and enforce the rules the pipeline may not bypass.
 
     Constitution VI: ``confirm`` and ``override`` are the owner's decisions, made in Obsidian; the pipeline
-    may repeat their current value but never change it, and new rows always start ``suggested``.
+    may repeat their current value but never change it, and new rows start ``suggested`` (or
+    ``quarantined`` when the output guard flagged the item at triage, spec 009).
     Constitution V: state changes follow :data:`pkpipe.domain.triage.TRANSITIONS`, so ``released`` needs a
     confirm tick or an override.
     """
@@ -78,8 +79,9 @@ def _normalise_triage_update(update: dict[str, Any], existing: dict[str, str] | 
     if existing is None:
         if data.get("confirm") or (isinstance(data.get("override"), str) and data["override"].strip()):
             raise ValueError("confirm and override are set by the owner, not by the pipeline")
-        if "state" in data and str(data["state"]).strip().lower() != ItemState.SUGGESTED.value:
-            raise ValueError("new triage rows start in state 'suggested'")
+        new_states = (ItemState.SUGGESTED.value, ItemState.QUARANTINED.value)
+        if "state" in data and str(data["state"]).strip().lower() not in new_states:
+            raise ValueError("new triage rows start in state 'suggested' (or 'quarantined' when flagged)")
         if not data.get("resource"):
             raise ValueError("resource is required for a new row")
         expected = item_id_for(data["resource"])

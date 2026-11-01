@@ -181,7 +181,7 @@ class WaitStep(StepExecutor):
 # -- guard --------------------------------------------------------------------------------------------------
 class GuardCheck(StepConfig):
     detector: str
-    tool: str = Field(description="Scoring tool, e.g. a prompt-guard classifier behind MCP")
+    tool: str = Field(description="Scoring tool, e.g. an injection classifier behind MCP")
     arguments: dict[str, Any] = Field(default_factory=dict)
     score: str = Field(default="score", description="Path of the score in the tool result")
     threshold: float = Field(ge=0.0, le=1.0)

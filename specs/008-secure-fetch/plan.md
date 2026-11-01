@@ -4,12 +4,12 @@
 
 ## Summary
 
-Reusable process that turns a URL into a clean JSON extract: URL filter, Lightpanda fetch with Chromium fallback, sanitizing, Prompt Guard 2 scan, Reader session without tools and a code-made verdict.
+Reusable process that turns a URL into a clean JSON extract: URL filter, Lightpanda fetch with Chromium fallback, sanitizing, local classifier scan (Qwen3Guard + DeBERTa), Reader session without tools and a code-made verdict.
 
 ## Technical Context
 
 **Language/Version**: Python 3.12+ (`uv`)
-**Primary Dependencies**: Lightpanda (MCP), Playwright, transformers (Prompt Guard 2), selectolax/BeautifulSoup for sanitizing.
+**Primary Dependencies**: Lightpanda (MCP), Playwright, transformers (Qwen3Guard-Gen, ProtectAI DeBERTa; extra `guard`), selectolax/BeautifulSoup for sanitizing.
 **Testing**: pytest with port fakes, eval suite
 **Target**: single machine, local model server
 
@@ -34,7 +34,7 @@ Reusable process that turns a URL into a clean JSON extract: URL filter, Lightpa
 
 - Core-grade security code: `src/pkpipe/security/{urlfilter,sanitize,heuristics,canary,verdict}.py`
 - Steps: `src/pkpipe/steps/secure_fetch.py` (`fetch`, `sanitize`, `reader`; code `secure_fetch.url_check|scan|verdict`)
-- Port + adapter: `ClassifierPort` (`pkpipe.ports`), `src/pkpipe/adapters/classifier_promptguard.py` (extra `promptguard`), fake `tests/fakes/classifier.py`
+- Port + adapter: `ClassifierPort` (`pkpipe.ports`), `src/pkpipe/adapters/classifier_{qwen3guard,deberta,combined}.py` + factory `classifiers.py` (extra `guard`, decision 0001), fake `tests/fakes/classifier.py`
 - web-fetch MCP server: `src/pkpipe/webfetch/{proxy,browsers,service,server}.py`, `mcp_servers/web_fetch/server.py`, `deploy/launchd/io.pkpipe.web-fetch.plist.example`
 - Pack: `flows/secure_fetch.json`, `prompts/system/reader.md`, `instructions/secure_fetch/read.md`, `schemas/reader_extract.json`, `security/deny_list.txt`
 - Evals: `evals/datasets/secure_fetch.jsonl` (security suite), `evals/datasets/sessions/secure_fetch/read.jsonl`, `evals/rubrics/reader_extract.md`

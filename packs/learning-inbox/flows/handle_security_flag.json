@@ -1,0 +1,151 @@
+{
+  "id": "handle_security_flag",
+  "description": "Called per flagged item (output guard, secure-fetch verdict, URL filter): log the malicious URL to security/malicious_urls.jsonl, deny-list its domain (once, counter on repeats), move the note to the quarantine folder in inert form, set the item quarantined and alert. The item ends here; the other items of the run continue. Releasing a false positive is the owner's decision (UI, app MCP).",
+  "bpmn": "handle-security-flag",
+  "nodes": [
+    {
+      "id": "read",
+      "type": "tool",
+      "bpmn_element": "Log malicious URL",
+      "config": {
+        "tool": "obsidian:read_note",
+        "arguments": {
+          "path": "${item.path}"
+        }
+      }
+    },
+    {
+      "id": "record",
+      "type": "code",
+      "bpmn_element": "Log malicious URL",
+      "config": {
+        "function": "security.record_flag",
+        "args": {
+          "read": "read"
+        }
+      }
+    },
+    {
+      "id": "quarantine",
+      "type": "tool",
+      "bpmn_element": "Move content to quarantine (inert form)",
+      "config": {
+        "tool": "obsidian:quarantine_note",
+        "arguments": {
+          "item_id": "${item.id}",
+          "path": "${item.path}",
+          "flags": "${item.security_flags}",
+          "run_id": "${run.run_id}",
+          "flagged_at": "${record.flagged_at}"
+        }
+      }
+    },
+    {
+      "id": "quarantine_url",
+      "type": "tool",
+      "bpmn_element": "Move content to quarantine (inert form)",
+      "config": {
+        "tool": "obsidian:quarantine_note",
+        "arguments": {
+          "item_id": "${item.id}",
+          "flags": "${item.security_flags}",
+          "run_id": "${run.run_id}",
+          "flagged_at": "${record.flagged_at}"
+        }
+      }
+    },
+    {
+      "id": "quarantine_done",
+      "type": "code",
+      "bpmn_element": "Move content to quarantine (inert form)",
+      "config": {
+        "function": "security.quarantined",
+        "args": {
+          "note": "quarantine",
+          "url_only": "quarantine_url"
+        }
+      }
+    },
+    {
+      "id": "mark",
+      "type": "code",
+      "bpmn_element": "Set item state quarantined",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "state": "quarantined",
+          "processing_status": "quarantined",
+          "quarantine": "${quarantine_done.path}"
+        }
+      }
+    },
+    {
+      "id": "alert",
+      "type": "notify",
+      "bpmn_element": "Alert + OTel security.flag",
+      "config": {
+        "event": "security_flag",
+        "message": "Security flag on item ${item.id} (${record.flag_text}). Domain: ${record.domain}. The item is quarantined in ${quarantine_done.path}; release it from the triage page if it is a false positive.",
+        "payload": {
+          "item_id": "${item.id}",
+          "detector": "${record.flag_text}",
+          "domain": "${record.domain}",
+          "quarantine": "${quarantine_done.path}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "START",
+      "to": "read",
+      "when": {
+        "path": "item.path",
+        "exists": true
+      }
+    },
+    {
+      "from": "START",
+      "to": "record",
+      "default": true
+    },
+    {
+      "from": "read",
+      "to": "record"
+    },
+    {
+      "from": "read",
+      "to": "record",
+      "on": "error"
+    },
+    {
+      "from": "record",
+      "to": "quarantine",
+      "when": {
+        "path": "item.path",
+        "exists": true
+      }
+    },
+    {
+      "from": "record",
+      "to": "quarantine_url",
+      "default": true
+    },
+    {
+      "from": "quarantine",
+      "to": "quarantine_done"
+    },
+    {
+      "from": "quarantine_url",
+      "to": "quarantine_done"
+    },
+    {
+      "from": "quarantine_done",
+      "to": "mark"
+    },
+    {
+      "from": "mark",
+      "to": "alert"
+    }
+  ]
+}

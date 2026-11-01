@@ -1,14 +1,16 @@
-"""ClassifierPort on Llama Prompt Guard 2 (86M), local and offline (spec 008 FR-004).
+"""ClassifierPort on ProtectAI ``deberta-v3-base-prompt-injection-v2`` (Apache-2.0), local and offline
+(spec 008 FR-004, spec 009 FR-002; decision record ``docs/decisions/0001-injection-classifier.md``).
 
-The text is tokenized once and scanned in chunks of ``chunk_tokens`` (512, the model's window) with a small
-overlap, so an attack split across a chunk border is still seen whole in one chunk. Each chunk's score is
-the softmax probability of the "malicious" label; the result is the maximum over all chunks. Whether that
-is a flag is decided by the verdict code (``security.prompt_guard.threshold``), not here.
+A binary sequence classifier (``SAFE`` / ``INJECTION``) with a 512-token window. The text is tokenized once
+and scanned in chunks of ``chunk_tokens`` with a small overlap, so an attack split across a chunk border is
+still seen whole in one chunk. Each chunk's score is the softmax probability of the ``INJECTION`` label; the
+result is the maximum over all chunks. Whether that is a flag is decided by code
+(``security.classifier.threshold``), not here.
 
-Heavy dependencies (``torch``, ``transformers``) are the optional extra ``pkpipe[promptguard]``; the model is
-gated on Hugging Face, so it is read from a local directory only (``security.prompt_guard.model_dir``,
-``$PKPIPE_PROMPT_GUARD_DIR`` or ``~/tools/prompt-guard-2/<model name>``) and never downloaded at run time.
-Missing model or dependencies raise :class:`ClassifierUnavailable`, and the verdict fails closed.
+Heavy dependencies (``torch``, ``transformers``) are the optional extra ``pkpipe[guard]``. Only the vetted
+safetensors weights are read from a local directory (``local_files_only``, ``use_safetensors``, never
+``trust_remote_code``), never downloaded at run time. Missing model or dependencies raise
+:class:`ClassifierUnavailable`, and the callers fail closed.
 """
 
 from __future__ import annotations
@@ -20,13 +22,13 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Protocol
 
+from pkpipe.adapters.classifier_qwen3guard import chunk_ids
 from pkpipe.adapters.model_openai import resolve_value
 from pkpipe.ports import ClassifierUnavailable
 
-DIR_ENV = "PKPIPE_PROMPT_GUARD_DIR"
-DEFAULT_MODEL = "meta-llama/Llama-Prompt-Guard-2-86M"
-DEFAULT_ROOT = Path("~/tools/prompt-guard-2")
-OVERLAP_TOKENS = 32
+DEFAULT_MODEL = "protectai/deberta-v3-base-prompt-injection-v2"
+DEFAULT_DIR = Path("~/tools/protectai-deberta-pi-v2")
+WINDOW = 512
 
 
 class Backend(Protocol):
@@ -39,32 +41,13 @@ class Backend(Protocol):
     def malicious_index(self) -> int: ...
 
 
-def model_dir(prompt_guard: Mapping[str, Any] | None, environ: Mapping[str, str] | None = None) -> Path:
-    """Where the model is expected: config ``model_dir`` (``env:`` allowed), then the env var, then the
-    default ``~/tools/prompt-guard-2/<last part of the model name>``."""
-    env = os.environ if environ is None else environ
-    cfg = dict(prompt_guard or {})
+def model_dir(classifier: Mapping[str, Any] | None, environ: Mapping[str, str] | None = None) -> Path:
+    """Config ``model_dir`` (``env:NAME|default`` allowed), else ``~/tools/protectai-deberta-pi-v2``."""
+    cfg = dict(classifier or {})
     if cfg.get("model_dir"):
+        env = os.environ if environ is None else environ
         return Path(resolve_value(str(cfg["model_dir"]), env)).expanduser()
-    if env.get(DIR_ENV):
-        return Path(env[DIR_ENV]).expanduser()
-    name = str(cfg.get("model") or DEFAULT_MODEL).rsplit("/", 1)[-1]
-    return (DEFAULT_ROOT / name).expanduser()
-
-
-def chunk_ids(ids: list[int], size: int, overlap: int = OVERLAP_TOKENS) -> list[list[int]]:
-    """Windows of ``size`` tokens that overlap by ``overlap`` (at least one, possibly empty, chunk)."""
-    if size <= 0:
-        raise ValueError("chunk size must be positive")
-    if len(ids) <= size:
-        return [list(ids)]
-    step = max(size - overlap, 1)
-    out = []
-    for start in range(0, len(ids), step):
-        out.append(ids[start : start + size])
-        if start + size >= len(ids):
-            break
-    return out
+    return DEFAULT_DIR.expanduser()
 
 
 def softmax(row: list[float]) -> list[float]:
@@ -75,21 +58,28 @@ def softmax(row: list[float]) -> list[float]:
 
 
 class TransformersBackend:
-    """Loads tokenizer and model from a local directory (``local_files_only``), CPU inference."""
+    """Tokenizer and sequence classifier from a local directory, CPU or MPS inference."""
 
     def __init__(self, directory: Path):
         if not directory.is_dir():
-            raise ClassifierUnavailable(f"Prompt Guard model directory not found: {directory}")
+            raise ClassifierUnavailable(f"injection classifier directory not found: {directory}")
         try:
             import torch
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
         except ImportError as exc:
             raise ClassifierUnavailable(
-                "Prompt Guard needs the optional extra: uv sync --extra promptguard"
+                "the injection classifier needs the optional extra: uv sync --extra guard"
             ) from exc
         self._torch = torch
-        self.tokenizer = AutoTokenizer.from_pretrained(str(directory), local_files_only=True)
-        self.model = AutoModelForSequenceClassification.from_pretrained(str(directory), local_files_only=True)
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                str(directory), local_files_only=True, trust_remote_code=False
+            )
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                str(directory), local_files_only=True, trust_remote_code=False, use_safetensors=True
+            )
+        except (OSError, ValueError) as exc:
+            raise ClassifierUnavailable(f"injection classifier could not be loaded: {exc}") from exc
         self.model.eval()
         self._lock = threading.Lock()
 
@@ -98,7 +88,7 @@ class TransformersBackend:
 
     def malicious_index(self) -> int:
         labels = {str(v).lower(): int(k) for k, v in (self.model.config.id2label or {}).items()}
-        for name in ("malicious", "label_1", "jailbreak", "injection"):
+        for name in ("injection", "malicious", "jailbreak", "label_1"):
             if name in labels:
                 return labels[name]
         return len(labels) - 1 if labels else 1
@@ -106,10 +96,7 @@ class TransformersBackend:
     def logits(self, chunks: list[list[int]]) -> list[list[float]]:
         torch = self._torch
         cls, sep = self.tokenizer.cls_token_id, self.tokenizer.sep_token_id
-        rows = [
-            [x for x in ([cls] if cls is not None else []) + c + ([sep] if sep is not None else [])]
-            for c in chunks
-        ]
+        rows = [([cls] if cls is not None else []) + c + ([sep] if sep is not None else []) for c in chunks]
         width = max(len(r) for r in rows)
         pad = self.tokenizer.pad_token_id or 0
         ids = torch.tensor([r + [pad] * (width - len(r)) for r in rows])
@@ -119,32 +106,32 @@ class TransformersBackend:
         return out.tolist()
 
 
-class PromptGuardClassifier:
+class DebertaInjectionClassifier:
     """ClassifierPort. ``backend`` is built lazily from ``directory`` (tests pass their own backend)."""
 
     def __init__(
         self,
         directory: Path | None = None,
         *,
-        chunk_tokens: int = 512,
+        chunk_tokens: int = WINDOW,
         model: str = DEFAULT_MODEL,
         backend: Backend | None = None,
         batch: int = 8,
     ):
         self.directory = directory
-        self.chunk_tokens = chunk_tokens
+        self.chunk_tokens = min(chunk_tokens, WINDOW)
         self.model = model
         self.batch = batch
         self._backend = backend
         self._lock = threading.Lock()
 
     @classmethod
-    def from_config(cls, security: Mapping[str, Any] | None, environ=None) -> PromptGuardClassifier:
-        pg = dict((security or {}).get("prompt_guard") or {})
+    def from_config(cls, classifier: Mapping[str, Any] | None, environ=None) -> DebertaInjectionClassifier:
+        cfg = dict(classifier or {})
         return cls(
-            model_dir(pg, environ),
-            chunk_tokens=int(pg.get("chunk_tokens", 512)),
-            model=str(pg.get("model") or DEFAULT_MODEL),
+            model_dir(cfg, environ),
+            chunk_tokens=int(cfg.get("chunk_tokens") or WINDOW),
+            model=str(cfg.get("model") or DEFAULT_MODEL),
         )
 
     def available(self) -> bool:
@@ -158,17 +145,18 @@ class PromptGuardClassifier:
         with self._lock:
             if self._backend is None:
                 if self.directory is None:
-                    raise ClassifierUnavailable("no Prompt Guard model directory configured")
+                    raise ClassifierUnavailable("no injection classifier directory configured")
                 self._backend = TransformersBackend(self.directory)
             return self._backend
 
     def scan(self, text: str) -> dict[str, Any]:
         backend = self._load()
-        # room for the special tokens the backend adds around each chunk
+        # room for the two special tokens the backend adds around each chunk
         chunks = chunk_ids(backend.tokenize(text or ""), max(self.chunk_tokens - 2, 1))
         bad = backend.malicious_index()
         scores: list[float] = []
         for i in range(0, len(chunks), self.batch):
             for row in backend.logits(chunks[i : i + self.batch]):
                 scores.append(round(softmax(list(row))[bad], 6))
+        # an injection detector only: no safety label or harm category (the caller's threshold decides)
         return {"model": self.model, "max_score": max(scores), "chunks": len(chunks), "scores": scores}

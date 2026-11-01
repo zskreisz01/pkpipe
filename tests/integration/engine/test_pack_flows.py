@@ -107,9 +107,17 @@ def test_triage_then_process_released_end_to_end(vault, pack_dir):
     assert plist[VIDEO].status.value == "ready" and plist[VIDEO].link.endswith(f"nb-{VIDEO}")
     assert plist[TOOL].obsidian_link == f"3-Resources/Tools/{TOOL}.md"
 
-    summary = notify.sent[-1]
+    summary = [m for m in notify.sent if m.event == "daily_summary"][-1]
     assert summary.message == "Processed 2, quarantined 1, failed 0; 1 item(s) still pending."
-    assert {"detector": "pattern", "action": "flag", "reason_code": "pattern_0"} in tracer.flags
+    # spec 009: the output guard flagged the injected instruction (heuristics) and the item was quarantined:
+    # logged, deny-listed, moved to the quarantine folder in inert form and alerted
+    assert {
+        "detector": "injection_or_jailbreak",
+        "action": "quarantine",
+        "reason_code": "heuristic:override",
+    } in (tracer.flags)
+    assert (vault / "0-INBOX/_quarantine" / f"{EVIL}.md").is_file()
+    assert any(m.event == "security_flag" for m in notify.sent)
 
     # traces: every step span carries flow, item and config version
     steps = [s for s in tracer.of("step") if s.attributes["flow.id"] == "process_released"]

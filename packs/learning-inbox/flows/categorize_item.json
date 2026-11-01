@@ -1,6 +1,6 @@
 {
   "id": "categorize_item",
-  "description": "One INBOX item: read it (code), suggest a category (isolated session, no tools, datamarked input), accept only a configured category (code).",
+  "description": "One INBOX item: read it (code), suggest a category (isolated session, no tools, datamarked input, run canary), check the suggestion with the output guard, accept only a configured category (code). A flagged suggestion is never written: the item goes to handle_security_flag (quarantine).",
   "bpmn": "process-inbox-items",
   "start": "read",
   "nodes": [
@@ -36,7 +36,26 @@
       "config": {
         "system": "triage",
         "instruction": "triage/categorize.md",
-        "output_schema": "triage_result"
+        "output_schema": "triage_result",
+        "canary": true
+      }
+    },
+    {
+      "id": "guard",
+      "type": "output_guard",
+      "bpmn_element": "Output guard",
+      "config": {
+        "input": [
+          "suggest"
+        ]
+      }
+    },
+    {
+      "id": "security_flag",
+      "type": "subflow",
+      "bpmn_element": "Handle security flag",
+      "config": {
+        "flow": "handle_security_flag"
       }
     },
     {
@@ -62,7 +81,20 @@
     },
     {
       "from": "suggest",
-      "to": "check"
+      "to": "guard"
+    },
+    {
+      "from": "guard",
+      "to": "security_flag",
+      "when": {
+        "path": "guard.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "guard",
+      "to": "check",
+      "default": true
     }
   ]
 }

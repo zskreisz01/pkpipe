@@ -9,10 +9,12 @@ steps or earlier calls leaks in; the model port is called without any message hi
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import Field
 
+from pkpipe.security.canary import canary_notice, run_canary
 from pkpipe.steps.base import (
     StepConfig,
     StepContext,
@@ -39,6 +41,11 @@ class LlmConfig(StepConfig):
     )
     output_schema: str | None = Field(default=None, description="Schema name: schemas/<name>.json")
     profile: str = Field(default="default", description="Model profile from models.json")
+    canary: bool = Field(
+        default=False,
+        description="Place the run's canary in the system prompt (sessions over external content, spec 009); "
+        "an output_guard step must check the output before anything is written",
+    )
 
 
 class LlmToolsConfig(LlmConfig):
@@ -102,6 +109,19 @@ def build_prompt(config: LlmConfig, ctx: StepContext) -> tuple[str, str, dict[st
     return system.strip() + "\n\n" + datamark_notice(token), "\n\n".join(parts), schema
 
 
+def step_canary(ctx: StepContext) -> str:
+    """The run's canary (``security.canary.rotate``): the same in the session and in the output guard."""
+    rotate = ((ctx.snapshot.section("security", {}) or {}).get("canary") or {}).get("rotate", "per_run")
+    day = None
+    if rotate == "daily":
+        day = datetime.fromtimestamp(ctx.ports.clock.now(), UTC).date().isoformat()
+    return run_canary(ctx.run.run_id, rotate, day)
+
+
+def with_canary(system: str, config: LlmConfig, ctx: StepContext) -> str:
+    return system + canary_notice(step_canary(ctx)) if config.canary else system
+
+
 def complete(ctx: StepContext, config: LlmConfig, system: str, user: str, schema: dict[str, Any] | None):
     model = ctx.ports.require("model")
     with ctx.ports.tracer.llm(config.profile) as span:
@@ -109,6 +129,34 @@ def complete(ctx: StepContext, config: LlmConfig, system: str, user: str, schema
         reply = model.complete(system, user, schema, profile=config.profile)
         ctx.ports.tracer.capture(system=system, user=user, response=_text(reply))
     return reply
+
+
+#: The step type that checks a guarded session's output (spec 009, ``pkpipe.steps.output_guard``).
+OUTPUT_GUARD_TYPE = "output_guard"
+
+
+def guarded_session_errors(flow, node, config: LlmConfig) -> list[str]:
+    """Spec 009 FR-001 as a validation rule: a ``canary: true`` session (one over external content) has at
+    least one successor, and every successor (error edges excepted) is an ``output_guard`` whose ``input``
+    names the session, so its output can never reach a write unchecked."""
+    if not config.canary:
+        return []
+    by_id = {n.id: n for n in flow.nodes}
+    edges = [e for e in flow.edges_from(node.id) if e.on != "error"]
+    if not edges:
+        return [f"session '{node.id}' works on external content (canary) but no output_guard follows it"]
+    errors = []
+    for edge in edges:
+        target = by_id.get(edge.to)
+        refs = (target.config.get("input") if target is not None else None) or []
+        refs = [refs] if isinstance(refs, str) else list(refs)
+        checks = any(str(ref).split(".", 1)[0] == node.id for ref in refs)
+        if target is None or target.type != OUTPUT_GUARD_TYPE or not checks:
+            errors.append(
+                f"session '{node.id}' works on external content (canary) and must be followed by an "
+                f"output_guard that checks it, not by '{edge.to}' (spec 009 FR-001)"
+            )
+    return errors
 
 
 @register_step
@@ -119,9 +167,12 @@ class LlmStep(StepExecutor):
     def check(self, node, config, snapshot):
         return check_session_assets(node.id, config, snapshot)
 
+    def check_flow(self, flow, node, config):
+        return guarded_session_errors(flow, node, config)
+
     def run(self, node, config: LlmConfig, ctx: StepContext) -> StepResult:
         system, user, schema = build_prompt(config, ctx)
-        return StepResult(output=complete(ctx, config, system, user, schema))
+        return StepResult(output=complete(ctx, config, with_canary(system, config, ctx), user, schema))
 
 
 DECISION_SCHEMA: dict[str, Any] = {
@@ -154,8 +205,12 @@ class LlmToolsStep(StepExecutor):
                 errors.append(f"node '{node.id}': {err}")
         return errors, warnings
 
+    def check_flow(self, flow, node, config):
+        return guarded_session_errors(flow, node, config)
+
     def run(self, node, config: LlmToolsConfig, ctx: StepContext) -> StepResult:
         system, user, schema = build_prompt(config, ctx)
+        system = with_canary(system, config, ctx)
         tool_notice = (
             "\n\nYou may call these tools: "
             + ", ".join(config.tools)

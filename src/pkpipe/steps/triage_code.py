@@ -20,6 +20,9 @@ from pkpipe.domain.triage import (
 from pkpipe.steps.base import StepContext, StepResult, register_code
 
 MANAGED_FILES = ("Inbox-Triage.md", "Manual-Resource-Processing-List.md")
+#: Suggested category of a row whose triage output was flagged (not a category, so a released item is
+#: triaged again).
+FLAGGED_SUGGESTION = "none"
 
 
 def _categories(ctx: StepContext) -> dict[str, dict[str, Any]]:
@@ -95,10 +98,27 @@ def check_category(ctx: StepContext, suggestion: dict[str, Any], fallback: str =
 
 @register_code("triage.suggested_rows")
 def suggested_rows(ctx: StepContext, results: list[dict[str, Any]]) -> dict[str, Any]:
-    """Triage rows (state ``suggested``) for every successfully categorized item."""
+    """Triage rows (state ``suggested``) for every successfully categorized item, and rows in state
+    ``quarantined`` for items the output guard flagged (spec 009: their suggestion is not trusted, so the
+    suggested category is ``none``; after the owner's release the item is triaged again)."""
     rows, failed = [], []
+    quarantined = 0
     for r in results or []:
         item = r.get("item") or {}
+        if r.get("status") == "done" and item.get("flagged"):
+            if item.get("state") != ItemState.QUARANTINED.value:  # flagged but not handled: never trusted
+                failed.append(item.get("id"))
+                continue
+            quarantined += 1
+            rows.append(
+                {
+                    "item_id": item["id"],
+                    "resource": item["resource"],
+                    "ai_suggested_category": FLAGGED_SUGGESTION,
+                    "state": ItemState.QUARANTINED.value,
+                }
+            )
+            continue
         if r.get("status") != "done" or not item.get("category"):
             failed.append(item.get("id"))
             continue
@@ -110,7 +130,7 @@ def suggested_rows(ctx: StepContext, results: list[dict[str, Any]]) -> dict[str,
                 "state": ItemState.SUGGESTED.value,
             }
         )
-    return {"rows": rows, "count": len(rows), "failed": failed}
+    return {"rows": rows, "count": len(rows), "failed": failed, "quarantined": quarantined}
 
 
 @register_code("triage.backlog")
@@ -121,14 +141,15 @@ def backlog(
     still wait for the owner: neither confirmed nor overridden, or decided on a category that is no longer
     configured (``invalid``: a removed category or an unknown override). Finished items do not count."""
     valid = frozenset(_categories(ctx))
-    fresh = {r["item_id"] for r in new_rows or []}
+    quarantined = {r["item_id"] for r in new_rows or [] if r.get("state") == ItemState.QUARANTINED.value}
+    fresh = {r["item_id"] for r in new_rows or []} - quarantined
     older = invalid = 0
     for r in (triage or {}).get("rows", []):
         try:
             state = ItemState(r.get("state", "suggested"))
         except ValueError:
             continue
-        if r.get("item_id") in fresh:
+        if r.get("item_id") in fresh or r.get("item_id") in quarantined:
             continue
         confirm, override = bool(r.get("confirm")), r.get("override") or None
         if is_unreviewed(state, confirm, override):
@@ -147,15 +168,20 @@ def backlog(
             f" {invalid} item(s) name a category that is no longer configured: write a configured category"
             " into override."
         )
+    if quarantined:
+        message += (
+            f" {len(quarantined)} new item(s) were quarantined by the security checks (see the alerts)."
+        )
     return {
         "new": new,
+        "quarantined": len(quarantined),
         "backlog": older,
         "invalid": invalid,
         "awaiting": new + older + invalid,
         "message": message,
         # New suggestions or a decision that can never be released need the owner; an unchanged backlog of
         # unreviewed items alone does not send a mail every evening (it is in the 06:00 summary).
-        "notify": bool(new or invalid),
+        "notify": bool(new or invalid or quarantined),
     }
 
 

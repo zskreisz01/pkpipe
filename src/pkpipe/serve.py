@@ -20,6 +20,16 @@ VAULT_ENV = "PKPIPE_VAULT_DIR"
 DEFAULT_PORT = 8787
 
 
+def _gate_classifier(snapshot: ConfigSnapshot):
+    """The runs' classifier for the security suite of the publish gate, or None when it is not installed
+    (the suite then notes that it measured without it; its classifier gate fails closed)."""
+    from pkpipe import app
+    from pkpipe.adapters.classifiers import is_available
+
+    clf = app.make_classifier(snapshot)
+    return clf if is_available(clf) else None
+
+
 def default_gate_factory(overlay_dir: Path | None) -> Callable[[ConfigSnapshot], PublishGate]:
     """Gate on the configured model; datasets from the public ``evals/`` plus the overlay's ``evals/``."""
 
@@ -27,7 +37,11 @@ def default_gate_factory(overlay_dir: Path | None) -> Callable[[ConfigSnapshot],
         from pkpipe import app
         from pkpipe.evals.datasets import EvalPaths
 
-        return PublishGate(model=app.make_model(snapshot), paths=EvalPaths.create(None, overlay_dir))
+        return PublishGate(
+            model=app.make_model(snapshot),
+            paths=EvalPaths.create(None, overlay_dir),
+            options={"classifier": _gate_classifier(snapshot)},
+        )
 
     return make
 
@@ -64,6 +78,7 @@ def build_services(
         launcher=RunLauncher(runs),
         vault=vault,
         gate_factory=gate_factory or default_gate_factory(overlay),
+        candidates_dir=app.candidates_dir(overlay),
     )
 
 

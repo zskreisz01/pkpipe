@@ -226,3 +226,17 @@ def test_timeouts_and_generation_time_are_recorded_as_pkpipe_metrics(tmp_path, c
     assert otel.metric_value("pkpipe.learning_timeouts_total") == 1
     [point] = otel.metric_points("pkpipe.learning_generation_seconds")
     assert point.count == 1 and point.sum == 120
+
+
+def test_a_domain_deny_listed_while_the_gateway_runs_is_refused_on_the_next_create(tmp_path, clock):
+    """Spec 009 US2: the security-flag handler extends the deny-list file while the gateway runs; the next
+    create re-reads it (regression: the gateway kept the list it read at startup)."""
+    from pkpipe.learning.errors import UrlBlocked
+
+    current: list[str] = []
+    gw, backend = make(tmp_path, clock, deny_loader=lambda: list(current))
+    gw.create(URL, TEMPLATE, "before")
+    current.append(URL.split("/")[2].removeprefix("www."))
+    with pytest.raises(UrlBlocked, match="deny_list"):
+        gw.create(URL, TEMPLATE, "after")
+    assert [c["item_id"] for c in backend.created] == ["before"]

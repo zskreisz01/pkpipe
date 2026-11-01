@@ -138,6 +138,10 @@ class StepExecutor:
         """Reference checks against the config (assets, tools, flows). Returns (errors, warnings)."""
         return [], []
 
+    def check_flow(self, flow: Flow, node: FlowNode, config: Any) -> list[str]:
+        """Structural rules on the node's place in its flow (successors, routing). Returns errors."""
+        return []
+
     def run(self, node: FlowNode, config: Any, ctx: StepContext) -> StepResult:
         raise NotImplementedError
 

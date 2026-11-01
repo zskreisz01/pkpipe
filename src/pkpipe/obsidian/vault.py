@@ -5,17 +5,19 @@ from __future__ import annotations
 import contextlib
 import functools
 import os
+import re
 import unicodedata
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from pkpipe.security import quarantine
 from pkpipe.telemetry import set_span_attributes, tool_span
 
 from . import improvements, lists
 from .atomic import dir_lock, update_text
 from .errors import NoteExists, NoteNotFound, PathRejected, VaultError
-from .notes import append_text, jsonable, parse_note, render_note
+from .notes import append_text, dump_front_matter, jsonable, parse_note, render_note
 from .policy import VaultPolicy, is_conflict_name
 
 
@@ -46,6 +48,7 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
 
 
 MAX_NOTES = 60
+ITEM_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 class Vault:
@@ -152,6 +155,8 @@ class Vault:
         target = self.policy.resolve(path, tool)
         if is_conflict_name(target.name):
             raise PathRejected("refusing to write a sync conflict file")
+        if self.policy.in_quarantine(target):
+            raise PathRejected("the quarantine folder is written only by quarantine_note (spec 009)")
         if self._is_managed(path, target):
             raise PathRejected("this file is maintained by the triage/processing-list tools")
         return target
@@ -198,8 +203,88 @@ class Vault:
 
     @_traced
     def owner_release_quarantine(self, item_id: str) -> dict[str, Any]:
+        """Owner decision (spec 009 US3): the row goes back to ``pending`` and the quarantined note back to
+        its INBOX path. ``content`` (the restored text, for the eval candidate) must not be passed on to an
+        agent; :class:`pkpipe.api.services.AppServices` drops it."""
         path = self.policy.resolve(self.policy.triage_file, "update_triage")
-        return lists.release_quarantine(path, item_id)
+        self._restore_quarantined(item_id, dry_run=True)  # refuse before the row changes
+        row = lists.release_quarantine(path, item_id)
+        restore = self._restore_quarantined(item_id, dry_run=False)
+        return {**row, **restore}
+
+    # -- quarantine (spec 009) -------------------------------------------------------------------------
+
+    def _quarantine_target(self, item_id: str) -> Path:
+        if not isinstance(item_id, str) or not ITEM_ID_RE.fullmatch(item_id):
+            raise PathRejected("item_id must be 1-64 letters, digits, '-' or '_'")
+        folder = self.policy.root / self.policy.quarantine_dir
+        target = (folder / f"{item_id}.md").resolve()
+        if not self.policy.in_quarantine(target) or target.parent != folder.resolve():
+            raise PathRejected("quarantine path escapes the quarantine folder")
+        return target
+
+    @_traced
+    def quarantine_note(
+        self,
+        item_id: str,
+        path: str | None = None,
+        flags: list[dict[str, Any]] | None = None,
+        run_id: str = "",
+        flagged_at: str = "",
+    ) -> dict[str, Any]:
+        """Move a flagged note into the quarantine folder in inert form (code block, ``security_flag`` front
+        matter with flag names and reason codes only). Idempotent: a re-run after the note moved keeps the
+        quarantined copy. Without ``path`` (an item that came from a URL only) a metadata note is written."""
+        target = self._quarantine_target(item_id)
+        source: Path | None = None
+        if path:
+            source = self.policy.resolve(path, "quarantine_note")
+            if self.policy.in_quarantine(source) or self._is_managed(path, source):
+                raise PathRejected("this note cannot be quarantined")
+        raw = source.read_bytes().decode("utf-8") if source is not None and source.is_file() else None
+        original = raw.replace("\r\n", "\n") if raw is not None else None
+        if original is None and target.is_file():
+            return {"path": self.policy.rel(target), "original_path": path, "moved": False}
+        front = quarantine.quarantine_front_matter(
+            item_id=item_id,
+            original_path=path,
+            flags=[f for f in flags or [] if isinstance(f, dict)],
+            run_id=str(run_id)[:64],
+            flagged_at=str(flagged_at)[:40],
+        )
+        if raw is not None:
+            front["original_format"] = quarantine.text_format(raw)  # for the exact restore
+        text = dump_front_matter(front) + quarantine.quarantine_body(item_id, original)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        update_text(target, lambda _existing: text)
+        if source is not None and original is not None:
+            source.unlink()
+        return {"path": self.policy.rel(target), "original_path": path, "moved": original is not None}
+
+    def _restore_quarantined(self, item_id: str, *, dry_run: bool) -> dict[str, Any]:
+        """Check (``dry_run``) or do the move back of a quarantined note to its original path."""
+        target = self._quarantine_target(item_id)
+        if not target.is_file():
+            return {"restored": None, "content": None, "flags": []}
+        note = parse_note(target.read_text(encoding="utf-8"))
+        original_path = note.front_matter.get("original_path")
+        text = quarantine.unwrap_inert(note.body)
+        flag_info = note.front_matter.get("security_flag")
+        flags = [str(f) for f in (flag_info or {}).get("flags") or []] if isinstance(flag_info, dict) else []
+        if not original_path or text is None:
+            if not dry_run:
+                target.unlink()
+            return {"restored": None, "content": text, "flags": flags}
+        dest = self.policy.resolve(str(original_path), "quarantine_note")
+        if self.policy.in_quarantine(dest):
+            raise PathRejected("invalid original path in the quarantine note")
+        if dest.exists():
+            raise NoteExists(f"cannot restore: {original_path} exists again; move it away first")
+        text = quarantine.restore_format(text, note.front_matter.get("original_format"))
+        if not dry_run:
+            update_text(dest, lambda _existing: text)
+            target.unlink()
+        return {"restored": original_path, "content": text, "flags": flags}
 
     @_traced
     def upsert_processing_list(self, rows: list[dict[str, Any]]) -> dict[str, Any]:

@@ -1,6 +1,6 @@
 {
   "id": "secure_fetch",
-  "description": "Reusable call activity: turn the item's URL (item.resource, or input.url for a direct run) into a validated JSON extract. URL filter, Lightpanda fetch with Chromium fallback (web-fetch MCP), sanitizing, heuristics and Prompt Guard 2, the Reader session without tools, and a verdict made by code. Sets item.fetch_status (clean, flagged, failed), item.extract when clean, and item.flagged with security_flags when any detector fires.",
+  "description": "Reusable call activity: turn the item's URL (item.resource, or input.url for a direct run) into a validated JSON extract. URL filter, Lightpanda fetch with Chromium fallback (web-fetch MCP), sanitizing, heuristics and the local classifier (Qwen3Guard + DeBERTa), the Reader session without tools, and a verdict made by code. Sets item.fetch_status (clean, flagged, failed), item.extract when clean, and item.flagged with security_flags when any detector fires.",
   "bpmn": "secure-fetch",
   "start": "url_check",
   "nodes": [
@@ -33,7 +33,7 @@
     {
       "id": "scan",
       "type": "code",
-      "bpmn_element": "Prompt Guard 2 scan",
+      "bpmn_element": "Classifier scan",
       "config": {
         "function": "secure_fetch.scan",
         "args": {

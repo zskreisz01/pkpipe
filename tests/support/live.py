@@ -137,7 +137,26 @@ def _open_notebook() -> str | None:
     return None
 
 
+QWEN3GUARD_DIR = Path("~/tools/qwen3guard/Qwen3Guard-Gen-0.6B").expanduser()
+DEBERTA_DIR = Path("~/tools/protectai-deberta-pi-v2").expanduser()
+
+
+@cache
+def _guard() -> str | None:
+    """The local classifiers of spec 008/009 (docs/decisions/0001): both model directories and the ``guard``
+    extra (torch, transformers)."""
+    import importlib.util
+
+    for directory in (QWEN3GUARD_DIR, DEBERTA_DIR):
+        if not (directory / "config.json").is_file() or not (directory / "model.safetensors").is_file():
+            return f"classifier model not installed at {directory} (see docs/installation.md)"
+    if not (importlib.util.find_spec("torch") and importlib.util.find_spec("transformers")):
+        return "optional extra missing: uv sync --extra guard"
+    return None
+
+
 PROBES: dict[str, Callable[[], str | None]] = {
+    "guard": _guard,
     "open_notebook": _open_notebook,
     "lmstudio": _lmstudio,
     "judge": _judge,

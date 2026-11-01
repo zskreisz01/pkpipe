@@ -21,6 +21,7 @@ TOOLS = {
     "read_notes",
     "read_improvements",
     "update_improvements",
+    "quarantine_note",
 }
 
 TRAVERSAL = [
@@ -285,3 +286,36 @@ def test_concurrent_client_calls_do_not_corrupt_triage_file(config, synthetic_va
 
     rows = run(read())["rows"]
     assert len(rows) == 6 and len({r["item_id"] for r in rows}) == 6
+
+
+def test_quarantine_note_over_mcp_moves_the_note_inert_and_guards_the_folder(config, synthetic_vault):
+    """Spec 009 US2 through the real server process: the note leaves the INBOX for the quarantine folder in
+    inert form, the tool returns no note text, and write_note cannot write into the quarantine folder."""
+    original = (synthetic_vault / "0-INBOX/example-tool.md").read_text(encoding="utf-8")
+
+    async def go():
+        async with stdio_client(config) as c:
+            flags = [
+                {"flag": "injection_or_jailbreak", "detector": "heuristic", "reason_code": "heuristic:x"}
+            ]
+            moved = await call(
+                c,
+                "quarantine_note",
+                item_id="abc123",
+                path="0-INBOX/example-tool.md",
+                flags=flags,
+                run_id="r1",
+            )
+            refused = await call(c, "write_note", path="0-INBOX/_quarantine/abc123.md", body="overwrite")
+            return moved, refused
+
+    (err, moved), (refused, message) = run(go())
+    assert not err and moved == {
+        "path": "0-INBOX/_quarantine/abc123.md",
+        "original_path": "0-INBOX/example-tool.md",
+        "moved": True,
+    }
+    assert refused and "quarantine" in message
+    assert not (synthetic_vault / "0-INBOX/example-tool.md").exists()
+    text = (synthetic_vault / "0-INBOX/_quarantine/abc123.md").read_text(encoding="utf-8")
+    assert "security_flag:" in text and "```text\n" + original in text

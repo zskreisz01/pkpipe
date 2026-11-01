@@ -8,6 +8,7 @@ choose, so ``backend: fake`` works without any option.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,8 @@ class GatewaySettings:
     audio_dir: Path | None = None
     block_private_networks: bool = True
     deny: list[str] = field(default_factory=list)
+    #: Re-reads the deny-list file per request (see :class:`pkpipe.learning.gateway.GatewayConfig`).
+    deny_loader: Callable[[], Iterable[str]] | None = None
 
     @classmethod
     def from_config(
@@ -67,6 +70,7 @@ class GatewaySettings:
             timeout_s=self.timeout_s,
             block_private_networks=self.block_private_networks,
             deny=self.deny,
+            deny_loader=self.deny_loader,
             audio_dir=self.audio_dir or self.data_dir / "audio",
         )
         return LearningGateway(backend, JobStore(self.data_dir / "jobs.db"), config, **kw)

@@ -15,6 +15,7 @@ from pkpipe import __version__
 from pkpipe.engine.config_models import config_json_schemas
 from pkpipe.engine.registry import ConfigError, load_effective
 from pkpipe.obsidian.models import vault_json_schemas
+from pkpipe.security.guard import guard_json_schemas
 from pkpipe.security.verdict import security_json_schemas
 
 Handler = Callable[[argparse.Namespace], int]
@@ -45,7 +46,12 @@ def _validate(args: argparse.Namespace) -> int:
 def _schema(args: argparse.Namespace) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    schemas = {**config_json_schemas(), **vault_json_schemas(), **security_json_schemas()}
+    schemas = {
+        **config_json_schemas(),
+        **vault_json_schemas(),
+        **security_json_schemas(),
+        **guard_json_schemas(),
+    }
     for name, schema in schemas.items():
         (out / f"{name}.schema.json").write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
     print(f"wrote {len(schemas)} schemas to {out}")

@@ -62,6 +62,13 @@ def make_snapshot(
 
 
 def make_ports(*, model=None, tools=None, notify=None, clock=None, tracer=None, **extra: Any) -> StepPorts:
+    """Fake ports. Unless given (``classifier=None`` switches it off), the spec 009 ports are fakes too:
+    ``classifier`` (substring rules, :func:`tests.support.evals.fake_classifier`) and ``security_log``."""
+    from tests.fakes import FakeSecurityLog
+    from tests.support.evals import fake_classifier
+
+    extra.setdefault("classifier", fake_classifier())
+    extra.setdefault("security_log", FakeSecurityLog())
     return StepPorts(
         clock=clock or FakeClock(),
         tracer=tracer or RecordingTracer(),

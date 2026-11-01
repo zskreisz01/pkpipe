@@ -1,6 +1,6 @@
 {
   "id": "other_resource",
-  "description": "Summarize the item in an isolated session without tools, pass the output guard, write the note into its PARA folder or quarantine the item. Spec 010 replaces the single session with the category's session plan.",
+  "description": "Summarize the item in an isolated session without tools (run canary), pass the output guard, write the note into its PARA folder or hand the item to handle_security_flag (quarantine). Spec 010 replaces the single session with the category's session plan.",
   "bpmn": "process-other-resource",
   "start": "read",
   "nodes": [
@@ -26,36 +26,26 @@
       "config": {
         "system": "synthesizer",
         "instruction": "other/summarize.md",
-        "output_schema": "resource_note"
+        "output_schema": "resource_note",
+        "canary": true
       }
     },
     {
       "id": "guard",
-      "type": "guard",
+      "type": "output_guard",
       "bpmn_element": "Output guard",
       "config": {
-        "input": "summarize.note",
-        "patterns": [
-          "\\b(ignore|disregard|forget|override|bypass)\\b[^.\\n]{0,40}\\b(instructions?|prompts?|rules|guidelines|polic(y|ies)|told)\\b",
-          "\\b(new|updated)\\s+(system\\s+)?instructions?\\s*:|\\bsystem\\s*(override\\b|:)|^\\s*#+\\s*system\\b",
-          "<\\|im_(start|end)\\|>|\\[/?INST\\]|<<\\s*SYS\\s*>>",
-          "\\byou\\s+are\\s+now\\b|\\b(enable|enter|activate)\\s+developer\\s+mode\\b|\\b(no|without)\\s+(restrictions|limits|guidelines|content\\s+policy|rules)\\b",
-          "display\\s*:\\s*none|visibility\\s*:\\s*hidden|font-size\\s*:\\s*0|<\\w+[^>]*\\shidden[\\s>]|color\\s*:\\s*white\\s*;\\s*background(-color)?\\s*:\\s*white|<!--[^>]*\\b(ai|assistant|model|llm)s?\\b",
-          "<\\s*script|javascript\\s*:|\\bon(error|load|click|mouseover)\\s*=|<\\s*iframe",
-          "\\b(repeat|print|reveal|show|output|tell me|what is)\\b[^.\\n]{0,40}\\b(system\\s+prompt|hidden\\s+instructions|reference\\s+code|secret|token|canary|confidential)|\\b(text|everything)\\s+above\\b",
-          "!\\[[^\\]]*\\]\\(https?://|\\b(send|post|upload|exfiltrate)\\b[^.\\n]{0,60}\\b(journal|notes|context|api\\s+keys?|passwords?)\\b|\\bapi[_\\s-]?keys?\\b"
+        "input": [
+          "summarize"
         ]
       }
     },
     {
-      "id": "quarantine",
-      "type": "code",
+      "id": "security_flag",
+      "type": "subflow",
       "bpmn_element": "Handle security flag",
       "config": {
-        "function": "item.set",
-        "args": {
-          "state": "quarantined"
-        }
+        "flow": "handle_security_flag"
       }
     },
     {
@@ -100,7 +90,7 @@
     },
     {
       "from": "guard",
-      "to": "quarantine",
+      "to": "security_flag",
       "when": {
         "path": "guard.flagged",
         "truthy": true

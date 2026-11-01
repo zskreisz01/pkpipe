@@ -22,7 +22,9 @@ def test_exported_schema_files_validate_the_pack_and_reject_a_broken_overlay(tmp
             "fetch-result",
             "reader-extract",
             "verdict",
-        }:  # vault row schemas (specs 004, 015), secure-fetch structures (spec 008)
+            "output-guard-result",
+            "malicious-url-entry",
+        }:  # vault row schemas (specs 004, 015), secure-fetch (spec 008) and output-guard (009) structures
             continue
         files = sorted((pack_dir / "flows").glob("*.json")) if stem == "flow" else [pack_dir / f"{stem}.json"]
         for f in files:

@@ -235,19 +235,60 @@ class CategoriesConfig(RootModel[list[Category]]):
 
 
 # security.json ---------------------------------------------------------------------------------------------
-class PromptGuard(_Strict):
-    model: str
-    threshold: float = Field(ge=0.0, le=1.0)
-    chunk_tokens: int = Field(gt=0, le=512)
+class ClassifierMember(_Strict):
+    """One model of the injection / harm classifier (decision record docs/decisions/0001)."""
+
+    backend: Literal["qwen3guard", "deberta"]
+    model: str | None = Field(default=None, description="Model name (Hugging Face id), for reports")
     model_dir: str | None = Field(
         default=None,
-        description="Local model directory (may be env:NAME); default $PKPIPE_PROMPT_GUARD_DIR or "
-        "~/tools/prompt-guard-2/<model name>",
+        description="Local model directory (may be env:NAME|default); default ~/tools/qwen3guard/<model "
+        "name> (qwen3guard) or ~/tools/protectai-deberta-pi-v2 (deberta)",
     )
+    chunk_tokens: int | None = Field(
+        default=None, gt=0, le=4096, description="Tokens per scanned chunk (deberta: at most 512)"
+    )
+
+    @model_validator(mode="after")
+    def _window(self) -> ClassifierMember:
+        if self.backend == "deberta" and self.chunk_tokens is not None and self.chunk_tokens > 512:
+            raise ValueError("the deberta classifier has a 512-token window (chunk_tokens <= 512)")
+        return self
+
+
+class ClassifierSettings(_Strict):
+    """``security.classifier``: the local classifier of secure fetch (spec 008 FR-004) and of the output
+    guard (spec 009 FR-002). ``combined`` scans with every member and takes the maximum score."""
+
+    backend: Literal["qwen3guard", "deberta", "combined"]
+    model: str | None = None
+    model_dir: str | None = None
+    chunk_tokens: int | None = Field(default=None, gt=0, le=4096)
+    members: list[ClassifierMember] = Field(default_factory=list)
+    threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="Score that raises a flag")
     required: bool = Field(
         default=True,
-        description="Fail closed: without a usable classifier every secure fetch is flagged (spec 008)",
+        description="Fail closed: without a usable classifier every secure fetch and every guarded output "
+        "is flagged (spec 008, 009)",
     )
+
+    @model_validator(mode="after")
+    def _members(self) -> ClassifierSettings:
+        if self.backend == "combined":
+            if not self.members:
+                raise ValueError("backend 'combined' needs at least one entry in members")
+            if self.model_dir or self.model or self.chunk_tokens:
+                raise ValueError("backend 'combined' takes model settings per member only")
+        else:
+            if self.members:
+                raise ValueError(f"members are only allowed with backend 'combined', not '{self.backend}'")
+            ClassifierMember(
+                backend=self.backend,
+                model=self.model,
+                model_dir=self.model_dir,
+                chunk_tokens=self.chunk_tokens,
+            )
+        return self
 
 
 class Heuristics(_Strict):
@@ -255,8 +296,11 @@ class Heuristics(_Strict):
 
 
 class OutputGuard(_Strict):
-    model: str
-    block_on: list[str]
+    """``security.output_guard`` (spec 009): which safety labels of the classifier count as
+    ``malicious_content``. Injection scores use ``security.classifier.threshold``, heuristics
+    ``security.heuristics.threshold``; a canary in an output is always a flag."""
+
+    block_on: list[Literal["Unsafe", "Controversial"]] = Field(default_factory=lambda: ["Unsafe"])
 
 
 class Canary(_Strict):
@@ -270,9 +314,9 @@ class UrlFilter(_Strict):
 
 
 class SecurityConfig(_Strict):
-    prompt_guard: PromptGuard
+    classifier: ClassifierSettings
     heuristics: Heuristics = Field(default_factory=Heuristics)
-    output_guard: OutputGuard
+    output_guard: OutputGuard = Field(default_factory=OutputGuard)
     canary: Canary
     url_filter: UrlFilter
     quarantine_dir: str

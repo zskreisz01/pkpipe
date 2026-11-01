@@ -113,3 +113,14 @@ def test_unknown_cassette_format_is_rejected(tmp_path):
     p.write_text(json.dumps({"format": 99, "entries": []}))
     with pytest.raises(ValueError, match="format"):
         CassetteModel(p, "replay")
+
+
+def test_run_canary_is_normalised_in_the_key():
+    """Spec 009: a ``canary: true`` session carries the run's canary (random per run), so a replayed run must
+    find the recording made in another run; other text differences still miss."""
+    from pkpipe.evals.cassette import request_key
+
+    a = request_key("sys\n\nInternal reference code: CNY-0123456789abcdef", "u", None, "default")
+    b = request_key("sys\n\nInternal reference code: CNY-fedcba9876543210", "u", None, "default")
+    c = request_key("sys\n\nInternal reference code: CNY-fedcba9876543210", "other", None, "default")
+    assert a == b != c

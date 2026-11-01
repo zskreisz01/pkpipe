@@ -4,7 +4,7 @@
 The pack flow ``secure_fetch`` chains them::
 
     url_check -> fetch (web-fetch MCP: Lightpanda, Chromium fallback) -> sanitize -> scan (heuristics +
-    Prompt Guard 2) -> read (Reader: no tools, canary, datamarking, JSON) -> verdict (code)
+    classifier) -> read (Reader: no tools, canary, datamarking, JSON) -> verdict (code)
 
 Untrusted-content isolation (constitution IV): ``fetch``, ``sanitize`` and ``reader`` outputs are raw or
 quote raw page text, so they are in ``compiler.UNVALIDATED_OUTPUT_TYPES`` and a session with tools can never
@@ -14,6 +14,7 @@ without the quoted evidence), set on the item only when the verdict is clean.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from typing import Any
 from urllib.parse import urlsplit
@@ -41,6 +42,8 @@ from pkpipe.steps.tool import check_tool_allowed
 #: Port names in ``StepPorts.extra``.
 CLASSIFIER_PORT = "classifier"
 RESOLVER_PORT = "resolver"
+#: The security log of the flag handler (spec 009): its deny-list applies at once, also inside a pinned run.
+SECURITY_LOG_PORT = "security_log"
 #: Test-only loopback allowance (``(host, port)`` pairs). Only the composition root of a test sets it; it has
 #: no config key, so a pack or overlay can never enable it (see ``pkpipe.security.urlfilter``).
 TEST_LOOPBACK_PORT = "fetch_test_loopback"
@@ -53,13 +56,18 @@ METADATA_KINDS = ("pdf", "video", "image", "audio", "other")
 
 # -- helpers ------------------------------------------------------------------------------------------------
 def url_policy(ctx: StepContext) -> UrlPolicy:
-    """The URL policy of the pinned config: ``security.url_filter`` and its deny-list file."""
+    """The URL policy of the pinned config: ``security.url_filter`` and its deny-list file, plus the domains
+    the security-flag handler has deny-listed meanwhile (spec 009)."""
     security = ctx.snapshot.section("security", {}) or {}
     url_filter = security.get("url_filter") or {}
     deny_path = url_filter.get("deny_list")
     deny_text = ctx.snapshot.asset(deny_path) if deny_path else None
     loopback = ctx.ports.extra.get(TEST_LOOPBACK_PORT) or ()
-    return UrlPolicy.from_config(url_filter, deny_text, test_loopback=loopback)
+    policy = UrlPolicy.from_config(url_filter, deny_text, test_loopback=loopback)
+    log = ctx.ports.extra.get(SECURITY_LOG_PORT)
+    if log is not None:  # domains the security-flag handler deny-listed since this config was pinned
+        policy = dataclasses.replace(policy, deny=policy.deny | log.denied_domains())
+    return policy
 
 
 def _resolver(ctx: StepContext):
@@ -228,6 +236,11 @@ def scan_page(page: dict[str, Any], classifier: Any | None) -> dict[str, Any]:
                 "max_score": float(res.get("max_score") or 0.0),
                 "chunks": int(res.get("chunks") or 0),
             }
+            if isinstance(res.get("members"), list):  # scores per model of a combined classifier
+                result["members"] = [
+                    {"model": m.get("model"), "max_score": float(m.get("max_score") or 0.0)}
+                    for m in res["members"]
+                ]
         except ClassifierUnavailable as exc:
             result = {"available": False, "reason": "unavailable", "error": str(exc)[:200]}
     return {"heuristics": found.as_dict(), "classifier": result, "removed": removed}
@@ -235,7 +248,7 @@ def scan_page(page: dict[str, Any], classifier: Any | None) -> dict[str, Any]:
 
 @register_code("secure_fetch.scan")
 def scan(ctx: StepContext, input: str = "sanitize") -> dict[str, Any]:
-    """FR-003 heuristics and FR-004 classifier (Prompt Guard 2, 512-token chunks). Scores only, no text."""
+    """FR-003 heuristics and FR-004 classifier (``security.classifier``, chunked). Scores only, no text."""
     return scan_page(ctx.resolve(input), ctx.ports.extra.get(CLASSIFIER_PORT))
 
 
@@ -314,7 +327,7 @@ def decide(
     classifier_required: bool | None = None,
 ) -> Verdict:
     """The verdict with the thresholds of ``security.json`` (shared with the security eval)."""
-    guard = security.get("prompt_guard") or {}
+    guard = security.get("classifier") or {}
     found = scan or {}
     required = bool(guard.get("required", True)) if classifier_required is None else classifier_required
     return evaluate(

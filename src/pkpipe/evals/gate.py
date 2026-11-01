@@ -152,8 +152,11 @@ class PublishGate:
         identities: dict[str, str] | None = None,
         workers: int = 1,
         limit: int | None = None,
+        options: dict | None = None,
     ):
         self.model = model
+        #: suite options, e.g. ``classifier`` (the security suite's ClassifierPort, spec 009)
+        self.options = options
         self.paths = paths or EvalPaths.create()
         self.mode = mode
         self.identities = identities
@@ -169,6 +172,7 @@ class PublishGate:
             identities=self.identities,
             workers=self.workers,
             limit=self.limit,
+            options=self.options,
         )
 
     def check(

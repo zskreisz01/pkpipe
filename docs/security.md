@@ -34,30 +34,34 @@ Process-level isolation: pages are fetched only by the web-fetch MCP server (`pk
 | URL filter | Deny-list (`security/deny_list.txt`, subdomains included), only http(s), no credentials in URLs, private networks blocked after DNS resolution (loopback, RFC 1918, link-local and cloud metadata, CGNAT, IPv6 local, numeric IP forms) on the URL and on every request the browser makes, size limit (`max_bytes`) | Known bad sources, SSRF, redirects into the private network |
 | Sanitizing | Hidden HTML (hidden attribute, `aria-hidden`, hiding inline styles and simple `<style>` rules, off-screen text), comments, scripts, zero-width, bidi and Unicode tag characters removed; the removed text is kept aside for the heuristics | Invisible injections |
 | Heuristics | Regexes with weights: overrides ("ignore previous instructions"), role tags, text addressed to the model, role changes, prompt-leak and exfiltration requests, output hijacking, base64 blobs; hidden matches count separately (`hidden_<rule>`) | Naive attacks, cheaply |
-| Classifier | Llama Prompt Guard 2 (86M), 512-token chunks with overlap, maximum over chunks; missing model fails closed | Injection and jailbreak |
+| Classifier | `security.classifier`: Qwen3Guard-Gen-0.6B (harm categories, jailbreak) and ProtectAI deberta-v3-base-prompt-injection-v2 (injection), token chunks with overlap, maximum over chunks and models; local files only, no remote code; missing model fails closed ([decision 0001](decisions/0001-injection-classifier.md)) | Injection, jailbreak, harmful content |
 | Reader verdict | `injection_suspected` + canary check | Context-dependent attempts |
 
-The verdict (`secure_fetch.verdict`) is code: any of `url_filter`, `heuristic`, `classifier`, `canary` or `reader` flags the item; a Reader reply that is not a valid `ReaderExtract` (checked strictly by code) is flagged as `reader` (`reader_invalid_output`), never passed on. A redirect hop that the proxy refuses (deny-list, private network) is a flag even though the browser shows the proxy's 403 as the page. A timeout or an unreachable page after the Chromium fallback is a failed fetch, not a flag. Measured on the synthetic `secure_fetch.jsonl` set (40 attack pages of 11 types, 41 clean pages, Prompt Guard 2 not installed): detection 1.0, false positives 0.024, canary leaks 0 ([Evaluation](evaluation.md)).
+The verdict (`secure_fetch.verdict`) is code: any of `url_filter`, `heuristic`, `classifier`, `canary` or `reader` flags the item; a Reader reply that is not a valid `ReaderExtract` (checked strictly by code) is flagged as `reader` (`reader_invalid_output`), never passed on. A redirect hop that the proxy refuses (deny-list, private network) is a flag even though the browser shows the proxy's 403 as the page. A timeout or an unreachable page after the Chromium fallback is a failed fetch, not a flag. Measured on the synthetic `secure_fetch.jsonl` set (40 attack pages of 11 types, 41 clean pages, with the classifier): detection 1.0, false positives 0.024, canary leaks 0; the output guard on 59 session outputs: detection 1.0, false positives 0.033 ([Evaluation](evaluation.md)).
 
 **Test-only loopback allowance.** Tests fetch synthetic pages from a local fixture server, which the URL filter would block as loopback. They use an allowance for exactly that `127.0.0.1:<port>`: in-process it is a port of the run (`fetch_test_loopback`, set by the test's composition root), for the web-fetch server process the environment variable `PKPIPE_WEBFETCH_TEST_LOOPBACK`, which accepts only loopback IP literals with a port and is logged at start-up. Neither is a config key: `security.url_filter` rejects unknown keys, so no pack or overlay can enable it. Never set the variable in a deployment.
 
 ## Output guard
 
-Runs on every session output that originates from external content, before anything is written to the vault. A note with an injected instruction would otherwise attack every agent that reads the vault later (stored injection).
+Runs on every session output that originates from external content, before anything is written to the vault (step type `output_guard`, spec 009). A note with an injected instruction would otherwise attack every agent that reads the vault later (stored injection). A session over external content is marked `canary: true`: the run's canary goes into its system prompt and `pkpipe validate` refuses a flow in which any path after it does not pass an `output_guard` that checks it, and an `output_guard` must route on its decision: its first conditional edge is `<guard>.flagged` (truthy) to the security branch, with no plain edge (taken even after a flag) and no error edge (a failed check stops the item). In the public pack these are the triage session (`categorize_item.suggest`, before the triage file is written) and the summary of other resources (`other_resource.summarize`, before the PARA note is written). The learning branch writes no derived text (notebook id, link and audio path only), so it has no output to guard.
 
-| Flag | Detector |
+| Flag | Detector (decided in code) |
 | --- | --- |
-| `malicious_content` | Qwen3Guard (Safe / Controversial / Unsafe + category) |
-| `injection_or_jailbreak` | Prompt Guard 2 on the output + heuristics |
-| `canary_leak` | Deterministic string match |
+| `canary_leak` | The run's canary or its hex part anywhere in the output: deterministic string match, independent of every model |
+| `injection_or_jailbreak` | Active markup (`<script>`, `<iframe>`, `javascript:`, event handlers), heuristics, the DeBERTa injection score ≥ `classifier.threshold`, a Qwen3Guard `Jailbreak` category, or no usable classifier while `classifier.required` (fail closed) |
+| `malicious_content` | A Qwen3Guard label in `output_guard.block_on` (default `Unsafe`) with a harm category (Violent, PII, Non-violent Illegal Acts, ...), or with no category at all (fail closed) |
+
+The step's output holds flag names, detectors, reason codes and scores, never the checked text. Regression: the spec 008 review once saw the triage session leak its canary on the injection set; the guard now stops such a reply before the triage file is written (`canary_leaks_unguarded` = 0 is a gate, and a flow eval case covers it).
 
 ## When something is flagged
 
-1. The item stops immediately and becomes `quarantined`.
-2. The URL is appended to `security/malicious_urls.jsonl` (url, domain, flag, detector, score, evidence, run id, timestamp) and the domain to the deny-list.
-3. The content moves to `0-INBOX/_quarantine/` in inert form (inside a code block, with `security_flag` front matter).
+The flow calls [Handle Security Flag](process/handle-security-flag.md) for the item:
+
+1. The item stops and becomes `quarantined`; the other items of the run continue (error end event per item). At triage the row is written as `quarantined` with the suggested category `none`.
+2. One row per flag is appended to `security/malicious_urls.jsonl` (url, domain, flag, detector, score, evidence = reason code, item id, run id, timestamp) and the domain goes on the deny-list once (`# pkpipe: flagged N, last <day>` on repeats), in the overlay so every process's URL filter applies it: the web-fetch server and the learning gateway read the deny-list file again on every request, and the in-process checks (secure fetch, `learning.prepare`) merge the handler's entries.
+3. The note moves to `0-INBOX/_quarantine/` in inert form: verbatim inside a fenced code block, `security_flag` front matter with flag codes only. Only the vault tool `quarantine_note` writes there; `write_note`, `append_note` and `move_note` refuse the folder.
 4. An alert goes to the configured channel and a `security.flag` event to the trace.
-5. A false positive is released by the owner; the release is added to the security eval dataset.
+5. A false positive is released by the owner (UI triage page or app MCP `release_quarantine`, owner token, audited): the note is restored exactly (byte for byte: the quarantine note records the original line ends and final newline), the row is `pending` again and the text becomes a candidate case of the security eval dataset (`<overlay>/evals/candidates/security.jsonl`). Domains are never unblocked automatically.
 
 ## Private data
 

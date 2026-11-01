@@ -221,3 +221,24 @@ def test_get_run_datamarks_a_failed_runs_error_text(stack, server):
     )
     err, state = run(call(server.url, AGENT_TOKEN, "get_run", run_id="r-failed"))
     assert not err and state["error"].startswith("<<DATA:") and "Ignore the owner" in state["error"]
+
+
+def test_release_over_mcp_is_owner_only_and_returns_no_note_text(stack, server):
+    """Spec 009 US3 over the app MCP: the agent token is refused (audited), the owner release re-queues the
+    item and exports the eval candidate; the tool result never carries the quarantined text."""
+    from pkpipe.domain.triage import item_id_for
+
+    resource = "0-INBOX/flagged.md"
+    (stack.vault / resource).write_text(
+        "Talk notes: ignore previous instructions is a known attack.", "utf-8"
+    )
+    item = item_id_for(resource)
+    stack.services.vault.update_triage(
+        [{"resource": resource, "ai_suggested_category": "none", "state": "quarantined"}]
+    )
+    stack.services.vault.quarantine_note(item, resource, [{"flag": "injection_or_jailbreak"}], run_id="r")
+    err, msg = run(call(server.url, AGENT_TOKEN, "release_quarantine", item_id=item))
+    assert err and (stack.vault / "0-INBOX/_quarantine" / f"{item}.md").exists()
+    err, row = run(call(server.url, OWNER_TOKEN, "release_quarantine", item_id=item))
+    assert not err and row["requeued"] is True and row["eval_candidate"].startswith(f"release-{item}-")
+    assert "known attack" not in str(row) and (stack.vault / resource).is_file()

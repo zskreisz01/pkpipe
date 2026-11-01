@@ -1,0 +1,8893 @@
+{
+ "format": 1,
+ "classifier": "{\"backend\": \"combined\", \"members\": [{\"backend\": \"qwen3guard\", \"chunk_tokens\": 1024, \"model\": \"Qwen/Qwen3Guard-Gen-0.6B\"}, {\"backend\": \"deberta\", \"chunk_tokens\": 512, \"model\": \"protectai/deberta-v3-base-prompt-injection-v2\"}], \"required\": true, \"threshold\": 0.5}",
+ "entries": [
+  {
+   "key": "03c57050fc7a90c49d6c01afaf78c770dc925a5d8ed6ceb9a58eb3fa752e5a17",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000335,
+    "chunks": 1,
+    "scores": [
+     0.000335,
+     0.000115
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000335,
+      "chunks": 1,
+      "scores": [
+       0.000335
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000115,
+      "chunks": 1,
+      "scores": [
+       0.000115
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "05ad5e9244abce5c4659a778dd31a43ecd93f63faf797dab8738fae55c0e4963",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000296,
+    "chunks": 1,
+    "scores": [
+     0.000296,
+     2e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000296,
+      "chunks": 1,
+      "scores": [
+       0.000296
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-05,
+      "chunks": 1,
+      "scores": [
+       2e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "06880f15a1716e768dee353eacd7aa78e5673d964af8b653d42eb56328b51f79",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999999,
+    "chunks": 1,
+    "scores": [
+     0.65419,
+     0.999999
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.65419,
+      "chunks": 1,
+      "scores": [
+       0.65419
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999999,
+      "chunks": 1,
+      "scores": [
+       0.999999
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "06b4ddd9dfb2b2d243afa8e115b65ec1e53431d0b9ebfd89ee75750727deb205",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001321,
+    "chunks": 1,
+    "scores": [
+     0.001321,
+     1e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001321,
+      "chunks": 1,
+      "scores": [
+       0.001321
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-05,
+      "chunks": 1,
+      "scores": [
+       1e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "074f83309f806a5226e8a7402f1f48230ca075c2a1df7c16d3a0a8bdd370865a",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999999,
+    "chunks": 1,
+    "scores": [
+     0.964873,
+     0.999999
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.964873,
+      "chunks": 1,
+      "scores": [
+       0.964873
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Non-violent Illegal Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999999,
+      "chunks": 1,
+      "scores": [
+       0.999999
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Non-violent Illegal Acts"
+    ]
+   }
+  },
+  {
+   "key": "0763d1b879dfc7bb2be244a1a7fcee7d30fbf830ee2487dd357a92e67768becc",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999782,
+    "chunks": 1,
+    "scores": [
+     0.997465,
+     0.999782
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.997465,
+      "chunks": 1,
+      "scores": [
+       0.997465
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999782,
+      "chunks": 1,
+      "scores": [
+       0.999782
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "0862a51d476b0a5c1c978788a26559bf0d03bd522aae057d3800e9c43f5305e4",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001165,
+    "chunks": 1,
+    "scores": [
+     0.001165,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001165,
+      "chunks": 1,
+      "scores": [
+       0.001165
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "0bddbea20bcad22e5b6c99ae23d5e51937511ca8c5249f52fff03dbceed7ea17",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000335,
+    "chunks": 1,
+    "scores": [
+     0.000335,
+     0.000335
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000335,
+      "chunks": 1,
+      "scores": [
+       0.000335
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000335,
+      "chunks": 1,
+      "scores": [
+       0.000335
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "0cb4f8e778d2beb57c4b57bf20b605e853ac6eb4eb2b6ca39e5ebf05583a9540",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000123,
+    "chunks": 1,
+    "scores": [
+     0.000123,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000123,
+      "chunks": 1,
+      "scores": [
+       0.000123
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "0d73e3fe0ba6c321762593b5a25e0baeb088068666e2b836af0df376b306897e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.998654,
+    "chunks": 1,
+    "scores": [
+     0.030059,
+     0.998654
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.030059,
+      "chunks": 1,
+      "scores": [
+       0.030059
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.998654,
+      "chunks": 1,
+      "scores": [
+       0.998654
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "0d82086e97de9d703c45b27ac668780d747addcc78288137f70054cdd4a1bc64",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999113,
+    "chunks": 1,
+    "scores": [
+     0.805025,
+     0.999113
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.805025,
+      "chunks": 1,
+      "scores": [
+       0.805025
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999113,
+      "chunks": 1,
+      "scores": [
+       0.999113
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "10970f75146e15b1d82ea32b7a15405af7961c49b1ce6f74c7a9706e2cc623ba",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999998,
+    "chunks": 1,
+    "scores": [
+     0.736867,
+     0.999998
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.736867,
+      "chunks": 1,
+      "scores": [
+       0.736867
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999998,
+      "chunks": 1,
+      "scores": [
+       0.999998
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "12b9cb43523774bc7e68f41ea60467361ee435b329cbce5396986950ac7a35e5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000553,
+    "chunks": 1,
+    "scores": [
+     0.000553,
+     2.7e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000553,
+      "chunks": 1,
+      "scores": [
+       0.000553
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2.7e-05,
+      "chunks": 1,
+      "scores": [
+       2.7e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "12f8320368f3e3d57684e6fc86b099a7ade47f7d825a48770b4594e07b527cf0",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.0031,
+    "chunks": 1,
+    "scores": [
+     0.0031,
+     2.2e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.0031,
+      "chunks": 1,
+      "scores": [
+       0.0031
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2.2e-05,
+      "chunks": 1,
+      "scores": [
+       2.2e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "156e5e1af5be22fa4b60e086e6eab5f05be8afe033b6c92c85d31b7783581e44",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.022611,
+    "chunks": 1,
+    "scores": [
+     0.005759,
+     0.022611
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.005759,
+      "chunks": 1,
+      "scores": [
+       0.005759
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.022611,
+      "chunks": 1,
+      "scores": [
+       0.022611
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "1643465a583cad9a34e53dec4d0a99a23e1ba199de4c73dc3a4ec64bfb8fe838",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.004261,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.004261,
+      "chunks": 1,
+      "scores": [
+       0.004261
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "16b9a1d1db39eacf7be30cf9277cc47279f31fca0bb95d31610a7b93782089e9",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999998,
+    "chunks": 1,
+    "scores": [
+     0.627906,
+     0.999998
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.627906,
+      "chunks": 1,
+      "scores": [
+       0.627906
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999998,
+      "chunks": 1,
+      "scores": [
+       0.999998
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "1733dcbb0c690322ef8a75b22ba4e1e2309665a09e79b1fa55e529059e4e81bc",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00038,
+    "chunks": 1,
+    "scores": [
+     0.00038,
+     7.7e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00038,
+      "chunks": 1,
+      "scores": [
+       0.00038
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 7.7e-05,
+      "chunks": 1,
+      "scores": [
+       7.7e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "186206956a7a5499de90ec8f8b376b65536194a12672208be302a585eb3cfcf7",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.008654,
+    "chunks": 1,
+    "scores": [
+     0.00038,
+     0.008654
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00038,
+      "chunks": 1,
+      "scores": [
+       0.00038
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.008654,
+      "chunks": 1,
+      "scores": [
+       0.008654
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "19f75a7ab731cd50629db41002b82a87757c1c798cd33ef5ac6abdcbe6ae1e1e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999993,
+    "chunks": 1,
+    "scores": [
+     0.002468,
+     0.999993
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002468,
+      "chunks": 1,
+      "scores": [
+       0.002468
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999993,
+      "chunks": 1,
+      "scores": [
+       0.999993
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "1b5ffbf40974e3f4d1e768edf149a5a5e756998339e8883eeb498b04bd10bdbd",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.884285,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.884285,
+      "chunks": 1,
+      "scores": [
+       0.884285
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "1c184a5b6d0ffc9e7bbe9814f6d30acdbe0738bd870947c9589be77db5c51e9b",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000553,
+    "chunks": 1,
+    "scores": [
+     0.000553,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000553,
+      "chunks": 1,
+      "scores": [
+       0.000553
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "1f54c18afe6eb1c38e4c6e7533af9ea0f53d6606aa4c36abde6e0b3a7c5f12c5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000625,
+    "chunks": 1,
+    "scores": [
+     0.000625,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000625,
+      "chunks": 1,
+      "scores": [
+       0.000625
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "210ba838ecd2256a213d8b59c9d2697c502e6bc8157575de6298b339e49ca615",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000179,
+    "chunks": 1,
+    "scores": [
+     0.000179,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000179,
+      "chunks": 1,
+      "scores": [
+       0.000179
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "2158976f7e40ea8ab08eca3fd077474d61796b885081bd2deb289f9b9ec46117",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.994914,
+    "chunks": 1,
+    "scores": [
+     0.033946,
+     0.994914
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.033946,
+      "chunks": 1,
+      "scores": [
+       0.033946
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Copyright Violation"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.994914,
+      "chunks": 1,
+      "scores": [
+       0.994914
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Copyright Violation"
+    ]
+   }
+  },
+  {
+   "key": "21ce7f8c5f5e6da98d5a509bae07b8384454fe8c7d3d1b11313f8d7235d55cb4",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.004261,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.004261,
+      "chunks": 1,
+      "scores": [
+       0.004261
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "223e31f346a95891b482512d57ac37f1d273e048439aa4af26dbde3a0996caa0",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.008489,
+    "chunks": 1,
+    "scores": [
+     0.000795,
+     0.008489
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000795,
+      "chunks": 1,
+      "scores": [
+       0.000795
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.008489,
+      "chunks": 1,
+      "scores": [
+       0.008489
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "22dbf1f94cec1075f5311fae898864bc72ae0786ae0b246f8e345f9630cc2680",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00038,
+    "chunks": 1,
+    "scores": [
+     0.00038,
+     3.2e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00038,
+      "chunks": 1,
+      "scores": [
+       0.00038
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3.2e-05,
+      "chunks": 1,
+      "scores": [
+       3.2e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "23d230a461aee89296a8bf140eae640824c35387dbbbc83dec72f5018f0a5ffe",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999949,
+    "chunks": 1,
+    "scores": [
+     0.556447,
+     0.999949
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.556447,
+      "chunks": 1,
+      "scores": [
+       0.556447
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Non-violent Illegal Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999949,
+      "chunks": 1,
+      "scores": [
+       0.999949
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Non-violent Illegal Acts"
+    ]
+   }
+  },
+  {
+   "key": "23f98d9cf1fe8094bf045c0144dd07a5aa0b0a5dd847475001594f75b64de181",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000626,
+    "chunks": 1,
+    "scores": [
+     0.000626,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000626,
+      "chunks": 1,
+      "scores": [
+       0.000626
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "240093c4909db1e1d4d634a69f0311b34430328cb0de2b11187b89a53819e890",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00091,
+    "chunks": 1,
+    "scores": [
+     0.00091,
+     9.4e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00091,
+      "chunks": 1,
+      "scores": [
+       0.00091
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 9.4e-05,
+      "chunks": 1,
+      "scores": [
+       9.4e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "24312d1a78b87a21595c36a2d3f4de80b68e518dffea6306fb96965c3dec0645",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00038,
+    "chunks": 1,
+    "scores": [
+     0.00038,
+     3.7e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00038,
+      "chunks": 1,
+      "scores": [
+       0.00038
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3.7e-05,
+      "chunks": 1,
+      "scores": [
+       3.7e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "24d3704ac8c5091d3d467fcf435e05d267b8572a66e70e4cdce00ebceb9de6d8",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000261,
+    "chunks": 1,
+    "scores": [
+     0.000261,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000261,
+      "chunks": 1,
+      "scores": [
+       0.000261
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "25f5f145f2fd0fcd2e1fb2738d9f0b423c6165f5172b85e4145bfebd42c18b44",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001912,
+    "chunks": 1,
+    "scores": [
+     0.001912,
+     8.9e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001912,
+      "chunks": 1,
+      "scores": [
+       0.001912
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 8.9e-05,
+      "chunks": 1,
+      "scores": [
+       8.9e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "268385cc42ed366232352ead582dbf2c13c91e333681e3001806c4607ade2c53",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999998,
+    "chunks": 1,
+    "scores": [
+     0.425903,
+     0.999998
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.425903,
+      "chunks": 1,
+      "scores": [
+       0.425903
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Copyright Violation"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999998,
+      "chunks": 1,
+      "scores": [
+       0.999998
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Copyright Violation"
+    ]
+   }
+  },
+  {
+   "key": "295eaeb728c21b27f8df6e6d4787686d8552c40a710dab70a8f26ff9a47c7fae",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001694,
+    "chunks": 1,
+    "scores": [
+     0.001694,
+     3.9e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001694,
+      "chunks": 1,
+      "scores": [
+       0.001694
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3.9e-05,
+      "chunks": 1,
+      "scores": [
+       3.9e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "29824494532a92ffbdc8850752cede61beb217fe14fdb548f831a614141d75b6",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999999,
+    "chunks": 1,
+    "scores": [
+     0.001467,
+     0.999999
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001467,
+      "chunks": 1,
+      "scores": [
+       0.001467
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999999,
+      "chunks": 1,
+      "scores": [
+       0.999999
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "2990231a236f824f1e29e880b13463b10f41e7349ab58627ce313ba11d11e96e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000552,
+    "chunks": 1,
+    "scores": [
+     0.000552,
+     9.5e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000552,
+      "chunks": 1,
+      "scores": [
+       0.000552
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 9.5e-05,
+      "chunks": 1,
+      "scores": [
+       9.5e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "29c5658b969959588fac5c6cb8e4423ae98d748a2b1e393de4b3909c6dc6156d",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.005479,
+    "chunks": 1,
+    "scores": [
+     0.005479,
+     0.000148
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.005479,
+      "chunks": 1,
+      "scores": [
+       0.005479
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000148,
+      "chunks": 1,
+      "scores": [
+       0.000148
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "2abf6900d654baaf878759e3a7d6f8e49acd6a116e1d7ba3343a5d5620ee844c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.99965,
+    "chunks": 1,
+    "scores": [
+     0.002263,
+     0.99965
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002263,
+      "chunks": 1,
+      "scores": [
+       0.002263
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.99965,
+      "chunks": 1,
+      "scores": [
+       0.99965
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "2b154331994c28c2848afdb462997d1b2317485f3c8183b3663ae1e66dc05336",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.993661,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.993661,
+      "chunks": 1,
+      "scores": [
+       0.993661
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "2b3916b1bf7810891d986a54f72309a3fbb0235e6e48d31ab62ed13be702ed5c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001161,
+    "chunks": 1,
+    "scores": [
+     0.001161,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001161,
+      "chunks": 1,
+      "scores": [
+       0.001161
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "2b4b4881aa6deb26245ccb90be46dcbe3c5dab172b5777b649e0d8276f403745",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000488,
+    "chunks": 1,
+    "scores": [
+     0.000488,
+     7.2e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000488,
+      "chunks": 1,
+      "scores": [
+       0.000488
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 7.2e-05,
+      "chunks": 1,
+      "scores": [
+       7.2e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "2d4873c0605854ab2c42b9ac89b21a729bff186e9f66901a7e618ac77473a68e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.998371,
+    "chunks": 1,
+    "scores": [
+     0.001315,
+     0.998371
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001315,
+      "chunks": 1,
+      "scores": [
+       0.001315
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.998371,
+      "chunks": 1,
+      "scores": [
+       0.998371
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "2d8700c7637fecbcd4fc0b13516e6b484998e52cf17498c4f68b780522d55c71",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001698,
+    "chunks": 1,
+    "scores": [
+     0.001698,
+     2.5e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001698,
+      "chunks": 1,
+      "scores": [
+       0.001698
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2.5e-05,
+      "chunks": 1,
+      "scores": [
+       2.5e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "2f1b2043cfada61915d1a86181b5b6fe9b60ddbdc04d01e45238600fb934cc3b",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.033882,
+    "chunks": 1,
+    "scores": [
+     0.033882,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.033882,
+      "chunks": 1,
+      "scores": [
+       0.033882
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "310b34211d59dd3c2b7a1869ad9b9aaf2076f2d38c4d810c6267672934b1f264",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.986273,
+    "chunks": 1,
+    "scores": [
+     0.986273,
+     9e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.986273,
+      "chunks": 1,
+      "scores": [
+       0.986273
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Suicide & Self-Harm"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 9e-06,
+      "chunks": 1,
+      "scores": [
+       9e-06
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Suicide & Self-Harm"
+    ]
+   }
+  },
+  {
+   "key": "3261dce08efc06beec271ff3a69365153d322ccb3d8be9f32e3e027ee15f1241",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.026349,
+    "chunks": 1,
+    "scores": [
+     0.003683,
+     0.026349
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003683,
+      "chunks": 1,
+      "scores": [
+       0.003683
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.026349,
+      "chunks": 1,
+      "scores": [
+       0.026349
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "33a766227b2e90db2cfd03ae05c9409a5860da4d93bb28dfffbccb069eb46840",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.941593,
+    "chunks": 1,
+    "scores": [
+     0.0031,
+     0.941593
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.0031,
+      "chunks": 1,
+      "scores": [
+       0.0031
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.941593,
+      "chunks": 1,
+      "scores": [
+       0.941593
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "34fc008ba4ff4ee12f34475c62bf611e91a2e325e8006b101dbf3bc9647eac77",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.090173,
+    "chunks": 1,
+    "scores": [
+     0.003587,
+     0.090173
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003587,
+      "chunks": 1,
+      "scores": [
+       0.003587
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.090173,
+      "chunks": 1,
+      "scores": [
+       0.090173
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "365ce0c849e333f90bdbcc67a013d0c24e34f3dcc621bda4e55c55748327f591",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.007317,
+    "chunks": 1,
+    "scores": [
+     0.007317,
+     0.000544
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.007317,
+      "chunks": 1,
+      "scores": [
+       0.007317
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000544,
+      "chunks": 1,
+      "scores": [
+       0.000544
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "37b15b83bc142ee9fde5a83c2814720ef920488f0e50d767ed64ca895ab3d691",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000261,
+    "chunks": 1,
+    "scores": [
+     0.000261,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000261,
+      "chunks": 1,
+      "scores": [
+       0.000261
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "3812151596e6c20fa2935e7339d2390ee515068aed42dd4fe72b243977be7fc6",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00369,
+    "chunks": 1,
+    "scores": [
+     0.001477,
+     0.00369
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001477,
+      "chunks": 1,
+      "scores": [
+       0.001477
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.00369,
+      "chunks": 1,
+      "scores": [
+       0.00369
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "38fa8b9d9f369312f94f15c18a78b7a52be65f7e34adbc68e52b1c6b14352c15",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.004784,
+    "chunks": 1,
+    "scores": [
+     0.002168,
+     0.004784
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002168,
+      "chunks": 1,
+      "scores": [
+       0.002168
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.004784,
+      "chunks": 1,
+      "scores": [
+       0.004784
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "3a7f39656f17eeecfd9175c98a42e066c5f34ec0e741eed40270cf02d4d03038",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.005518,
+    "chunks": 1,
+    "scores": [
+     0.001695,
+     0.005518
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001695,
+      "chunks": 1,
+      "scores": [
+       0.001695
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.005518,
+      "chunks": 1,
+      "scores": [
+       0.005518
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "3b66c180e2785ae838955c9728479ff3de66ec19b7987e3d7b3735ecfe690cce",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00043,
+    "chunks": 1,
+    "scores": [
+     0.00043,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00043,
+      "chunks": 1,
+      "scores": [
+       0.00043
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "3b787a13b4f1c2506f57db34f48d480ba70b14bcc346d8d13b819a6aa3f8bc1b",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001675,
+    "chunks": 1,
+    "scores": [
+     0.00091,
+     0.001675
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00091,
+      "chunks": 1,
+      "scores": [
+       0.00091
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.001675,
+      "chunks": 1,
+      "scores": [
+       0.001675
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "3bac0b1be8702d1c1da2805841f0527553a5f9912f8fdac73b8d2d6684e2e57c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999951,
+    "chunks": 1,
+    "scores": [
+     0.003999,
+     0.999951
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003999,
+      "chunks": 1,
+      "scores": [
+       0.003999
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999951,
+      "chunks": 1,
+      "scores": [
+       0.999951
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "3e1a1fe1ef7e8e014282fca0f872f10f670fe517b1093e4b083a5086b27d580c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.986036,
+    "chunks": 1,
+    "scores": [
+     0.061567,
+     0.986036
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.061567,
+      "chunks": 1,
+      "scores": [
+       0.061567
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Non-violent Illegal Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.986036,
+      "chunks": 1,
+      "scores": [
+       0.986036
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Non-violent Illegal Acts"
+    ]
+   }
+  },
+  {
+   "key": "3e365e2f16b9a29503d2700ff5042eb57ada28aa4e1064c6805cae2c55e0a95f",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999849,
+    "chunks": 1,
+    "scores": [
+     0.001322,
+     0.999849
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001322,
+      "chunks": 1,
+      "scores": [
+       0.001322
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999849,
+      "chunks": 1,
+      "scores": [
+       0.999849
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "3fbeea99242e2375877d13fb82290d7681f25e8e5305a3830a6054b7b83c6ca0",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.991768,
+    "chunks": 1,
+    "scores": [
+     0.000552,
+     0.991768
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000552,
+      "chunks": 1,
+      "scores": [
+       0.000552
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.991768,
+      "chunks": 1,
+      "scores": [
+       0.991768
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "3fcc40123318a9902df55da51c7c91c8ceee90f559c612fd73d544a4a3fad282",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000335,
+    "chunks": 1,
+    "scores": [
+     0.000335,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000335,
+      "chunks": 1,
+      "scores": [
+       0.000335
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "3feefd262f4562cd55475aa24ee215b78ff33d7021ecca2a6b289b26c1b72fd1",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000487,
+    "chunks": 1,
+    "scores": [
+     0.000487,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000487,
+      "chunks": 1,
+      "scores": [
+       0.000487
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "40e119ac5b06c00b27ae4090ac5c4f644576bf6cb131ff36ecf2e8f1200cebb1",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999596,
+    "chunks": 1,
+    "scores": [
+     0.999596,
+     4e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.999596,
+      "chunks": 1,
+      "scores": [
+       0.999596
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Non-violent Illegal Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 4e-06,
+      "chunks": 1,
+      "scores": [
+       4e-06
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Non-violent Illegal Acts"
+    ]
+   }
+  },
+  {
+   "key": "41bd1a5bf44f4f9675af3df0da6f455b902c448198c36a52062f70858ca9f822",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00038,
+    "chunks": 1,
+    "scores": [
+     0.00038,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00038,
+      "chunks": 1,
+      "scores": [
+       0.00038
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "43f65d69f1364c77044da49189f25ad99393a8b68162df854b4a153c61c40f11",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999995,
+    "chunks": 1,
+    "scores": [
+     0.003951,
+     0.999995
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003951,
+      "chunks": 1,
+      "scores": [
+       0.003951
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999995,
+      "chunks": 1,
+      "scores": [
+       0.999995
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "443b5141a181998db18424140b6eadea5d73cdfdd819824f3f18d4ad7cb53c5a",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.028321,
+    "chunks": 1,
+    "scores": [
+     0.001295,
+     0.028321
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001295,
+      "chunks": 1,
+      "scores": [
+       0.001295
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.028321,
+      "chunks": 1,
+      "scores": [
+       0.028321
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "454b50594471308b8fc349f5f325d258f6238aed7084a0a44446fc6f4113df88",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00346,
+    "chunks": 1,
+    "scores": [
+     0.00346,
+     9.3e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00346,
+      "chunks": 1,
+      "scores": [
+       0.00346
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 9.3e-05,
+      "chunks": 1,
+      "scores": [
+       9.3e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "45c6917ba4ae3dc19a909ef39eb63e3788973308e91ef7377068dd3014b030d4",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.003511,
+    "chunks": 1,
+    "scores": [
+     0.003511,
+     3e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003511,
+      "chunks": 1,
+      "scores": [
+       0.003511
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3e-06,
+      "chunks": 1,
+      "scores": [
+       3e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "45cb5e7ce6f6818f8952fcf921f361eae213331c4d3ab382470b9bf277df6e8b",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.995726,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.995726,
+      "chunks": 1,
+      "scores": [
+       0.995726
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "467defc406d7f47f293f17fc60feaad413dccd966a06be3edf40e5154123d57e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.565253,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.565253,
+      "chunks": 1,
+      "scores": [
+       0.565253
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "49232031a3e6338811c3136fd0230c8c0f6a37aabde2b607ca4cae55e08f7456",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.293249,
+    "chunks": 1,
+    "scores": [
+     0.087189,
+     0.293249
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.087189,
+      "chunks": 1,
+      "scores": [
+       0.087189
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Non-violent Illegal Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.293249,
+      "chunks": 1,
+      "scores": [
+       0.293249
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Non-violent Illegal Acts"
+    ]
+   }
+  },
+  {
+   "key": "49852bd31e6011d3c61567652550158acc690b88dfcd36101c65184c0a65109b",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000552,
+    "chunks": 1,
+    "scores": [
+     0.000552,
+     0.000211
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000552,
+      "chunks": 1,
+      "scores": [
+       0.000552
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000211,
+      "chunks": 1,
+      "scores": [
+       0.000211
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "4b7e6858d8e3198149592b60fb4cf8285293ec1f59a69203439a75022cfa16ba",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.003554,
+    "chunks": 1,
+    "scores": [
+     0.003554,
+     1.6e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003554,
+      "chunks": 1,
+      "scores": [
+       0.003554
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.6e-05,
+      "chunks": 1,
+      "scores": [
+       1.6e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "4e598829845b4a55adf51a6c38cf7e1d6fe55156a2e057b576535cf79774f5db",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001675,
+    "chunks": 1,
+    "scores": [
+     0.000804,
+     0.001675
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000804,
+      "chunks": 1,
+      "scores": [
+       0.000804
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.001675,
+      "chunks": 1,
+      "scores": [
+       0.001675
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5107c826148e80fb198d25d6c587b1c334d4200cf2e3a5b6fc76d6d36d7d981b",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00686,
+    "chunks": 1,
+    "scores": [
+     0.00686,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00686,
+      "chunks": 1,
+      "scores": [
+       0.00686
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5143dde09c6ea2ce58952778b76773e46bdf478c4d5383e2251cd3671c96bca5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.989691,
+    "chunks": 1,
+    "scores": [
+     0.032708,
+     0.989691
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.032708,
+      "chunks": 1,
+      "scores": [
+       0.032708
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.989691,
+      "chunks": 1,
+      "scores": [
+       0.989691
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5371ca4b45b9b10aa3ce16aeb187615862b801a81a83cada39ad14b153d242c6",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.997823,
+    "chunks": 1,
+    "scores": [
+     0.001317,
+     0.997823
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001317,
+      "chunks": 1,
+      "scores": [
+       0.001317
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.997823,
+      "chunks": 1,
+      "scores": [
+       0.997823
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "55f619fcc3c6e1b15053598ec78d7f5992817d6b97c062c26f480847e22a5d18",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.989561,
+    "chunks": 1,
+    "scores": [
+     0.00043,
+     0.989561
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00043,
+      "chunks": 1,
+      "scores": [
+       0.00043
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.989561,
+      "chunks": 1,
+      "scores": [
+       0.989561
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5697782cdd200faaa313baa594be9cb24d8499874be059088f1b6574630d38bf",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999995,
+    "chunks": 1,
+    "scores": [
+     0.000909,
+     0.999995
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000909,
+      "chunks": 1,
+      "scores": [
+       0.000909
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999995,
+      "chunks": 1,
+      "scores": [
+       0.999995
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5843461ac3dd55390a4641d8db88009a1baaad82734b6d4a8e8402d43f86a102",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00103,
+    "chunks": 1,
+    "scores": [
+     0.00103,
+     0.000237
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00103,
+      "chunks": 1,
+      "scores": [
+       0.00103
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000237,
+      "chunks": 1,
+      "scores": [
+       0.000237
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5a14b25cbf81adbfd9459640eb3730eed2f4668bf9bceecc835fb013904f1fd5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.091833,
+    "chunks": 1,
+    "scores": [
+     0.027822,
+     0.091833
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.027822,
+      "chunks": 1,
+      "scores": [
+       0.027822
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.091833,
+      "chunks": 1,
+      "scores": [
+       0.091833
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5ac5def6be4a1a44abe9cd6087cd374c76a764d66803f86acfe145996a12ca90",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001306,
+    "chunks": 1,
+    "scores": [
+     0.001306,
+     4.7e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001306,
+      "chunks": 1,
+      "scores": [
+       0.001306
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 4.7e-05,
+      "chunks": 1,
+      "scores": [
+       4.7e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5c988aa629e000cb0a491b606027ec6a9160dee0b27ee0cdccf634b99a373686",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001322,
+    "chunks": 1,
+    "scores": [
+     0.001322,
+     3.7e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001322,
+      "chunks": 1,
+      "scores": [
+       0.001322
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3.7e-05,
+      "chunks": 1,
+      "scores": [
+       3.7e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5d66cabeb2713bc36d2cb5db0ebf29645376e128a83b3bac4724f87fdce1de01",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001654,
+    "chunks": 1,
+    "scores": [
+     0.000203,
+     0.001654
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000203,
+      "chunks": 1,
+      "scores": [
+       0.000203
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.001654,
+      "chunks": 1,
+      "scores": [
+       0.001654
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5db4e5bf4aecfec64c8b41ab03fd89826eca666ff6e71c501f780cfc006ff690",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.014753,
+    "chunks": 1,
+    "scores": [
+     0.014753,
+     0.004678
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.014753,
+      "chunks": 1,
+      "scores": [
+       0.014753
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.004678,
+      "chunks": 1,
+      "scores": [
+       0.004678
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "5f89398d8f51055318aef9e8e7ad30031e97c6cd6fb0e1e3a0b9f2735845cb56",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.716723,
+    "chunks": 1,
+    "scores": [
+     0.440823,
+     0.716723
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.440823,
+      "chunks": 1,
+      "scores": [
+       0.440823
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Non-violent Illegal Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.716723,
+      "chunks": 1,
+      "scores": [
+       0.716723
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Non-violent Illegal Acts"
+    ]
+   }
+  },
+  {
+   "key": "626d4842d09c437e54ad5b60fc4258bfb88dcfb9e658884f3c5e36ca153c6fab",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.011566,
+    "chunks": 1,
+    "scores": [
+     0.000803,
+     0.011566
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000803,
+      "chunks": 1,
+      "scores": [
+       0.000803
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.011566,
+      "chunks": 1,
+      "scores": [
+       0.011566
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "62e71ce5ae1ee9d8edcaab19e29df02816c1a54403b907cf55135417825b1d93",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000803,
+    "chunks": 1,
+    "scores": [
+     0.000803,
+     4.5e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000803,
+      "chunks": 1,
+      "scores": [
+       0.000803
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 4.5e-05,
+      "chunks": 1,
+      "scores": [
+       4.5e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "634cb40fc11a6e56a3759554f5c9f98b9b28548d151bd12fbf83c5336461cd61",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.965324,
+    "chunks": 1,
+    "scores": [
+     0.965324,
+     0.000307
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.965324,
+      "chunks": 1,
+      "scores": [
+       0.965324
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000307,
+      "chunks": 1,
+      "scores": [
+       0.000307
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "662411ab1a84db7d0847f729e29ace89e43a183e35378cf61d91c039a46727f0",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.005068,
+    "chunks": 1,
+    "scores": [
+     0.005068,
+     0.000695
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.005068,
+      "chunks": 1,
+      "scores": [
+       0.005068
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000695,
+      "chunks": 1,
+      "scores": [
+       0.000695
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "662eca95a7f6232e91ed3fbb545007a87753dfcd9871092647165ea316522c99",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001912,
+    "chunks": 1,
+    "scores": [
+     0.001912,
+     0.000423
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001912,
+      "chunks": 1,
+      "scores": [
+       0.001912
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000423,
+      "chunks": 1,
+      "scores": [
+       0.000423
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "6712a9a660a52ac72d4815a7685776bcdf34b4324923b4f18fec00bfe18d01e4",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.960547,
+    "chunks": 1,
+    "scores": [
+     0.003529,
+     0.960547
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003529,
+      "chunks": 1,
+      "scores": [
+       0.003529
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.960547,
+      "chunks": 1,
+      "scores": [
+       0.960547
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "6739ad9ff20d7737d833252003064cf3bbca1fd7d0e3b0bbec4a123eccc599e9",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.318102,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.318102,
+      "chunks": 1,
+      "scores": [
+       0.318102
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "PII"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "PII"
+    ]
+   }
+  },
+  {
+   "key": "675a23e183842213c3709211a954a7cda917a33a4397fe66e397c26c5d2e2d89",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00038,
+    "chunks": 1,
+    "scores": [
+     0.00038,
+     3e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00038,
+      "chunks": 1,
+      "scores": [
+       0.00038
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3e-06,
+      "chunks": 1,
+      "scores": [
+       3e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "68ee50ae8c7e52da2fa54b39971bc211b3f244f0dd7c23e4ee85979c20c6804d",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000709,
+    "chunks": 1,
+    "scores": [
+     0.000709,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000709,
+      "chunks": 1,
+      "scores": [
+       0.000709
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "69729b1529c66d87f17711a1d7069fb152b1b45be5772b701f15cefa9b647e7f",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.002337,
+    "chunks": 1,
+    "scores": [
+     0.001319,
+     0.002337
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001319,
+      "chunks": 1,
+      "scores": [
+       0.001319
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.002337,
+      "chunks": 1,
+      "scores": [
+       0.002337
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "69f8c1bb16166773c06d7c2bc69e11f7abcef34dfc489af7a2fedb3bac3b880e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.970452,
+    "chunks": 1,
+    "scores": [
+     0.001166,
+     0.970452
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001166,
+      "chunks": 1,
+      "scores": [
+       0.001166
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.970452,
+      "chunks": 1,
+      "scores": [
+       0.970452
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "6c0cfff98280034ce6f6b31106be474bc1de19165eb6c6fefb78798159b0112e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.04407,
+    "chunks": 1,
+    "scores": [
+     0.001026,
+     0.04407
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001026,
+      "chunks": 1,
+      "scores": [
+       0.001026
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.04407,
+      "chunks": 1,
+      "scores": [
+       0.04407
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "6d71bda8ee144ef615a25ed638cc9193c59d0bf46585d943cbcd46bc2d77b99b",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.314573,
+    "chunks": 1,
+    "scores": [
+     0.000552,
+     0.314573
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000552,
+      "chunks": 1,
+      "scores": [
+       0.000552
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.314573,
+      "chunks": 1,
+      "scores": [
+       0.314573
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "6ff4aec3719c150a4acf7a45e65129502334492d9ccf97c49725266d8d84844e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.003098,
+    "chunks": 1,
+    "scores": [
+     0.002461,
+     0.003098
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002461,
+      "chunks": 1,
+      "scores": [
+       0.002461
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.003098,
+      "chunks": 1,
+      "scores": [
+       0.003098
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "707aca2bfbb034c9a7b49a2bc92d20734ce2c9068854f61db5ef67bd2d57f07b",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999586,
+    "chunks": 1,
+    "scores": [
+     0.001883,
+     0.999586
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001883,
+      "chunks": 1,
+      "scores": [
+       0.001883
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999586,
+      "chunks": 1,
+      "scores": [
+       0.999586
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "70c8102036f1f420cce2f342358d31fbadd143b581a36f70839a52a5f45296c6",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.870039,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.870039,
+      "chunks": 1,
+      "scores": [
+       0.870039
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "7104ecc48b25c1bcb0efca86d8ec43fdbb877d5afe334acd0592be90110864ed",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.003445,
+    "chunks": 1,
+    "scores": [
+     0.000706,
+     0.003445
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000706,
+      "chunks": 1,
+      "scores": [
+       0.000706
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.003445,
+      "chunks": 1,
+      "scores": [
+       0.003445
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "737657114d0c0b6eb9236bcff089da2c60f31e5c049c8657696f873997f9eb8c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00103,
+    "chunks": 1,
+    "scores": [
+     0.00103,
+     4e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00103,
+      "chunks": 1,
+      "scores": [
+       0.00103
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 4e-06,
+      "chunks": 1,
+      "scores": [
+       4e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "74281ced406ef12f7a06c02921b9702feca38783f5b558c67251e11bbd27bfff",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.005805,
+    "chunks": 1,
+    "scores": [
+     0.005805,
+     0.002105
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.005805,
+      "chunks": 1,
+      "scores": [
+       0.005805
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.002105,
+      "chunks": 1,
+      "scores": [
+       0.002105
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "75b934d13001777745442c322946c30bf98233dff9bb03bc850cafddeaa23e3c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.032686,
+    "chunks": 1,
+    "scores": [
+     0.003489,
+     0.032686
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003489,
+      "chunks": 1,
+      "scores": [
+       0.003489
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.032686,
+      "chunks": 1,
+      "scores": [
+       0.032686
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "768fdd47146364d2995dfff93afb2a5d6ff68503d56b64f4aa226b97dbffe1a8",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00091,
+    "chunks": 1,
+    "scores": [
+     0.00091,
+     0.000301
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00091,
+      "chunks": 1,
+      "scores": [
+       0.00091
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000301,
+      "chunks": 1,
+      "scores": [
+       0.000301
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "774f7f17c9064499998d9057dd085bbc9bc6574cbb66ae5956e6c2f490948f5a",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.041593,
+    "chunks": 1,
+    "scores": [
+     0.001151,
+     0.041593
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001151,
+      "chunks": 1,
+      "scores": [
+       0.001151
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.041593,
+      "chunks": 1,
+      "scores": [
+       0.041593
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "78673e19355b61f30d8e4a0e4afaaae6194afa436e4649546a85773437218e34",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.010192,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.010192,
+      "chunks": 1,
+      "scores": [
+       0.010192
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "79309f384eff75632be1d41f62c8d206991d0c9b9edc62112122627a87668cb8",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001321,
+    "chunks": 1,
+    "scores": [
+     0.001321,
+     0.000165
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001321,
+      "chunks": 1,
+      "scores": [
+       0.001321
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000165,
+      "chunks": 1,
+      "scores": [
+       0.000165
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "7d3028f4033b67d952541bc15100f106cf02eb0bc63476025de487128fe76941",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.003402,
+    "chunks": 1,
+    "scores": [
+     0.003402,
+     0.002228
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003402,
+      "chunks": 1,
+      "scores": [
+       0.003402
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.002228,
+      "chunks": 1,
+      "scores": [
+       0.002228
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "7d67a1961d1052e7640ecee80adbf8b7a41d5154c49cff7fcb90eeadec846a0b",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.002737,
+    "chunks": 1,
+    "scores": [
+     0.002737,
+     0.000179
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002737,
+      "chunks": 1,
+      "scores": [
+       0.002737
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000179,
+      "chunks": 1,
+      "scores": [
+       0.000179
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "7df1e599065a08adf38815b25d02f73c41c6ecb773b6af5848b4c6e149fb7473",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.997402,
+    "chunks": 1,
+    "scores": [
+     0.996578,
+     0.997402
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.996578,
+      "chunks": 1,
+      "scores": [
+       0.996578
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "PII"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.997402,
+      "chunks": 1,
+      "scores": [
+       0.997402
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "PII"
+    ]
+   }
+  },
+  {
+   "key": "7ec28c627c9bafb3fe5625bdb495bc3cc43c9dd1ef41198dd224153ed10091a0",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000626,
+    "chunks": 1,
+    "scores": [
+     0.000626,
+     3e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000626,
+      "chunks": 1,
+      "scores": [
+       0.000626
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3e-06,
+      "chunks": 1,
+      "scores": [
+       3e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "7fd4b1c8b317ace2483b5024e0cf6520e8b3b2bcdd4db271378fdf2310e9dcb5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000626,
+    "chunks": 1,
+    "scores": [
+     0.000626,
+     4.9e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000626,
+      "chunks": 1,
+      "scores": [
+       0.000626
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 4.9e-05,
+      "chunks": 1,
+      "scores": [
+       4.9e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "80b0df484fcecd8917ecd287f6b275dbf1842de14e95243ec3d62a2775c346ae",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.09755,
+    "chunks": 1,
+    "scores": [
+     0.000626,
+     0.09755
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000626,
+      "chunks": 1,
+      "scores": [
+       0.000626
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.09755,
+      "chunks": 1,
+      "scores": [
+       0.09755
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "84bb25304e0dcbb5a43ad699263bb68ce615a013232af7ca5516118fab2e7844",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000335,
+    "chunks": 1,
+    "scores": [
+     0.000335,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000335,
+      "chunks": 1,
+      "scores": [
+       0.000335
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "863c095d0d7bf23672a2aa2c0f4b7f007a399397d4838051f48209a941a90f36",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.002173,
+    "chunks": 1,
+    "scores": [
+     0.002173,
+     0.001142
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002173,
+      "chunks": 1,
+      "scores": [
+       0.002173
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.001142,
+      "chunks": 1,
+      "scores": [
+       0.001142
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "86dbc613cd045a334149a62cff87f9783cacf1ad703146e99529e0a0afe8c3d4",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.081629,
+    "chunks": 1,
+    "scores": [
+     0.023581,
+     0.081629
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.023581,
+      "chunks": 1,
+      "scores": [
+       0.023581
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.081629,
+      "chunks": 1,
+      "scores": [
+       0.081629
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "881ad2034add52d4919a0cdbf7c74155663d847727031706197388d88205e0c3",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000296,
+    "chunks": 1,
+    "scores": [
+     0.000296,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000296,
+      "chunks": 1,
+      "scores": [
+       0.000296
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "89463d16fa8df369112a42e4ea40e54fb395341963021bacfcac80c7c2857182",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.002871,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002871,
+      "chunks": 1,
+      "scores": [
+       0.002871
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "8a289f36d5dc1aaa43511791d94aa575b7a81c2849d930dc5092d8a84a6c2a61",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999999,
+    "chunks": 1,
+    "scores": [
+     0.008561,
+     0.999999
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.008561,
+      "chunks": 1,
+      "scores": [
+       0.008561
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999999,
+      "chunks": 1,
+      "scores": [
+       0.999999
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "8a72460407fb27da285d8cbfe95f5c4e0c99397106820bfc5f055c76a51bf930",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.998566,
+    "chunks": 1,
+    "scores": [
+     0.998566,
+     9e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.998566,
+      "chunks": 1,
+      "scores": [
+       0.998566
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Non-violent Illegal Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 9e-06,
+      "chunks": 1,
+      "scores": [
+       9e-06
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Non-violent Illegal Acts"
+    ]
+   }
+  },
+  {
+   "key": "8b2d2fd5522b76011370d4af73dd46b29bd5bbdc3726e6848c7a5d22c08a3d65",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999999,
+    "chunks": 1,
+    "scores": [
+     0.033024,
+     0.999999
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.033024,
+      "chunks": 1,
+      "scores": [
+       0.033024
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Suicide & Self-Harm"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999999,
+      "chunks": 1,
+      "scores": [
+       0.999999
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Suicide & Self-Harm"
+    ]
+   }
+  },
+  {
+   "key": "8bb7234d9ccc52ce383d11066ddff6cfd2a5b2aebe49f1ba8e1eddfcf41856a0",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.002168,
+    "chunks": 1,
+    "scores": [
+     0.002168,
+     0.000551
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002168,
+      "chunks": 1,
+      "scores": [
+       0.002168
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000551,
+      "chunks": 1,
+      "scores": [
+       0.000551
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "8e2e5c08ecd0b8dd867ec78eaf3080c885b15cc9b0176ae669388f0c81fd0157",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999998,
+    "chunks": 1,
+    "scores": [
+     0.537753,
+     0.999998
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.537753,
+      "chunks": 1,
+      "scores": [
+       0.537753
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999998,
+      "chunks": 1,
+      "scores": [
+       0.999998
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "900c450bfa3e4bdcc544c7084b8cdbbe9f255a1dca574409b430868a675ab690",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00346,
+    "chunks": 1,
+    "scores": [
+     0.00346,
+     0.000719
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00346,
+      "chunks": 1,
+      "scores": [
+       0.00346
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000719,
+      "chunks": 1,
+      "scores": [
+       0.000719
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "901d3a9064f254c7b30015ca306a977b1989e99d98dd7b7278dc7d889154b458",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.019721,
+    "chunks": 1,
+    "scores": [
+     0.019721,
+     0.002929
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.019721,
+      "chunks": 1,
+      "scores": [
+       0.019721
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.002929,
+      "chunks": 1,
+      "scores": [
+       0.002929
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "90b07a35e363bdeaffc376bb1c5adfdb5f71daafe594bbd4680ce779cbfc183c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.012287,
+    "chunks": 1,
+    "scores": [
+     0.012287,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.012287,
+      "chunks": 1,
+      "scores": [
+       0.012287
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "9428763aa9667b21fa4e2deb523bb5379fd810d6389541131877ca5da4924ff8",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999999,
+    "chunks": 1,
+    "scores": [
+     0.008133,
+     0.999999
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.008133,
+      "chunks": 1,
+      "scores": [
+       0.008133
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999999,
+      "chunks": 1,
+      "scores": [
+       0.999999
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "94d8c6094635598334bc88f4cd23a5e0498649e9845365224aa9bd5d23ff3e51",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001892,
+    "chunks": 1,
+    "scores": [
+     0.001892,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001892,
+      "chunks": 1,
+      "scores": [
+       0.001892
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "9617049b566998dc6d73bb2dc88cdb4fd3de712ac83194b2fb5f9b455a265493",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00308,
+    "chunks": 1,
+    "scores": [
+     0.00308,
+     0.000264
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00308,
+      "chunks": 1,
+      "scores": [
+       0.00308
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000264,
+      "chunks": 1,
+      "scores": [
+       0.000264
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "98f88b6c3d2da891511ecf2396b25d421548c5084985c84face0e3b46d80a687",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000803,
+    "chunks": 1,
+    "scores": [
+     0.000803,
+     0.000295
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000803,
+      "chunks": 1,
+      "scores": [
+       0.000803
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000295,
+      "chunks": 1,
+      "scores": [
+       0.000295
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "9b639150329a3a6c98e4b41667d9d546befdd802438663ba634a1e7d1c172fa1",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999986,
+    "chunks": 1,
+    "scores": [
+     0.020182,
+     0.999986
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.020182,
+      "chunks": 1,
+      "scores": [
+       0.020182
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999986,
+      "chunks": 1,
+      "scores": [
+       0.999986
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "9caf348086147578dc3c4907c7dc0657e4b86a261571c5fa8fbc1bc7b61f5428",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000552,
+    "chunks": 1,
+    "scores": [
+     0.000552,
+     0.000144
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000552,
+      "chunks": 1,
+      "scores": [
+       0.000552
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000144,
+      "chunks": 1,
+      "scores": [
+       0.000144
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a01b94a45ebf7b5f0d21636acc4b7703f99b647dbcb82548ee6d112de488a109",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00043,
+    "chunks": 1,
+    "scores": [
+     0.00043,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00043,
+      "chunks": 1,
+      "scores": [
+       0.00043
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a219efcdfdc85b0adb32ae81b971a7ce8ca97ba8c7d068de9e27afe314f0aa8b",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000708,
+    "chunks": 1,
+    "scores": [
+     0.000708,
+     0.000284
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000708,
+      "chunks": 1,
+      "scores": [
+       0.000708
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000284,
+      "chunks": 1,
+      "scores": [
+       0.000284
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a268e248d7f70d8e2071d359a070d7e23f264faea5864df9dea9eee91453a69a",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000488,
+    "chunks": 1,
+    "scores": [
+     0.000488,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000488,
+      "chunks": 1,
+      "scores": [
+       0.000488
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a42320b4dc6e4242c423c282aa9b5b68af5c1b64dde2433a0f746417301c8981",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.002744,
+    "chunks": 1,
+    "scores": [
+     0.002744,
+     5.7e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002744,
+      "chunks": 1,
+      "scores": [
+       0.002744
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 5.7e-05,
+      "chunks": 1,
+      "scores": [
+       5.7e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a49b3ab65b5959345dff784f23602a81e576cb1f7d0bd7f00786f36b1a381dea",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000804,
+    "chunks": 1,
+    "scores": [
+     0.000804,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000804,
+      "chunks": 1,
+      "scores": [
+       0.000804
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a503631bd7f12d6dc2f8a64b40acec4ee632b33b29b8d2d186e2eb2fe7c2bff0",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.066442,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.066442,
+      "chunks": 1,
+      "scores": [
+       0.066442
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Copyright Violation"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Copyright Violation"
+    ]
+   }
+  },
+  {
+   "key": "a509aaf96b404425ab8a922e245eb0a275510d450f760b5ebb16ff4a934f10ed",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00038,
+    "chunks": 1,
+    "scores": [
+     0.00038,
+     3e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00038,
+      "chunks": 1,
+      "scores": [
+       0.00038
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3e-06,
+      "chunks": 1,
+      "scores": [
+       3e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a5d7510b112f9234c683490bedb3e5a93ca38be728aabb4d1391ef352468e9e6",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001445,
+    "chunks": 1,
+    "scores": [
+     0.001445,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001445,
+      "chunks": 1,
+      "scores": [
+       0.001445
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a5e29714518168f592c462fff13d4942caf40ed80f3931b197149fece046e512",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.004334,
+    "chunks": 1,
+    "scores": [
+     0.004334,
+     0.001794
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.004334,
+      "chunks": 1,
+      "scores": [
+       0.004334
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.001794,
+      "chunks": 1,
+      "scores": [
+       0.001794
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a742f479403ef5cc91db39d85e35667593cf41278a02e66f709f58d1e763693d",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001167,
+    "chunks": 1,
+    "scores": [
+     0.001167,
+     1e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001167,
+      "chunks": 1,
+      "scores": [
+       0.001167
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-05,
+      "chunks": 1,
+      "scores": [
+       1e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a78079aa74ef133af9deeee1dbdb640002b306aea0788721051fe7b6636894fd",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.929328,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.929328,
+      "chunks": 1,
+      "scores": [
+       0.929328
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "a78e6214a364427d3bebe208707450d0f9fcf9f1f2e4a4b3b8043dc1d5e28aed",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001497,
+    "chunks": 1,
+    "scores": [
+     0.001497,
+     3e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001497,
+      "chunks": 1,
+      "scores": [
+       0.001497
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3e-06,
+      "chunks": 1,
+      "scores": [
+       3e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a7f52addf745db1f65177e8abb522b7e69dfc4702ef01e8370d357b228e2458a",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001029,
+    "chunks": 1,
+    "scores": [
+     0.001029,
+     1.1e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001029,
+      "chunks": 1,
+      "scores": [
+       0.001029
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.1e-05,
+      "chunks": 1,
+      "scores": [
+       1.1e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "a8ef0d6d97b82737fb8f213ceae2493021ec0db5667eef4f5fadbeee3c526bf4",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00043,
+    "chunks": 1,
+    "scores": [
+     0.00043,
+     3.9e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00043,
+      "chunks": 1,
+      "scores": [
+       0.00043
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3.9e-05,
+      "chunks": 1,
+      "scores": [
+       3.9e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "aa2f1eafaeb9384fdf43db10c36ad130265321964afb33ffc62cb69f153df8d2",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000109,
+    "chunks": 1,
+    "scores": [
+     0.000109,
+     1.4e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000109,
+      "chunks": 1,
+      "scores": [
+       0.000109
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.4e-05,
+      "chunks": 1,
+      "scores": [
+       1.4e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "aaaaa98b810f0de796ab9f83d67f5f7d670250f7c4739d46c2bd40d4c4e03618",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000707,
+    "chunks": 1,
+    "scores": [
+     0.000707,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000707,
+      "chunks": 1,
+      "scores": [
+       0.000707
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "abdcc9e85bb7b3083290c13f1003756d68608a5e70d87d42397fad6090d915f2",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.029065,
+    "chunks": 1,
+    "scores": [
+     0.016685,
+     0.029065
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.016685,
+      "chunks": 1,
+      "scores": [
+       0.016685
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.029065,
+      "chunks": 1,
+      "scores": [
+       0.029065
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "ae726a857d21c1f96e04e5f96dc42343afd1236574996558fe91dddcad159791",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000709,
+    "chunks": 1,
+    "scores": [
+     0.000709,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000709,
+      "chunks": 1,
+      "scores": [
+       0.000709
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "ae7b549d39d496a870566c1eb1d8e559522c57fc8efebc365cb486c4b0bd6e89",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.003462,
+    "chunks": 1,
+    "scores": [
+     0.001492,
+     0.003462
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001492,
+      "chunks": 1,
+      "scores": [
+       0.001492
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.003462,
+      "chunks": 1,
+      "scores": [
+       0.003462
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "aed2f9e40c37c295f1112ec0ca174d7bfcb62870dc6cee35539afacaa8adfa06",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.637154,
+    "chunks": 1,
+    "scores": [
+     0.637154,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.637154,
+      "chunks": 1,
+      "scores": [
+       0.637154
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Non-violent Illegal Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Non-violent Illegal Acts"
+    ]
+   }
+  },
+  {
+   "key": "aed621821487c514ed729e4f5ffa72e1aac49914e6ed37ad9d234f718094cde7",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.28743,
+    "chunks": 1,
+    "scores": [
+     0.002159,
+     0.28743
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002159,
+      "chunks": 1,
+      "scores": [
+       0.002159
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.28743,
+      "chunks": 1,
+      "scores": [
+       0.28743
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b085f765ec4e579aa3fafa48324fafcf39a0d5361541d5e77abc17da208e2b1a",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000261,
+    "chunks": 1,
+    "scores": [
+     0.000261,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000261,
+      "chunks": 1,
+      "scores": [
+       0.000261
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b20c50123434f75d203d268fc8516b24365b05ed18c2e431d3431ee7d5a7e411",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999999,
+    "chunks": 1,
+    "scores": [
+     0.00536,
+     0.999999
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00536,
+      "chunks": 1,
+      "scores": [
+       0.00536
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999999,
+      "chunks": 1,
+      "scores": [
+       0.999999
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b27e4818f77013f4ba140ec447234014ca2b3640bdc872cbb1d1e6ee2d0c924c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000295,
+    "chunks": 1,
+    "scores": [
+     0.000295,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000295,
+      "chunks": 1,
+      "scores": [
+       0.000295
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b2d7e6d9cfddef50db5545c96c330901dcbc0821086294ae6fcd7220543c018c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001323,
+    "chunks": 1,
+    "scores": [
+     0.001323,
+     0.000101
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001323,
+      "chunks": 1,
+      "scores": [
+       0.001323
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000101,
+      "chunks": 1,
+      "scores": [
+       0.000101
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b2ec141bc6de6d540f699d5261d440baab63a5b0dd148a217983f2859ef03fda",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.002171,
+    "chunks": 1,
+    "scores": [
+     0.002171,
+     0.000189
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002171,
+      "chunks": 1,
+      "scores": [
+       0.002171
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000189,
+      "chunks": 1,
+      "scores": [
+       0.000189
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b3be3b5ccd00a2998980dd1e47ebe00d5a8ea68f1dc5e5e7f7b5fdbb0fe04896",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.812503,
+    "chunks": 1,
+    "scores": [
+     0.812503,
+     0.204147
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.812503,
+      "chunks": 1,
+      "scores": [
+       0.812503
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Non-violent Illegal Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.204147,
+      "chunks": 1,
+      "scores": [
+       0.204147
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Non-violent Illegal Acts"
+    ]
+   }
+  },
+  {
+   "key": "b3d7fbc49fee7abfd40b5f98b20a62e5d73fd6a0d4e17643f9e488b718249991",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.994237,
+    "chunks": 1,
+    "scores": [
+     0.000552,
+     0.994237
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000552,
+      "chunks": 1,
+      "scores": [
+       0.000552
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.994237,
+      "chunks": 1,
+      "scores": [
+       0.994237
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b4ed872b512546d3cfa6255259c6627dd14dbc6fd98c2a70cb354542bb7fb388",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999925,
+    "chunks": 1,
+    "scores": [
+     0.000909,
+     0.999925
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000909,
+      "chunks": 1,
+      "scores": [
+       0.000909
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999925,
+      "chunks": 1,
+      "scores": [
+       0.999925
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b5ad8bfd8d93a80a12e90a67be0a73dd08cffd18cbec17a653f65a2a32352ac5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.984766,
+    "chunks": 1,
+    "scores": [
+     0.002168,
+     0.984766
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002168,
+      "chunks": 1,
+      "scores": [
+       0.002168
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.984766,
+      "chunks": 1,
+      "scores": [
+       0.984766
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b5f0b521fd2b6e776a208c19ee38cb793311cc56f12c8460bc2c0582fd178489",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.007328,
+    "chunks": 1,
+    "scores": [
+     0.007328,
+     3.6e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.007328,
+      "chunks": 1,
+      "scores": [
+       0.007328
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3.6e-05,
+      "chunks": 1,
+      "scores": [
+       3.6e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b6a246a13ec189c287067182f8f975a22eb4feb7ed0a295b50dbd23c506081c2",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.003549,
+    "chunks": 1,
+    "scores": [
+     0.003549,
+     5.1e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003549,
+      "chunks": 1,
+      "scores": [
+       0.003549
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 5.1e-05,
+      "chunks": 1,
+      "scores": [
+       5.1e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b6aa789ccdedf479df68133f12b0990f02a6cde291bf13d3d9fd2753f0539c92",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00055,
+    "chunks": 1,
+    "scores": [
+     0.00055,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00055,
+      "chunks": 1,
+      "scores": [
+       0.00055
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b7810297c92c087bc9bf953e7086df85f5d298a2e299fdc367fc352e912e1bc5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999999,
+    "chunks": 1,
+    "scores": [
+     0.996197,
+     0.999999
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.996197,
+      "chunks": 1,
+      "scores": [
+       0.996197
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999999,
+      "chunks": 1,
+      "scores": [
+       0.999999
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "b7d22b4265a80c6c73b394bc4d60e6e9b29a686c24560c6d7f9a7700cfc2d94c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000707,
+    "chunks": 1,
+    "scores": [
+     0.000707,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000707,
+      "chunks": 1,
+      "scores": [
+       0.000707
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "b87d28282fc4b052fad34eff0d3567ad5ea145df4b51560a493fa6c7226a126e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001499,
+    "chunks": 1,
+    "scores": [
+     0.001499,
+     2.5e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001499,
+      "chunks": 1,
+      "scores": [
+       0.001499
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2.5e-05,
+      "chunks": 1,
+      "scores": [
+       2.5e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "bbe2716f785ec08b4215e2ef90c735a74e416c365019c075630f5f0ccdfb74cf",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.003827,
+    "chunks": 1,
+    "scores": [
+     0.003827,
+     3e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003827,
+      "chunks": 1,
+      "scores": [
+       0.003827
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3e-06,
+      "chunks": 1,
+      "scores": [
+       3e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "bc580561d6fb1e1231afd9083d58adf5f70ee3fd58b5e93d072ab4f2a814471a",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.019877,
+    "chunks": 1,
+    "scores": [
+     0.019877,
+     0.004071
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.019877,
+      "chunks": 1,
+      "scores": [
+       0.019877
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "PII"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.004071,
+      "chunks": 1,
+      "scores": [
+       0.004071
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "PII"
+    ]
+   }
+  },
+  {
+   "key": "c11b6b2d04d5590900566d606f161de4b84cafd47b0bb0901e01c876fc37ca3d",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.994682,
+    "chunks": 1,
+    "scores": [
+     0.249663,
+     0.994682
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.249663,
+      "chunks": 1,
+      "scores": [
+       0.249663
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Politically Sensitive Topics"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.994682,
+      "chunks": 1,
+      "scores": [
+       0.994682
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Politically Sensitive Topics"
+    ]
+   }
+  },
+  {
+   "key": "c2ab55b2897e7222cd58ec63628c47a26ca209a7833ea2380a4bfe072f929d6f",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.010154,
+    "chunks": 1,
+    "scores": [
+     0.005101,
+     0.010154
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.005101,
+      "chunks": 1,
+      "scores": [
+       0.005101
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.010154,
+      "chunks": 1,
+      "scores": [
+       0.010154
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "c30a55215a65f7553812894cbe5662302f13b493324314ee8e493bb97c1ba0dd",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.006774,
+    "chunks": 1,
+    "scores": [
+     0.006774,
+     0.001884
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.006774,
+      "chunks": 1,
+      "scores": [
+       0.006774
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.001884,
+      "chunks": 1,
+      "scores": [
+       0.001884
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "c3ac70e78437bb2106afda5c065b5e76166fb75f33a3134c58044d34f772100d",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.002114,
+    "chunks": 1,
+    "scores": [
+     0.00038,
+     0.002114
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00038,
+      "chunks": 1,
+      "scores": [
+       0.00038
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.002114,
+      "chunks": 1,
+      "scores": [
+       0.002114
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "c53ee30fac271b00fee2ee21b05b006b08d8a87b23a44457cb6a23ffab4b07e3",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00043,
+    "chunks": 1,
+    "scores": [
+     0.00043,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00043,
+      "chunks": 1,
+      "scores": [
+       0.00043
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "c5ba45d9840cd21e98dd0456db38120647967d0a422b3c3dc40d6830cd8abbc5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001496,
+    "chunks": 1,
+    "scores": [
+     0.001496,
+     1.5e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001496,
+      "chunks": 1,
+      "scores": [
+       0.001496
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.5e-05,
+      "chunks": 1,
+      "scores": [
+       1.5e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "c6ad1cf39443d9f09b7d74b845c80d314a0a9aadaacb5f90a8e3cb607c425f70",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001387,
+    "chunks": 1,
+    "scores": [
+     0.001387,
+     0.000659
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001387,
+      "chunks": 1,
+      "scores": [
+       0.001387
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000659,
+      "chunks": 1,
+      "scores": [
+       0.000659
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "c8290f45a47415417c3c0f4b7826c471107cea141d1a154eb55ba9c630e82bc9",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.00346,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00346,
+      "chunks": 1,
+      "scores": [
+       0.00346
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "c8b5dc4f862536c3f6207eb38934df10b298ab627c5a27fd3f5052e8e6e34943",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001497,
+    "chunks": 1,
+    "scores": [
+     0.001497,
+     3.6e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001497,
+      "chunks": 1,
+      "scores": [
+       0.001497
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3.6e-05,
+      "chunks": 1,
+      "scores": [
+       3.6e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "c95750d62ef4677b50f6a8242ed7a0061000835fda387e272b93eccbe637afb1",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001324,
+    "chunks": 1,
+    "scores": [
+     0.001324,
+     3e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001324,
+      "chunks": 1,
+      "scores": [
+       0.001324
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3e-05,
+      "chunks": 1,
+      "scores": [
+       3e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "ca4c432221975655e8120fb881d80c31f12a4f742a8d37ad51c41d18cd63e274",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.993336,
+    "chunks": 1,
+    "scores": [
+     0.001892,
+     0.993336
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001892,
+      "chunks": 1,
+      "scores": [
+       0.001892
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.993336,
+      "chunks": 1,
+      "scores": [
+       0.993336
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "cb027add95e25bfd1aac97d2a4fb9be977d4d62c3089084c54d14305e1914f82",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000626,
+    "chunks": 1,
+    "scores": [
+     0.000626,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000626,
+      "chunks": 1,
+      "scores": [
+       0.000626
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "cbf4c317dff1d4c7a44c006fd930320a619a49caa3c42abea0999e417c257be6",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000804,
+    "chunks": 1,
+    "scores": [
+     0.000804,
+     5e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000804,
+      "chunks": 1,
+      "scores": [
+       0.000804
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 5e-06,
+      "chunks": 1,
+      "scores": [
+       5e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "ce3bd0ec4de8ef9c17b69f02ba95a7d5a644f7b609c3f887725e63e0680446a7",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000487,
+    "chunks": 1,
+    "scores": [
+     0.000487,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000487,
+      "chunks": 1,
+      "scores": [
+       0.000487
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "ceba1b049c7f037b026e0709751a7de017548fac0b1a828ee254edfd5058200e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.996977,
+    "chunks": 1,
+    "scores": [
+     0.996977,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.996977,
+      "chunks": 1,
+      "scores": [
+       0.996977
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Violent"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Violent"
+    ]
+   }
+  },
+  {
+   "key": "d048921dd7a1a4a2bc5bd6f9fa754a238b5e2b51548af7e346a0fc62f39a5bc1",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001306,
+    "chunks": 1,
+    "scores": [
+     0.001306,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001306,
+      "chunks": 1,
+      "scores": [
+       0.001306
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "d1d82e244cdc27bf3cf6d7417aad8a3b0ac7f875db4167aefaaae089de7b2826",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.002891,
+    "chunks": 1,
+    "scores": [
+     0.002446,
+     0.002891
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002446,
+      "chunks": 1,
+      "scores": [
+       0.002446
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.002891,
+      "chunks": 1,
+      "scores": [
+       0.002891
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "d1dd354f1371193b645a57cb336d7162e92b1ba474f0cc2a86e430b696b52023",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001695,
+    "chunks": 1,
+    "scores": [
+     0.001695,
+     0.000432
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001695,
+      "chunks": 1,
+      "scores": [
+       0.001695
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000432,
+      "chunks": 1,
+      "scores": [
+       0.000432
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "d2c622bb603a4b3883507fb648a30e4d5d675f3700135162e5eb4602346c307f",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999993,
+    "chunks": 1,
+    "scores": [
+     0.097609,
+     0.999993
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.097609,
+      "chunks": 1,
+      "scores": [
+       0.097609
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Copyright Violation"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999993,
+      "chunks": 1,
+      "scores": [
+       0.999993
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Copyright Violation"
+    ]
+   }
+  },
+  {
+   "key": "d2e936fbb1a8689984346e83cc2fab3f1ab45af544072d28cba78a95aad86208",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000908,
+    "chunks": 1,
+    "scores": [
+     0.000908,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000908,
+      "chunks": 1,
+      "scores": [
+       0.000908
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "d3ae19f50df01a24be46db93c8b78eb40049e99cb8d20abaadadb5ae48eaaa6f",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.896112,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.896112,
+      "chunks": 1,
+      "scores": [
+       0.896112
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "d3cbd97a585ed2ac67c544258861689dfab1f15880b473b9fcf191508744f766",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00043,
+    "chunks": 1,
+    "scores": [
+     0.00043,
+     7e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00043,
+      "chunks": 1,
+      "scores": [
+       0.00043
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 7e-06,
+      "chunks": 1,
+      "scores": [
+       7e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "d3f14305ecace0ae70e3e1fa9574d3a45c4e1fe95d748b747e1497869c04ce00",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001031,
+    "chunks": 1,
+    "scores": [
+     0.001031,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001031,
+      "chunks": 1,
+      "scores": [
+       0.001031
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "d431308da88bb8cc28796f471e3bb1f45d62212d4b7c41f857beee3002df5d86",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000487,
+    "chunks": 1,
+    "scores": [
+     0.000487,
+     1.5e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000487,
+      "chunks": 1,
+      "scores": [
+       0.000487
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.5e-05,
+      "chunks": 1,
+      "scores": [
+       1.5e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "d4709c459f8b3f5ffc16391a4b06988ee612451dd14f91ee62338f2514e2bba2",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.006528,
+    "chunks": 1,
+    "scores": [
+     0.004049,
+     0.006528
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.004049,
+      "chunks": 1,
+      "scores": [
+       0.004049
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.006528,
+      "chunks": 1,
+      "scores": [
+       0.006528
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "d4d9708b1707e68549b5da2832bd309f09098dd00267cb34a82385af5373ad8f",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999993,
+    "chunks": 1,
+    "scores": [
+     0.533354,
+     0.999993
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.533354,
+      "chunks": 1,
+      "scores": [
+       0.533354
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999993,
+      "chunks": 1,
+      "scores": [
+       0.999993
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "d586070d5c4ad504045c4c85aff2be301d9cd32496c2b20681f2d7319d7b6dcb",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999986,
+    "chunks": 1,
+    "scores": [
+     0.338945,
+     0.999986
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.338945,
+      "chunks": 1,
+      "scores": [
+       0.338945
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Copyright Violation"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999986,
+      "chunks": 1,
+      "scores": [
+       0.999986
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Copyright Violation"
+    ]
+   }
+  },
+  {
+   "key": "d71aeba39b39f2b2f6c57900dc754979eeda03a049ce2affc60988c66eb4fdf5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.505811,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.505811,
+      "chunks": 1,
+      "scores": [
+       0.505811
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "d8b58e48fcbcac4876b7542ab9643bc3420a7ccd8114553f3f0f0f35a977f507",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000551,
+    "chunks": 1,
+    "scores": [
+     0.000551,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000551,
+      "chunks": 1,
+      "scores": [
+       0.000551
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "d9b53a3d33412b8de38101cea8f31cd39b4614853935fe832ca040287f8791b5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001024,
+    "chunks": 1,
+    "scores": [
+     0.001024,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001024,
+      "chunks": 1,
+      "scores": [
+       0.001024
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "dbedaf77ca7c5ae39a8b5d72c61ee098c68ac32f6ec588967e90bfac5027c7a0",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000626,
+    "chunks": 1,
+    "scores": [
+     0.000626,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000626,
+      "chunks": 1,
+      "scores": [
+       0.000626
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "de0a1dc4fbb181df0a3420603ecc5c4b4f002fb04de23e331e1e0a7a99d7544e",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999999,
+    "chunks": 1,
+    "scores": [
+     0.388436,
+     0.999999
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.388436,
+      "chunks": 1,
+      "scores": [
+       0.388436
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Sexual Content or Sexual Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999999,
+      "chunks": 1,
+      "scores": [
+       0.999999
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Sexual Content or Sexual Acts"
+    ]
+   }
+  },
+  {
+   "key": "dedcbfec1bb3646cd71063ff530fb27f61e79a6edd07fb7cdd019b7228eaa3f9",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.996849,
+    "chunks": 1,
+    "scores": [
+     0.003854,
+     0.996849
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003854,
+      "chunks": 1,
+      "scores": [
+       0.003854
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.996849,
+      "chunks": 1,
+      "scores": [
+       0.996849
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "dfc7da9627c748df408384fdf171fd05f486e85812c809d7ab4aa00daca5f379",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001269,
+    "chunks": 1,
+    "scores": [
+     0.001269,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001269,
+      "chunks": 1,
+      "scores": [
+       0.001269
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "e10f573508aa6eb3bb6b52415e35c1c81b39dd2636d99b72f995552c7069ec48",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.920665,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.920665,
+      "chunks": 1,
+      "scores": [
+       0.920665
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Non-violent Illegal Acts"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Non-violent Illegal Acts"
+    ]
+   }
+  },
+  {
+   "key": "e1d037a3f25fabfa36c4fe2fd1682e7b7fc8e3dbd0badbe87d33441e60f9d4b5",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.351416,
+    "chunks": 1,
+    "scores": [
+     0.351416,
+     0.021286
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.351416,
+      "chunks": 1,
+      "scores": [
+       0.351416
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "PII"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.021286,
+      "chunks": 1,
+      "scores": [
+       0.021286
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "PII"
+    ]
+   }
+  },
+  {
+   "key": "e320075f4b5792b5aba10e8ad7a1b130b72223948fea2b0bd589bec7df427b09",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001011,
+    "chunks": 1,
+    "scores": [
+     0.001011,
+     3e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001011,
+      "chunks": 1,
+      "scores": [
+       0.001011
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3e-06,
+      "chunks": 1,
+      "scores": [
+       3e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "e37f3137f9175fe12a1d3ec0e3d64923fabfe05b24e283c24dae9668ed13030f",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.941872,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.941872,
+      "chunks": 1,
+      "scores": [
+       0.941872
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "e53860931590978c72dac91c0477c745c1e8355ed9f60e8c5c49be02fd124a7a",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999995,
+    "chunks": 1,
+    "scores": [
+     0.803552,
+     0.999995
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.803552,
+      "chunks": 1,
+      "scores": [
+       0.803552
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999995,
+      "chunks": 1,
+      "scores": [
+       0.999995
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "e5a77180a31b8383e4ab112e36d3ed24c81b2760404e520b850afbcd864cd0b4",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.002683,
+    "chunks": 1,
+    "scores": [
+     0.002683,
+     3e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.002683,
+      "chunks": 1,
+      "scores": [
+       0.002683
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3e-06,
+      "chunks": 1,
+      "scores": [
+       3e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "e76583ad3a9f1e59783e7eef476a05e72fd290a1aff8777df0755f8728a60415",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.999996,
+    "chunks": 1,
+    "scores": [
+     0.00393,
+     0.999996
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00393,
+      "chunks": 1,
+      "scores": [
+       0.00393
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.999996,
+      "chunks": 1,
+      "scores": [
+       0.999996
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "e7ccec225d493299e63e59f47da6adbdce553a0a11ea8830c215d5af04e08ff2",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.989292,
+    "chunks": 1,
+    "scores": [
+     0.025659,
+     0.989292
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.025659,
+      "chunks": 1,
+      "scores": [
+       0.025659
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Politically Sensitive Topics"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.989292,
+      "chunks": 1,
+      "scores": [
+       0.989292
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Politically Sensitive Topics"
+    ]
+   }
+  },
+  {
+   "key": "ed7de99cb26cbf7ced2fec022558dcb89163fb6834190851cf3e9712b9fc8fc7",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000261,
+    "chunks": 1,
+    "scores": [
+     0.000261,
+     2.2e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000261,
+      "chunks": 1,
+      "scores": [
+       0.000261
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2.2e-05,
+      "chunks": 1,
+      "scores": [
+       2.2e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "ef67171c24aa35f14262cec6f0e9ceb9b850793651113d6deb55ad37146bcc2c",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.003231,
+    "chunks": 1,
+    "scores": [
+     0.001023,
+     0.003231
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001023,
+      "chunks": 1,
+      "scores": [
+       0.001023
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.003231,
+      "chunks": 1,
+      "scores": [
+       0.003231
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "f047e85053aabe1d56e452a8ef6cb71aa4423e210de6fc5a7bf61ccd61b3fb7d",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.671271,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.671271,
+      "chunks": 1,
+      "scores": [
+       0.671271
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "f20cd48091fdd795366b067defd08acec39e6425a85b2d53e4b236cc01d92126",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.008312,
+    "chunks": 1,
+    "scores": [
+     0.004516,
+     0.008312
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.004516,
+      "chunks": 1,
+      "scores": [
+       0.004516
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.008312,
+      "chunks": 1,
+      "scores": [
+       0.008312
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "f2f45efe612fc6d72b77fc0f45801f5f7b23bffca8b2c8e8494d23a3a142bdfc",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000487,
+    "chunks": 1,
+    "scores": [
+     0.000487,
+     2e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000487,
+      "chunks": 1,
+      "scores": [
+       0.000487
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 2e-06,
+      "chunks": 1,
+      "scores": [
+       2e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "f3f4f585a4a833f4fac830a8d069ac55d8eff5bb76fdfaa2be2b6f927b226ddc",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.825618,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.825618,
+      "chunks": 1,
+      "scores": [
+       0.825618
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Jailbreak"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Jailbreak"
+    ]
+   }
+  },
+  {
+   "key": "f4c3b141ca17f8a3d9aea7c4bffc915e9adf712ec39a3901fe0fc5f5e3f58691",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000625,
+    "chunks": 1,
+    "scores": [
+     0.000625,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000625,
+      "chunks": 1,
+      "scores": [
+       0.000625
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "f5e65a74a9d241ed3695f6aafb248cbfd5ba5723129c1d3ec02117c86722cefe",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000906,
+    "chunks": 1,
+    "scores": [
+     0.000906,
+     1.4e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000906,
+      "chunks": 1,
+      "scores": [
+       0.000906
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.4e-05,
+      "chunks": 1,
+      "scores": [
+       1.4e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "f622ef848f0af16529a6926264e866f366aeef247e568f4093d5b5d1cad13d61",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 1.0,
+    "chunks": 1,
+    "scores": [
+     0.092354,
+     1.0
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.092354,
+      "chunks": 1,
+      "scores": [
+       0.092354
+      ],
+      "label": "Controversial",
+      "labels": [
+       "Controversial"
+      ],
+      "categories": [
+       "Copyright Violation"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1.0,
+      "chunks": 1,
+      "scores": [
+       1.0
+      ]
+     }
+    ],
+    "label": "Controversial",
+    "categories": [
+     "Copyright Violation"
+    ]
+   }
+  },
+  {
+   "key": "f6880cefa13048ac8ad7b380e110d91059122d34563b2a68db75eaf9dbbfafed",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001572,
+    "chunks": 1,
+    "scores": [
+     0.000801,
+     0.001572
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000801,
+      "chunks": 1,
+      "scores": [
+       0.000801
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.001572,
+      "chunks": 1,
+      "scores": [
+       0.001572
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "f82c04752b0a2146bcdccdae436affeccab905a5961d2c0c5e31a94fcf356570",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.998012,
+    "chunks": 1,
+    "scores": [
+     0.998012,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.998012,
+      "chunks": 1,
+      "scores": [
+       0.998012
+      ],
+      "label": "Unsafe",
+      "labels": [
+       "Unsafe"
+      ],
+      "categories": [
+       "Violent"
+      ]
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Unsafe",
+    "categories": [
+     "Violent"
+    ]
+   }
+  },
+  {
+   "key": "f8fd092f0a25dadf5576187d725919942efebc4c0c1cc2fea7837c98f6bff38d",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00043,
+    "chunks": 1,
+    "scores": [
+     0.00043,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00043,
+      "chunks": 1,
+      "scores": [
+       0.00043
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "f96b4c10b810aa7ae587afbcf91d53e1f1afb5d0e3aca20ba010330068a8e5c1",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.969232,
+    "chunks": 1,
+    "scores": [
+     0.003489,
+     0.969232
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.003489,
+      "chunks": 1,
+      "scores": [
+       0.003489
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.969232,
+      "chunks": 1,
+      "scores": [
+       0.969232
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "f9b048ed2d27b3bbd379fa19dca4b0990b454adae8d3f052847e7695d986c371",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.995652,
+    "chunks": 1,
+    "scores": [
+     0.00437,
+     0.995652
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00437,
+      "chunks": 1,
+      "scores": [
+       0.00437
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.995652,
+      "chunks": 1,
+      "scores": [
+       0.995652
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "f9c0deb9a69987a83540da65d4031d69feaf8f746e34b66b989cd9196b5169fa",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001696,
+    "chunks": 1,
+    "scores": [
+     0.001696,
+     3.7e-05
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001696,
+      "chunks": 1,
+      "scores": [
+       0.001696
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3.7e-05,
+      "chunks": 1,
+      "scores": [
+       3.7e-05
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "f9fec94ce4a072d57b21d95bc28949b313e1db928e4d91c87fd5350cf4b509ae",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000804,
+    "chunks": 1,
+    "scores": [
+     0.000804,
+     6e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000804,
+      "chunks": 1,
+      "scores": [
+       0.000804
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 6e-06,
+      "chunks": 1,
+      "scores": [
+       6e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "fac8ace558e4760340c8a8322cbae5838db997064d274a22eb17ab072449c414",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.00246,
+    "chunks": 1,
+    "scores": [
+     0.00246,
+     3e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.00246,
+      "chunks": 1,
+      "scores": [
+       0.00246
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 3e-06,
+      "chunks": 1,
+      "scores": [
+       3e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "fb54220d1af742d4428c3ec1499fe5b8661e785c29496f72786320af097c7c90",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.000626,
+    "chunks": 1,
+    "scores": [
+     0.000626,
+     1e-06
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.000626,
+      "chunks": 1,
+      "scores": [
+       0.000626
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 1e-06,
+      "chunks": 1,
+      "scores": [
+       1e-06
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  },
+  {
+   "key": "fc79d5c32a3615b0afb8f9b402577d1d08db9c283b3beb52b6f17abff0d9ba78",
+   "result": {
+    "model": "Qwen/Qwen3Guard-Gen-0.6B+protectai/deberta-v3-base-prompt-injection-v2",
+    "max_score": 0.001314,
+    "chunks": 1,
+    "scores": [
+     0.001314,
+     0.000622
+    ],
+    "members": [
+     {
+      "model": "Qwen/Qwen3Guard-Gen-0.6B",
+      "max_score": 0.001314,
+      "chunks": 1,
+      "scores": [
+       0.001314
+      ],
+      "label": "Safe",
+      "labels": [
+       "Safe"
+      ],
+      "categories": []
+     },
+     {
+      "model": "protectai/deberta-v3-base-prompt-injection-v2",
+      "max_score": 0.000622,
+      "chunks": 1,
+      "scores": [
+       0.000622
+      ]
+     }
+    ],
+    "label": "Safe",
+    "categories": []
+   }
+  }
+ ]
+}

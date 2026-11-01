@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -53,6 +53,9 @@ class GatewayConfig:
     timeout_s: float = DEFAULT_TIMEOUT_S
     block_private_networks: bool = True
     deny: list[str] = field(default_factory=list)
+    #: Reads the deny-list file again on every create (the security-flag handler extends it while the
+    #: gateway runs, spec 009); ``None`` = only ``deny``.
+    deny_loader: Callable[[], Iterable[str]] | None = None
     audio_dir: Path = Path("learning-audio")
     max_template_chars: int = 4000
 
@@ -79,8 +82,11 @@ class LearningGateway:
     def create(self, url: str, template: str, item_id: str = "") -> dict[str, Any]:
         """Notebook from ``url`` + podcast job. The gateway only forwards the URL and the template."""
         cfg = self.config
+        deny = list(cfg.deny)
+        if cfg.deny_loader is not None:
+            deny += [d for d in cfg.deny_loader() if d not in deny]
         url = check_url(
-            url, block_private_networks=cfg.block_private_networks, deny=cfg.deny, resolver=self.resolver
+            url, block_private_networks=cfg.block_private_networks, deny=deny, resolver=self.resolver
         )
         template = (template or "").strip()
         if len(template) > cfg.max_template_chars:
