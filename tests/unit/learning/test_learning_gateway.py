@@ -115,8 +115,12 @@ def test_an_active_item_is_reused_and_a_failed_one_is_created_again(tmp_path, cl
 def test_blocked_urls_never_reach_the_backend(tmp_path, clock):
     """Constitution IV: the URL filter runs before anything is forwarded."""
     gw, backend = make(tmp_path, clock, deny=["evil.example"])
-    for url in ("http://127.0.0.1/admin", "file:///etc/passwd", "https://x.evil.example/p"):
-        with pytest.raises(UrlBlocked):
+    for url, code in (
+        ("http://127.0.0.1/admin", "private_network"),
+        ("file:///etc/passwd", "scheme_not_allowed"),
+        ("https://x.evil.example/p", "deny_list"),
+    ):
+        with pytest.raises(UrlBlocked, match=f"^url_blocked: {code}$"):  # the flow keys on this prefix
             gw.create(url, TEMPLATE, "item1")
     assert backend.created == []
 

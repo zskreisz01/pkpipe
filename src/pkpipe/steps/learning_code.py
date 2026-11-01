@@ -53,3 +53,27 @@ def prepare(ctx: StepContext, note: dict[str, Any], instruction: str) -> StepRes
             item={"flagged": True, "security_flags": flags},
         )
     return StepResult(output={"status": "ok", "reason": "", "url": url, "template": template.strip()})
+
+
+_URL_BLOCKED = re.compile(r"\burl_blocked: ([a-z_]{1,40})\b")
+
+
+@register_code("learning.create_failed")
+def create_failed(ctx: StepContext, error: dict[str, Any] | None) -> StepResult:
+    """Error branch of ``learning:create`` (SC-003).
+
+    The gateway refuses a URL with ``url_blocked: <reason code>`` after DNS resolution and the deny
+    list, which the cheap first check in :func:`prepare` cannot do. Such an item is flagged for
+    quarantine (it would be refused on every retry). Any other error (service down, invalid
+    configuration) fails the step again, so the item stays ``released`` and the next run retries it.
+    """
+    message = str((error or {}).get("message") or "")
+    match = _URL_BLOCKED.search(message)
+    if match is None:
+        raise StepError(f"learning service: {message[:300] or 'create failed'}")
+    reason = match.group(1)
+    ctx.ports.tracer.security_flag("url_filter", action="flag", reason_code=reason)
+    return StepResult(
+        output={"status": "blocked", "reason": reason},
+        item={"flagged": True, "security_flags": [{"detector": "url_filter", "reason_code": reason}]},
+    )

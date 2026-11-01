@@ -14,6 +14,8 @@ from pkpipe.domain.urlfilter import check_url as _check
 
 from .errors import UrlBlocked
 
+URL_BLOCKED_PREFIX = "url_blocked: "
+
 
 def _resolve(host: str) -> list[str]:
     try:
@@ -29,11 +31,14 @@ def check_url(
     deny: Iterable[str] = (),
     resolver: Resolver = _resolve,
 ) -> str:
-    """The normalised URL, or :class:`UrlBlocked` whose message is a short reason code."""
+    """The normalised URL, or :class:`UrlBlocked` with the message ``url_blocked: <reason code>``.
+
+    The ``url_blocked:`` prefix is part of the tool contract: the flow recognises a refused URL by it and
+    quarantines the item instead of retrying it (spec 012 SC-003)."""
     try:
         return _check(url, block_private_networks=block_private_networks, deny=deny, resolver=resolver)
     except UrlRejected as exc:
-        raise UrlBlocked(str(exc)) from None
+        raise UrlBlocked(f"{URL_BLOCKED_PREFIX}{exc}") from None
 
 
-__all__ = ["check_url", "parse_deny_list"]
+__all__ = ["URL_BLOCKED_PREFIX", "check_url", "parse_deny_list"]

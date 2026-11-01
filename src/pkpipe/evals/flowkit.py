@@ -33,7 +33,9 @@ class ScriptedLearning:
     """The real learning gateway (spec 012: URL filter, job store, timeout, failure reasons) over the fake
     backend. Per resource: ready after ``ready_after`` polls (default 1), ``fail`` -> the generation fails,
     ``never`` -> stays generating (the gateway timeout or the wait deadline ends it), ``down`` -> the
-    service is unreachable, ``timeout_s`` -> gateway timeout (default: the pack's 90 minutes)."""
+    service is unreachable, ``timeout_s`` -> gateway timeout (default: the pack's 90 minutes),
+    ``deny`` -> the gateway's deny list, ``resolve`` -> synthetic DNS (host -> addresses; unknown hosts do
+    not resolve)."""
 
     def __init__(
         self,
@@ -42,6 +44,8 @@ class ScriptedLearning:
         never: list[str] | None = None,
         down: bool = False,
         timeout_s: float | None = None,
+        deny: list[str] | None = None,
+        resolve: dict[str, list[str]] | None = None,
         *,
         clock: Callable[[], float] | None = None,
         workdir: Path | None = None,
@@ -59,13 +63,14 @@ class ScriptedLearning:
         )
         config = GatewayConfig(
             timeout_s=timeout_s or DEFAULT_TIMEOUT_S,
+            deny=[d.lower() for d in deny or []],
             audio_dir=(workdir or Path(tempfile.mkdtemp(prefix="pkpipe-eval-learning-"))) / "audio",
         )
         self.gateway = LearningGateway(
             self.backend,
             JobStore(":memory:"),
             config,
-            resolver=lambda host: [],  # synthetic hosts: no DNS lookups in an eval
+            resolver=lambda host: list((resolve or {}).get(host, [])),  # no real DNS lookups in an eval
             **({"clock": clock} if clock else {}),
         )
 

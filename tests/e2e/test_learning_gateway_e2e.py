@@ -28,6 +28,7 @@ from tests.support.vault_mcp import http_server as vault_server
 
 VIDEO = item_id_for("0-INBOX/example-video.md")
 BAD = item_id_for("0-INBOX/bad-link.md")
+DENIED = item_id_for("0-INBOX/denied-link.md")
 PLIST = "0-INBOX/Manual-Resource-Processing-List.md"
 FAST_WAIT = {
     "flows": {"learning_material": {"nodes": [{"id": "wait_generation", "config": {"poll_s": 0.05}}]}}
@@ -50,6 +51,10 @@ def world(tmp_path, synthetic_vault, write_json, fakes, capsys, request):
     (synthetic_vault / "0-INBOX" / "example-tool.md").unlink()  # only the learning items
     (synthetic_vault / "0-INBOX" / "bad-link.md").write_text(
         "---\nsource: http://127.0.0.1:8080/admin\n---\nA synthetic video pointing at a private address.\n",
+        encoding="utf-8",
+    )
+    (synthetic_vault / "0-INBOX" / "denied-link.md").write_text(
+        "---\nsource: https://talks.denied.example.invalid/video\n---\nA synthetic video on a denied host.\n",
         encoding="utf-8",
     )
     gateway_overlay = write_overlay(tmp_path, **learning)
@@ -130,6 +135,20 @@ def test_a_private_source_url_is_quarantined_before_anything_reaches_the_gateway
     assert notify.sent[-1].message.startswith("Processed 0, quarantined 1, failed 0")
 
 
+@pytest.mark.parametrize("world", [{"deny": ["denied.example.invalid"]}], indirect=True)
+def test_a_url_the_gateway_refuses_quarantines_the_item_instead_of_retrying_it(world):
+    """SC-003, constitution IV: the flow's first check passes a public-looking URL, the gateway refuses it
+    (deny list, also DNS to a private address) with ``url_blocked: ...``; the item is quarantined with a
+    security flag, no job and no notebook exist, and it is not left ``released`` for endless retries."""
+    vault, run, notify, data_dir = world
+    release(run, vault, confirm=[DENIED])
+    rows = {r["item_id"]: r["state"] for r in lists.read_triage(vault / TRIAGE_FILE)["rows"]}
+    assert rows[DENIED] == "quarantined"
+    assert not (data_dir / "jobs.db").exists() or jobs(data_dir) == []
+    assert DENIED not in {r.item_id for r in lists.read_processing_list(vault / PLIST)}
+    assert notify.sent[-1].message.startswith("Processed 0, quarantined 1, failed 0")
+
+
 @pytest.mark.parametrize("world", [{"backend_options": {"fail": []}, "timeout_s": 0.001}], indirect=True)
 def test_a_generation_that_exceeds_the_gateway_timeout_is_listed_as_failed_with_its_reason(world):
     """SC-001 (timeout), FR-003: the item is failed, not stuck; the reason is recorded in the job store."""
@@ -142,8 +161,8 @@ def test_a_generation_that_exceeds_the_gateway_timeout_is_listed_as_failed_with_
 
 
 @pytest.mark.parametrize("world", [{"backend_options": {"never": [VIDEO]}}], indirect=True)
-def test_a_stalled_generation_ends_with_a_failed_item_and_a_retry_does_not_duplicate_the_notebook(world):
-    """The wait deadline backs up the gateway timeout; the item is failed and its job is kept once."""
+def test_a_stalled_generation_ends_with_a_failed_item_while_the_gateway_keeps_its_job(world):
+    """The wait deadline backs up the gateway timeout; the item is failed and its single job is kept."""
     vault, run, notify, data_dir = world
     code, triage = run("run", "triage")
     assert code == 0

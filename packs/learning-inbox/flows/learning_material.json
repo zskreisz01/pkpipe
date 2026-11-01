@@ -1,6 +1,6 @@
 {
   "id": "learning_material",
-  "description": "URL check, then a notebook from the URL and the prompt template only, wait for the generation result (poll + deadline above the gateway timeout), fetch audio and link, update the list. Output guard of derived text: spec 009.",
+  "description": "URL check, then a notebook from the URL and the prompt template only, wait for the generation result (poll + deadline above the gateway timeout), fetch audio and link, update the list. A URL the gateway refuses (DNS, deny list) is quarantined; any other create error leaves the item released for the next run. Output guard of derived text: spec 009.",
   "bpmn": "process-learning-material",
   "start": "read",
   "nodes": [
@@ -60,6 +60,17 @@
           "url": "${prepare.url}",
           "template": "${prepare.template}",
           "item_id": "${item.id}"
+        }
+      }
+    },
+    {
+      "id": "create_failed",
+      "type": "code",
+      "bpmn_element": "URL check",
+      "config": {
+        "function": "learning.create_failed",
+        "args": {
+          "error": "${error}"
         }
       }
     },
@@ -141,7 +152,7 @@
         "args": {
           "nb_id": "${create.nb_id}",
           "processing_status": "failed",
-          "failure_reason": "no result before the wait deadline"
+          "failure_reason": "${error.message}"
         }
       }
     },
@@ -189,6 +200,15 @@
     {
       "from": "create",
       "to": "wait_generation"
+    },
+    {
+      "from": "create",
+      "to": "create_failed",
+      "on": "error"
+    },
+    {
+      "from": "create_failed",
+      "to": "quarantine"
     },
     {
       "from": "wait_generation",

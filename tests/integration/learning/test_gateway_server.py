@@ -65,8 +65,8 @@ def test_failure_reason_comes_back_through_the_tool(tools):
 @pytest.mark.parametrize(
     ("tool", "args", "message"),
     [
-        ("create", {"url": "http://127.0.0.1:8080/admin", "template": ""}, "private_network"),
-        ("create", {"url": "file:///etc/passwd", "template": ""}, "scheme_not_allowed"),
+        ("create", {"url": "http://127.0.0.1:8080/admin", "template": ""}, "url_blocked: private_network"),
+        ("create", {"url": "file:///etc/passwd", "template": ""}, "url_blocked: scheme_not_allowed"),
         ("create", {"url": URL, "template": "", "item_id": "../../etc"}, "item_id may only contain"),
         ("status", {"job_id": "nope"}, "unknown job"),
         ("link", {"nb_id": "nope"}, "unknown notebook"),

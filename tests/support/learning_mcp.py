@@ -15,10 +15,16 @@ from tests.support.vault_mcp import free_port
 SERVER_MODULE = "pkpipe.learning.server"
 
 
-def write_overlay(directory: Path, *, backend: str = "fake", **options: Any) -> Path:
-    """An overlay that selects the backend and its options (the only thing an owner changes to switch)."""
+def write_overlay(
+    directory: Path, *, backend: str = "fake", deny: list[str] | None = None, **options: Any
+) -> Path:
+    """An overlay that selects the backend and its options (the only thing an owner changes to switch);
+    ``deny`` replaces the pack's deny list (``security/deny_list.txt``)."""
     overlay = directory / "learning-overlay"
     overlay.mkdir(parents=True, exist_ok=True)
+    if deny is not None:
+        (overlay / "security").mkdir(exist_ok=True)
+        (overlay / "security" / "deny_list.txt").write_text("\n".join(deny) + "\n", encoding="utf-8")
     entry = {"backend": backend, "options": {"data_dir": str(directory / "learning-data"), **options}}
     (overlay / "mcp_servers.json").write_text(json.dumps({"learning": entry}), encoding="utf-8")
     return overlay

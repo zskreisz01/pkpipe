@@ -108,3 +108,39 @@ def test_missing_instruction_asset_is_an_error():
     c, _ = ctx(assets={})
     with pytest.raises(StepError, match="not found"):
         CODE["learning.prepare"](c, note=note({"source": "https://a.example/x"}), instruction=INSTRUCTION)
+
+
+@pytest.mark.parametrize(
+    ("message", "reason"),
+    [
+        ("create: url_blocked: private_network", "private_network"),  # through the MCP client
+        ("url_blocked: deny_list", "deny_list"),  # in-process gateway
+    ],
+)
+def test_create_refused_by_the_gateway_url_filter_flags_the_item(message, reason):
+    """SC-003: the gateway's own URL filter (DNS, deny list) refused the URL: quarantine, never retry."""
+    c, tracer = ctx()
+    out = CODE["learning.create_failed"](c, error={"node": "create", "message": message})
+    assert out.output == {"status": "blocked", "reason": reason}
+    assert out.item == {
+        "flagged": True,
+        "security_flags": [{"detector": "url_filter", "reason_code": reason}],
+    }
+    assert tracer.flags == [{"detector": "url_filter", "action": "flag", "reason_code": reason}]
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        {"message": "create: Open Notebook not reachable at http://127.0.0.1:5055 (ConnectError)"},
+        {"message": "create: template too long"},
+        {"message": "a page about url_blocked handling"},  # the prefix needs a reason code
+        None,
+    ],
+)
+def test_any_other_create_error_fails_again_so_the_item_is_retried(error):
+    """Edge case "Open Notebook down": the step fails, the item stays released, no security flag."""
+    c, tracer = ctx()
+    with pytest.raises(StepError, match="learning service"):
+        CODE["learning.create_failed"](c, error=error)
+    assert tracer.flags == []
