@@ -1,0 +1,62 @@
+{
+  "id": "review_improvement",
+  "description": "Subflow of improvement_review: for one active item, find evidence in its journal days (session without tools), keep only quotes that are verbatim in the journal, and propose a verdict and the next experiment. Without verified evidence the verdict is 'keep'.",
+  "bpmn": "self-improvement-cycle",
+  "data_classes": ["journal"],
+  "nodes": [
+    {
+      "id": "evidence",
+      "type": "llm",
+      "bpmn_element": "Collect evidence from journals since each item started",
+      "inputs": ["item.statement", "item.success_criterion", "item.journal"],
+      "config": {
+        "system": "journal_analyst",
+        "instruction": "improvement/evidence.md",
+        "output_schema": "improvement_evidence"
+      }
+    },
+    {
+      "id": "check_evidence",
+      "type": "code",
+      "bpmn_element": "Collect evidence from journals since each item started",
+      "config": {
+        "function": "improvement.check_evidence",
+        "args": {"evidence": "${evidence}", "journal_days": "${item.journal_days}"}
+      }
+    },
+    {
+      "id": "verdict",
+      "type": "llm",
+      "bpmn_element": "Propose verdict (keep / adjust / drop) + next experiment",
+      "inputs": ["item.statement", "item.success_criterion", "item.type", "check_evidence.evidence"],
+      "config": {
+        "system": "journal_analyst",
+        "instruction": "improvement/verdict.md",
+        "output_schema": "improvement_verdict"
+      }
+    },
+    {
+      "id": "propose",
+      "type": "code",
+      "bpmn_element": "Propose verdict (keep / adjust / drop) + next experiment",
+      "config": {
+        "function": "improvement.propose",
+        "args": {"verdict": "${verdict}", "evidence": "${check_evidence.evidence}"}
+      }
+    },
+    {
+      "id": "no_evidence",
+      "type": "code",
+      "bpmn_element": "Propose verdict (keep / adjust / drop) + next experiment",
+      "config": {"function": "improvement.no_evidence"}
+    }
+  ],
+  "edges": [
+    {"from": "START", "to": "evidence", "when": {"path": "item.journal", "truthy": true}},
+    {"from": "START", "to": "no_evidence", "default": true},
+    {"from": "evidence", "to": "check_evidence"},
+    {"from": "check_evidence", "to": "verdict", "when": {"path": "check_evidence.count", "gt": 0}},
+    {"from": "check_evidence", "to": "no_evidence", "default": true},
+    {"from": "verdict", "to": "propose"}
+  ]
+}

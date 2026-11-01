@@ -82,9 +82,24 @@ def _flatten_text(value: Any) -> str:
     return "" if value is None else str(value)
 
 
-def text_checks(output: Any, expected: Mapping[str, Any] | None) -> dict[str, list[str]]:
+def _items_of(output: Any, field: str) -> list[Any]:
+    value = output.get(field) if isinstance(output, Mapping) else None
+    return value if isinstance(value, list) else []
+
+
+def _norm(text: Any) -> str:
+    return re.sub(r"\s+", " ", str(text)).strip().casefold()
+
+
+def text_checks(
+    output: Any, expected: Mapping[str, Any] | None, inputs: Mapping[str, Any] | None = None
+) -> dict[str, list[str]]:
     """``must_include`` / ``must_not`` (case-insensitive substrings), ``must_not_match`` (regex) and
-    ``max_words`` (per string field) on every string in the output. Returns failures by check name."""
+    ``max_words`` (per string field) on every string in the output. Structured outputs add ``fields``
+    (field equals value), ``min_items`` / ``max_items`` (list length per field) and ``quotes_from``
+    (``{"field": "evidence", "key": "quote", "source": "item.journal"}``: every listed ``key`` must occur
+    verbatim, whitespace and case aside, in the case input ``source``, so a quote can never be invented).
+    Returns failures by check name."""
     expected = expected or {}
     text = _flatten_text(output)
     low = text.lower()
@@ -103,6 +118,29 @@ def text_checks(output: Any, expected: Mapping[str, Any] | None) -> dict[str, li
         long = [k for k, v in output.items() if isinstance(v, str) and len(v.split()) > int(limit)]
         if long:
             out["max_words"] = long
+    wrong = [
+        k
+        for k, v in (expected.get("fields") or {}).items()
+        if not isinstance(output, Mapping) or output.get(k) != v
+    ]
+    if wrong:
+        out["fields"] = wrong
+    few = [f for f, n in (expected.get("min_items") or {}).items() if len(_items_of(output, f)) < int(n)]
+    if few:
+        out["min_items"] = few
+    many = [f for f, n in (expected.get("max_items") or {}).items() if len(_items_of(output, f)) > int(n)]
+    if many:
+        out["max_items"] = many
+    spec = expected.get("quotes_from")
+    if spec:
+        source = _norm((inputs or {}).get(spec["source"], ""))
+        invented = [
+            str(item.get(spec["key"]))
+            for item in _items_of(output, spec["field"])
+            if isinstance(item, Mapping) and _norm(item.get(spec["key"], "")) not in source
+        ]
+        if invented:
+            out["quotes_from"] = invented
     return out
 
 

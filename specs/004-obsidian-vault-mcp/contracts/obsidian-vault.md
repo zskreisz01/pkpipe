@@ -44,6 +44,9 @@ conflict files are never written, appended to or moved.
 | `read_triage` | – | `{rows[TriageRow], invalid, conflicts}` |
 | `update_triage` | `rows[]` | upsert by `item_id` (or hash of `resource`); omitted fields keep their value; all-or-nothing; see rules below |
 | `upsert_processing_list` | `rows[ProcessingListRow]` | upsert by `item_id`; other rows untouched |
+| `read_notes` | `paths[]` (at most 60) | `{notes[{path, body}], missing[]}`; a missing note is listed, a path outside the allowlist rejects the call (spec 015: journal days) |
+| `read_improvements` | – | `{rows[ImprovementItem], invalid, conflicts}` (spec 015, `improvement_file`, default `2-Areas/Self-Improvement/Improvement-Backlog.md`, allowlist `2-Areas`) |
+| `update_improvements` | `rows[]` | upsert by `id`; new rows are `proposed` only (id = hash of source note and statement); on existing rows only `evidence`, `verdict`, `reason`, `next_experiment`, `proposal` change; all-or-nothing (spec 015 FR-001) |
 
 Errors are MCP tool errors (`isError`) with a message that is safe to show to the model.
 

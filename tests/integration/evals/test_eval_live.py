@@ -35,6 +35,19 @@ def test_triage_suite_live_passes_its_gate(live_env, pack_dir):
     assert report.status is Status.PASSED, report.failures()
 
 
+@pytest.mark.live
+def test_improvement_extraction_live_passes_its_gate(live_env, pack_dir):
+    """Spec 015 SC-001 live: the journal sections of improvement_extract.jsonl through the real extraction
+    session and the flow's grounding code; precision >= 0.90 (no invented items) from evals.json."""
+    snap = load_effective(pack_dir, None).snapshot()
+    runner = EvalRunner(snap, paths=EvalPaths.create(REPO / "evals"), model=app.make_model(snap), workers=2)
+    report = runner.run(["improvement"]).suite("improvement")
+    assert report.metrics["n"] >= 20 and report.metrics["schema_valid_rate"] == 1.0
+    assert report.metrics["precision"] >= 0.9
+    assert {g.metric for g in report.gate} == set(evals_config(snap).suites["improvement"].gate)
+    assert report.status is Status.PASSED, report.failures()
+
+
 @pytest.mark.live("lmstudio", "judge")
 def test_sessions_and_security_live_with_a_different_judge(live_env, pack_dir):
     """FR-002 live: the session eval is judged by another model; the security suite's injection cases go

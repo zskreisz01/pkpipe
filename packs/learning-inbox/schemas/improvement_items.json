@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "required": ["items"],
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["statement", "area", "type", "success_criterion"],
+        "additionalProperties": false,
+        "properties": {
+          "statement": {"type": "string", "maxLength": 300},
+          "area": {"type": "string", "enum": ["personal", "learning", "work", "system"]},
+          "type": {"type": "string", "enum": ["habit", "experiment", "system-change"]},
+          "success_criterion": {"type": "string", "maxLength": 200}
+        }
+      }
+    }
+  }
+}

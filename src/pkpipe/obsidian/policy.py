@@ -25,6 +25,9 @@ TOOLS = (
     "read_triage",
     "update_triage",
     "upsert_processing_list",
+    "read_notes",
+    "read_improvements",
+    "update_improvements",
 )
 PARA = ("0-INBOX", "1-Projects", "2-Areas", "3-Resources", "4-Archive")
 DEFAULT_ALLOW: dict[str, list[str]] = {
@@ -36,6 +39,9 @@ DEFAULT_ALLOW: dict[str, list[str]] = {
     "read_triage": ["0-INBOX"],
     "update_triage": ["0-INBOX"],
     "upsert_processing_list": ["0-INBOX"],
+    "read_notes": list(PARA),
+    "read_improvements": ["2-Areas"],
+    "update_improvements": ["2-Areas"],
 }
 CONFLICT_RE = re.compile(r"\([^)]*conflict[^)]*\)|\.sync-conflict-", re.IGNORECASE)
 
@@ -52,6 +58,7 @@ class VaultPolicy(BaseModel):
     )
     triage_file: str = "0-INBOX/Inbox-Triage.md"
     processing_list: str = "0-INBOX/Manual-Resource-Processing-List.md"
+    improvement_file: str = "2-Areas/Self-Improvement/Improvement-Backlog.md"
 
     @field_validator("allow")
     @classmethod
@@ -84,8 +91,8 @@ class VaultPolicy(BaseModel):
         return self.vault_dir.resolve()
 
     @property
-    def managed_files(self) -> tuple[str, str]:
-        return (self.triage_file, self.processing_list)
+    def managed_files(self) -> tuple[str, str, str]:
+        return (self.triage_file, self.processing_list, self.improvement_file)
 
     def prefixes(self, tool: str) -> list[tuple[str, ...]]:
         if tool not in TOOLS:

@@ -18,6 +18,9 @@ TOOLS = {
     "read_triage",
     "update_triage",
     "upsert_processing_list",
+    "read_notes",
+    "read_improvements",
+    "update_improvements",
 }
 
 TRAVERSAL = [

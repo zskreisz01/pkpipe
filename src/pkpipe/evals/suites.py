@@ -7,6 +7,7 @@ suite              level  what it measures
 ``triage``         2      the real ``categorize_item.suggest`` session: accuracy, per-category F1, confusion
 ``sessions``       2      every session with a dataset: schema, must_include / must_not, LLM-judge rubric
 ``calibration``    2      judge vs owner scores on the same outputs (rubric refinement signal)
+``improvement``    2      journal section -> improvement items: precision / recall after the flow's code (015)
 ``flows``          3      the pack's flows end-to-end on a temp vault with scripted tool/model responses
 ``security``       4      guard detection / false positives on attack + clean texts, injection and canary
                           leaks through the triage session
@@ -27,12 +28,13 @@ from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 from pkpipe import telemetry
+from pkpipe.domain import improvement as imp
 from pkpipe.domain.triage import ItemState, check_transition
 from pkpipe.engine.flow_models import FlowNode
 from pkpipe.engine.snapshot import ConfigSnapshot
@@ -435,7 +437,7 @@ class SessionsSuite(Suite):
                 case_id=cid, passed=False, error=f"SchemaError: {exc}", details={"schema_valid": False}
             )
         errors = schema_errors(reply, schema)
-        failed = text_checks(reply, case.expected)
+        failed = text_checks(reply, case.expected, case.input)
         details: dict[str, Any] = {"schema_valid": not errors, "checks_failed": failed}
         if judge is not None and rubric is not None:
             try:
@@ -553,6 +555,117 @@ class CalibrationSuite(Suite):
             report.status = Status.ERROR
             report.reason = f"{len(errors)} item(s) could not be judged: {errors[0].error}"
         return report
+
+
+# -- level 2: improvement extraction (spec 015) -------------------------------------------------------------
+class ImprovementSuite(Suite):
+    """``datasets/improvement_extract.jsonl``: journal sections -> improvement items, scored after the same
+    code the flow runs (:func:`pkpipe.domain.improvement.ground_items`), so the measured precision is that of
+    the backlog, not of the raw session. SC-001: no invented items (precision gate)."""
+
+    name, level, uses_model = "improvement", Level.STEP, True
+    flow, node = "improvement_extract", "extract"
+    dataset = "datasets/improvement_extract.jsonl"
+
+    def fingerprint(self, snapshot):
+        return step_fingerprint(snapshot, self.flow, self.node)
+
+    #: a statement matches when one contains the other and the shorter one is either at least this share of
+    #: the longer one (a full stop may differ) or whole sentences of it (the owner's improvement without the
+    #: criterion sentence they appended). A fragment such as "Stretch" of "Stretch for ten minutes every
+    #: morning." is not the owner's improvement and counts as a miss and a false positive.
+    MIN_OVERLAP = 0.8
+
+    @classmethod
+    def _match(cls, predicted: str, wanted: str) -> bool:
+        p, w = imp.normalize(predicted), imp.normalize(wanted)
+        short, long = sorted((p, w), key=len)
+        if not short or short not in long:
+            return False
+        if len(short) >= cls.MIN_OVERLAP * len(long):
+            return True
+        start = long.index(short)
+        before, after = long[:start].rstrip(), long[start + len(short) :]
+        whole = short[-1] in ".!?" and (not before or before[-1] in ".!?")
+        return whole and (not after or after[0] == " ")
+
+    def _case(self, ctx: SuiteContext, case: EvalCase) -> CaseResult:
+        expected = (case.expected or {}).get("items", [])
+        section = case.input["section"]
+        try:
+            node = find_node(ctx.snapshot, self.flow, self.node)
+            reply, schema = run_step(ctx.snapshot, self.flow, node, {"section.text": section}, ctx.model)
+        except SchemaError as exc:
+            return CaseResult(
+                case_id=case.id,
+                passed=False,
+                expected=expected,
+                error=f"SchemaError: {exc}",
+                details={"schema_valid": False, "raw": 0, "proposed": 0, "tp": 0, "expected": len(expected)},
+            )
+        errors = schema_errors(reply, schema)
+        raw = reply.get("items", []) if not errors else []
+        grounded = imp.ground_items(
+            raw, section=section, source_note="eval/journal.md", day=date(2026, 10, 30), max_items=10
+        )
+        unmatched = list(expected)
+        tp = area_ok = type_ok = criterion_extra = 0
+        for item in grounded.items:
+            hit = next((e for e in unmatched if self._match(item["statement"], e["statement"])), None)
+            if hit is None:
+                continue
+            unmatched.remove(hit)
+            tp += 1
+            area_ok += item["area"] == hit.get("area")
+            type_ok += item["type"] == hit.get("type")
+            criterion_extra += bool(item["success_criterion"]) and not hit.get("success_criterion")
+        proposed = len(grounded.items)
+        return CaseResult(
+            case_id=case.id,
+            passed=not errors and tp == proposed == len(expected),
+            expected=[e["statement"] for e in expected],
+            actual=[i["statement"] for i in grounded.items],
+            error="; ".join(errors) or None,
+            details={
+                "schema_valid": not errors,
+                "raw": len(raw),
+                "proposed": proposed,
+                "tp": tp,
+                "expected": len(expected),
+                "area_ok": area_ok,
+                "type_ok": type_ok,
+                "criterion_extra": criterion_extra,
+                "dropped": grounded.dropped,
+            },
+        )
+
+    def run(self, ctx):
+        if ctx.model is None:
+            return self.report(Status.SKIPPED, reason="no model")
+        try:
+            find_node(ctx.snapshot, self.flow, self.node)
+        except KeyError:
+            return self.report(notes=[f"no '{self.flow}' flow in this config: nothing to evaluate"])
+        cases = ctx.cases(self.dataset, self.name)
+        results = ctx.map(cases, lambda c: self._case(ctx, c))
+        d = [r.details for r in results]
+        total = lambda key: sum(x.get(key, 0) for x in d)  # noqa: E731
+        proposed, tp, wanted, raw = total("proposed"), total("tp"), total("expected"), total("raw")
+        empty = [r for r in results if r.details.get("expected") == 0 and r.details.get("schema_valid")]
+        metrics = {
+            "n": len(results),
+            "items_expected": wanted,
+            "items_proposed": proposed,
+            "precision": _rate(tp, proposed),
+            "recall": _rate(tp, wanted),
+            "invented_rate": _rate(sum(x.get("dropped", {}).get("not_in_journal", 0) for x in d), raw),
+            "area_accuracy": _rate(total("area_ok"), tp),
+            "type_accuracy": _rate(total("type_ok"), tp),
+            "criterion_invented_rate": _rate(total("criterion_extra"), tp),
+            "empty_clean_rate": _rate(sum(r.details["proposed"] == 0 for r in empty), len(empty)),
+            "schema_valid_rate": _rate(sum(bool(x.get("schema_valid")) for x in d), len(d)),
+        }
+        return self.report(metrics=metrics, cases=results)
 
 
 # -- level 3 -------------------------------------------------------------------------------------------------
@@ -875,12 +988,13 @@ SUITES: dict[str, Suite] = {
         TriageSuite(),
         SessionsSuite(),
         CalibrationSuite(),
+        ImprovementSuite(),
         FlowsSuite(),
         SecuritySuite(),
         ProductionSuite(),
     )
 }
-DEFAULT_SUITES = ("deterministic", "triage", "sessions", "calibration", "flows", "security")
+DEFAULT_SUITES = ("deterministic", "triage", "sessions", "calibration", "improvement", "flows", "security")
 
 
 def resolve_suites(spec: str) -> list[str]:

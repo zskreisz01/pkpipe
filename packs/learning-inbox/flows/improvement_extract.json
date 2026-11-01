@@ -1,0 +1,76 @@
+{
+  "id": "improvement_extract",
+  "description": "21:30 (optional, enabled by an overlay schedule): read today's journal, extract the improvement statements of its '## Improvement' section with a local session without tools, and add the verbatim ones to the backlog as 'proposed'.",
+  "bpmn": "self-improvement-cycle",
+  "data_classes": ["journal"],
+  "start": "locate",
+  "nodes": [
+    {
+      "id": "locate",
+      "type": "code",
+      "bpmn_element": "Extract improvement items (local session, no tools)",
+      "config": {
+        "function": "improvement.locate_journal",
+        "args": {"folder": "2-Areas/Journal"}
+      }
+    },
+    {
+      "id": "read",
+      "type": "tool",
+      "bpmn_element": "Extract improvement items (local session, no tools)",
+      "config": {"tool": "obsidian:read_note", "arguments": {"path": "${locate.path}"}}
+    },
+    {
+      "id": "section",
+      "type": "code",
+      "bpmn_element": "Extract improvement items (local session, no tools)",
+      "config": {
+        "function": "improvement.section",
+        "args": {"note": "${read}", "path": "${locate.path}", "date": "${locate.date}", "heading": "Improvement"}
+      }
+    },
+    {
+      "id": "read_backlog",
+      "type": "tool",
+      "bpmn_element": "New items?",
+      "config": {"tool": "obsidian:read_improvements"}
+    },
+    {
+      "id": "extract",
+      "type": "llm",
+      "bpmn_element": "Extract improvement items (local session, no tools)",
+      "inputs": ["section.text"],
+      "config": {
+        "system": "journal_analyst",
+        "instruction": "improvement/extract.md",
+        "output_schema": "improvement_items"
+      }
+    },
+    {
+      "id": "rows",
+      "type": "code",
+      "bpmn_element": "New items?",
+      "config": {
+        "function": "improvement.new_rows",
+        "args": {"section": "${section}", "extracted": "${extract}", "backlog": "${read_backlog}", "max_items": 10}
+      }
+    },
+    {
+      "id": "write",
+      "type": "tool",
+      "bpmn_element": "Add to Improvement-Backlog (status = proposed)",
+      "config": {"tool": "obsidian:update_improvements", "arguments": {"rows": "${rows.rows}"}}
+    }
+  ],
+  "edges": [
+    {"from": "locate", "to": "read"},
+    {"from": "read", "to": "section"},
+    {"from": "read", "to": "END", "on": "error"},
+    {"from": "section", "to": "read_backlog", "when": {"path": "section.found", "truthy": true}},
+    {"from": "section", "to": "END", "default": true},
+    {"from": "read_backlog", "to": "extract"},
+    {"from": "extract", "to": "rows"},
+    {"from": "rows", "to": "write", "when": {"path": "rows.count", "gt": 0}},
+    {"from": "rows", "to": "END", "default": true}
+  ]
+}

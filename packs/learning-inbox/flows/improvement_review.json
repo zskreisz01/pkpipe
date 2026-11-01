@@ -1,0 +1,127 @@
+{
+  "id": "improvement_review",
+  "description": "Sunday 19:30 (optional, enabled by an overlay schedule): for every active item collect evidence from the journals since it started and propose keep / adjust / drop with a next experiment; write system-change proposals for kept system items; notify the owner. The owner changes the status.",
+  "bpmn": "self-improvement-cycle",
+  "data_classes": ["journal"],
+  "start": "read_backlog",
+  "max_parallel": 1,
+  "nodes": [
+    {
+      "id": "read_backlog",
+      "type": "tool",
+      "bpmn_element": "Collect evidence from journals since each item started",
+      "config": {"tool": "obsidian:read_improvements"}
+    },
+    {
+      "id": "select",
+      "type": "code",
+      "bpmn_element": "Collect evidence from journals since each item started",
+      "config": {
+        "function": "improvement.select_review",
+        "args": {
+          "backlog": "${read_backlog}",
+          "journal_folder": "2-Areas/Journal",
+          "proposals_folder": "2-Areas/Self-Improvement/System-Changes",
+          "max_days": 28
+        }
+      }
+    },
+    {
+      "id": "journals",
+      "type": "tool",
+      "bpmn_element": "Collect evidence from journals since each item started",
+      "config": {"tool": "obsidian:read_notes", "arguments": {"paths": "${select.journal_paths}"}}
+    },
+    {
+      "id": "prepare",
+      "type": "code",
+      "bpmn_element": "Collect evidence from journals since each item started",
+      "config": {
+        "function": "improvement.attach_journals",
+        "args": {"items": "${select.items}", "notes": "${journals}", "today": "${select.today}", "max_days": 28}
+      }
+    },
+    {
+      "id": "review_each",
+      "type": "subflow",
+      "bpmn_element": "Propose verdict (keep / adjust / drop) + next experiment",
+      "for_each": "prepare.items",
+      "on_item_error": "continue",
+      "config": {"flow": "review_improvement"}
+    },
+    {
+      "id": "review_rows",
+      "type": "code",
+      "bpmn_element": "Propose verdict (keep / adjust / drop) + next experiment",
+      "config": {"function": "improvement.review_rows", "args": {"results": "${review_each}"}}
+    },
+    {
+      "id": "write_review",
+      "type": "tool",
+      "bpmn_element": "Propose verdict (keep / adjust / drop) + next experiment",
+      "config": {"tool": "obsidian:update_improvements", "arguments": {"rows": "${review_rows.rows}"}}
+    },
+    {
+      "id": "write_proposals",
+      "type": "tool",
+      "bpmn_element": "System change via eval gate (instruction / config → eval → publish)",
+      "for_each": "select.proposals",
+      "on_item_error": "continue",
+      "config": {
+        "tool": "obsidian:write_note",
+        "arguments": {
+          "path": "${item.path}",
+          "body": "${item.body}",
+          "front_matter": {"pkpipe_item": "${item.id}", "status": "awaiting-eval-gate"}
+        }
+      }
+    },
+    {
+      "id": "proposal_rows",
+      "type": "code",
+      "bpmn_element": "System change via eval gate (instruction / config → eval → publish)",
+      "config": {"function": "improvement.proposal_rows", "args": {"results": "${write_proposals}"}}
+    },
+    {
+      "id": "write_links",
+      "type": "tool",
+      "bpmn_element": "System change via eval gate (instruction / config → eval → publish)",
+      "config": {"tool": "obsidian:update_improvements", "arguments": {"rows": "${proposal_rows.rows}"}}
+    },
+    {
+      "id": "summary",
+      "type": "code",
+      "bpmn_element": "Notify: weekly review ready",
+      "config": {
+        "function": "improvement.summary",
+        "args": {
+          "review": "${review_rows}",
+          "proposals": "${proposal_rows}",
+          "location": "2-Areas/Self-Improvement/Improvement-Backlog.md"
+        }
+      }
+    },
+    {
+      "id": "notify",
+      "type": "notify",
+      "bpmn_element": "Notify: weekly review ready",
+      "config": {"event": "weekly_review", "message": "${summary.message}"}
+    }
+  ],
+  "edges": [
+    {"from": "read_backlog", "to": "select"},
+    {"from": "select", "to": "journals"},
+    {"from": "journals", "to": "prepare"},
+    {"from": "prepare", "to": "review_each"},
+    {"from": "review_each", "to": "review_rows"},
+    {"from": "review_rows", "to": "write_review", "when": {"path": "review_rows.count", "gt": 0}},
+    {"from": "review_rows", "to": "write_proposals", "default": true},
+    {"from": "write_review", "to": "write_proposals"},
+    {"from": "write_proposals", "to": "proposal_rows"},
+    {"from": "proposal_rows", "to": "write_links", "when": {"path": "proposal_rows.count", "gt": 0}},
+    {"from": "proposal_rows", "to": "summary", "default": true},
+    {"from": "write_links", "to": "summary"},
+    {"from": "summary", "to": "notify", "when": {"path": "summary.total", "gt": 0}},
+    {"from": "summary", "to": "END", "default": true}
+  ]
+}
