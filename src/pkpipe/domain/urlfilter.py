@@ -9,33 +9,27 @@ import ipaddress
 from collections.abc import Callable, Iterable
 from urllib.parse import urlsplit
 
+from pkpipe.security.urlfilter import LOCAL_NAMES, LOCAL_SUFFIXES, is_public_address
+from pkpipe.security.urlfilter import parse_deny_list as _parse_deny_list
+
 
 class UrlRejected(ValueError):
     """The URL is refused; the message is a short reason code (``private_network``, ``deny_list``, ...)."""
 
 
 Resolver = Callable[[str], list[str]]
-_LOCAL_SUFFIXES = (".local", ".localhost", ".internal", ".lan", ".home.arpa")
 
 
 def _is_private(addr: str) -> bool:
-    try:
-        ip = ipaddress.ip_address(addr.split("%", 1)[0])
-    except ValueError:
-        return True  # not an address: refuse rather than guess
-    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
-        ip = ip.ipv4_mapped
-    return not ip.is_global or ip.is_multicast
+    """The address classification of secure fetch (spec 008): loopback, private, link-local, CGNAT, 6to4 and
+    IPv4-mapped forms, multicast, reserved; anything that is not an address is refused rather than guessed."""
+    return not is_public_address(addr)
 
 
 def parse_deny_list(text: str) -> list[str]:
-    """One host or domain per line; ``#`` starts a comment. A domain also denies its sub domains."""
-    entries = []
-    for line in text.splitlines():
-        line = line.split("#", 1)[0].strip().lower()
-        if line:
-            entries.append(line)
-    return entries
+    """One host or domain per line; ``#`` comments, ``*.`` prefixes and URLs accepted (the same file format
+    as secure fetch). A domain also denies its sub domains."""
+    return sorted(_parse_deny_list(text))
 
 
 def check_url(
@@ -65,7 +59,7 @@ def check_url(
         if host == entry or host.endswith("." + entry):
             raise UrlRejected("deny_list")
     if block_private_networks:
-        if host == "localhost" or host.endswith(_LOCAL_SUFFIXES):
+        if host in LOCAL_NAMES or host.endswith(LOCAL_SUFFIXES):
             raise UrlRejected("private_network")
         try:
             addresses = [str(ipaddress.ip_address(host))]

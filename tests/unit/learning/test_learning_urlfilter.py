@@ -59,11 +59,26 @@ def test_private_networks_can_be_allowed_by_configuration():
 
 def test_deny_list_blocks_the_host_and_its_subdomains_only():
     deny = parse_deny_list("# comment\nEvil.example\n\nbad.test  # inline\n")
-    assert deny == ["evil.example", "bad.test"]
+    assert deny == ["bad.test", "evil.example"]
     for url in ("https://evil.example/x", "https://www.evil.example/x", "https://BAD.test/"):
         with pytest.raises(UrlRejected, match="deny_list"):
             check_url(url, deny=deny)
     assert check_url("https://notevil.example/x", deny=deny)  # a suffix of the string is not a sub domain
+
+
+def test_deny_list_file_format_matches_secure_fetch():
+    """The pack's one deny-list file feeds both URL filters: ``*.`` prefixes and URLs must deny here too."""
+    deny = parse_deny_list("*.wild.example\nhttps://url.example/path\n")
+    assert deny == ["url.example", "wild.example"]
+    for url in ("https://a.wild.example/", "https://url.example/x"):
+        with pytest.raises(UrlRejected, match="deny_list"):
+            check_url(url, deny=deny)
+
+
+def test_carrier_grade_nat_and_6to4_count_as_private():
+    for addr in ("100.64.1.1", "2002:c0a8:0101::1"):
+        with pytest.raises(UrlRejected, match="private_network"):
+            check_url("https://n.example/", resolver=lambda h, a=addr: [a])
 
 
 def test_resolver_result_decides_for_names():
