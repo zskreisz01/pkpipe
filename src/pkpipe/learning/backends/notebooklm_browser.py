@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import importlib
 import re
+import threading
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -43,12 +44,16 @@ class NotebookLMDriver(Protocol):
 class NotebookLMBrowserBackend:
     name = BackendName.NOTEBOOKLM_BROWSER
 
-    def __init__(self, driver: NotebookLMDriver):
+    def __init__(self, driver: NotebookLMDriver, *, call_timeout_s: float = 120.0):
+        if call_timeout_s <= 0:
+            raise BackendUnavailable("call_timeout_s must be positive")
         self.driver = driver
+        self.call_timeout_s = call_timeout_s
 
     @classmethod
     def from_config(cls, cfg: dict) -> NotebookLMBrowserBackend:
-        """``{"driver": "package.module:factory", "options": {...}}``: the factory returns the driver."""
+        """``{"driver": "package.module:factory", "options": {...}, "call_timeout_s": 120}``: the factory
+        returns the driver; ``call_timeout_s`` bounds every driver call."""
         spec = cfg.get("driver")
         if not isinstance(spec, str) or not re.fullmatch(r"[A-Za-z_][\w.]*:[A-Za-z_]\w*", spec):
             raise BackendUnavailable(
@@ -61,18 +66,36 @@ class NotebookLMBrowserBackend:
             raise BackendUnavailable(
                 f"NotebookLM driver '{spec}' could not be loaded ({type(exc).__name__})"
             ) from None
-        return cls(driver)
+        return cls(driver, call_timeout_s=float(cfg.get("call_timeout_s", 120.0)))
 
     def _call(self, what: str, fn, *args):
-        try:
-            return fn(*args)
-        except BackendUnavailable:
-            raise
-        except Exception as exc:  # noqa: BLE001 - a UI change or a lost login must fail fast and readable
+        """Run one driver call with a hard timeout. A hung browser leaves a daemon thread behind, but the
+        gateway answers at once instead of blocking the flow."""
+        box: dict = {}
+
+        def target() -> None:
+            try:
+                box["value"] = fn(*args)
+            except BaseException as exc:  # noqa: BLE001 - re-raised in the caller's thread
+                box["error"] = exc
+
+        worker = threading.Thread(target=target, name=f"notebooklm-{what}", daemon=True)
+        worker.start()
+        worker.join(self.call_timeout_s)
+        if worker.is_alive():
             raise BackendUnavailable(
-                f"NotebookLM browser automation failed at '{what}' ({type(exc).__name__}): "
-                "the NotebookLM page may have changed or the browser session expired"
-            ) from None
+                f"NotebookLM browser automation timed out at '{what}' after {self.call_timeout_s:g} s: "
+                "the NotebookLM page may have changed or the browser hangs"
+            )
+        exc = box.get("error")
+        if exc is None:
+            return box.get("value")
+        if isinstance(exc, BackendUnavailable):
+            raise exc
+        raise BackendUnavailable(
+            f"NotebookLM browser automation failed at '{what}' ({type(exc).__name__}): "
+            "the NotebookLM page may have changed or the browser session expired"
+        ) from None
 
     def create(self, url: str, template: str, item_id: str) -> BackendHandle:
         nb = self._call("create notebook", self.driver.create_notebook, f"pkpipe {item_id}".strip())

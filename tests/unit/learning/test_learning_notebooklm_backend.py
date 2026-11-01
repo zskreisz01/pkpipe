@@ -62,3 +62,29 @@ def test_driver_is_loaded_from_configuration_only():
 def test_unknown_backend_name_lists_the_known_ones():
     with pytest.raises(LearningError, match="open_notebook, notebooklm_browser, fake"):
         build_backend("notebooklm", {})
+
+
+def test_a_hanging_browser_call_times_out_instead_of_blocking_the_gateway():
+    """Edge case "fails fast": a driver call that never returns ends after ``call_timeout_s``."""
+    import threading
+    import time
+
+    release = threading.Event()
+
+    class Hanging(Driver):
+        def add_url_source(self, notebook_id, url):
+            release.wait(30)
+
+    be = NotebookLMBrowserBackend.from_config(
+        {"driver": "tests.support.notebooklm_driver:make", "call_timeout_s": 0.2}
+    )
+    be.driver = Hanging()
+    start = time.monotonic()
+    try:
+        with pytest.raises(BackendUnavailable, match="timed out at 'add source' after 0.2 s"):
+            be.create("https://example.invalid/x", "", "i")
+    finally:
+        release.set()
+    assert time.monotonic() - start < 5
+    with pytest.raises(BackendUnavailable, match="call_timeout_s must be positive"):
+        NotebookLMBrowserBackend(Driver(), call_timeout_s=0)

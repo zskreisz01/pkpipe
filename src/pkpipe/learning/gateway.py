@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from .backend import BackendHandle, LearningBackend
 from .errors import BackendUnavailable, LearningError, NotReady, UnknownJob, UrlBlocked
@@ -30,6 +30,22 @@ def clean_reason(text: str, limit: int = 300) -> str:
     one = _CONTROL.sub(" ", str(text)).strip()
     one = re.sub(r"\s+", " ", one)
     return one[:limit] if one else "unknown error"
+
+
+class LearningMetrics(Protocol):
+    """The two learning metrics of docs/operations.md (``pkpipe.telemetry.Metrics`` implements them)."""
+
+    def learning_timeout(self) -> None: ...
+
+    def learning_generation(self, seconds: float) -> None: ...
+
+
+class _NoMetrics:
+    def learning_timeout(self) -> None:
+        pass
+
+    def learning_generation(self, seconds: float) -> None:
+        pass
 
 
 @dataclass
@@ -50,12 +66,14 @@ class LearningGateway:
         *,
         clock: Callable[[], float] = time.time,
         resolver: Resolver = _resolve,
+        metrics: LearningMetrics | None = None,
     ):
         self.backend = backend
         self.store = store
         self.config = config or GatewayConfig()
         self.clock = clock
         self.resolver = resolver
+        self.metrics = metrics or _NoMetrics()
 
     # -- tools -----------------------------------------------------------------------------------------
     def create(self, url: str, template: str, item_id: str = "") -> dict[str, Any]:
@@ -105,6 +123,7 @@ class LearningGateway:
             return job.public()
         now = self.clock()
         if now - job.started_at >= self.config.timeout_s:
+            self.metrics.learning_timeout()
             return self._finish(
                 job, JobStatus.FAILED, f"timeout after {round(self.config.timeout_s / 60)} min"
             )
@@ -124,6 +143,7 @@ class LearningGateway:
             return job.public()
         if result.status is JobStatus.READY:
             job.link = job.link or self.backend.link(job.nb_id or "")
+            self.metrics.learning_generation(max(0.0, now - job.started_at))
             return self._finish(job, JobStatus.READY, None)
         return self._finish(job, JobStatus.FAILED, clean_reason(result.reason or "generation failed"))
 
@@ -172,4 +192,11 @@ class LearningGateway:
         return job.public()
 
 
-__all__ = ["DEFAULT_TIMEOUT_S", "GatewayConfig", "LearningGateway", "UrlBlocked", "clean_reason"]
+__all__ = [
+    "DEFAULT_TIMEOUT_S",
+    "GatewayConfig",
+    "LearningGateway",
+    "LearningMetrics",
+    "UrlBlocked",
+    "clean_reason",
+]

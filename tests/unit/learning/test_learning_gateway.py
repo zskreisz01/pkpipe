@@ -197,3 +197,32 @@ def test_job_store_survives_a_restart(tmp_path, clock):
     assert gw2.status(job["job_id"])["status"] == "generating"
     assert gw2.status(job["job_id"])["status"] == "ready"
     assert gw2.create(URL, TEMPLATE, "item1")["job_id"] == job["job_id"]
+
+
+def test_timeouts_and_generation_time_are_recorded_as_pkpipe_metrics(tmp_path, clock):
+    """Constitution X, docs/operations.md: ``pkpipe.learning_timeouts_total`` counts a timed-out job and
+    ``pkpipe.learning_generation_seconds`` records the wall time of a ready one (real OTel instruments)."""
+    from tests.support.otel import make_in_memory
+
+    otel = make_in_memory()
+    backend = FakeLearningBackend(ready_after=2, never={"slow"})
+    config = GatewayConfig(audio_dir=tmp_path / "audio", timeout_s=600)
+    gw = LearningGateway(
+        backend,
+        JobStore(":memory:"),
+        config,
+        clock=clock,
+        resolver=lambda h: [],
+        metrics=otel.telemetry.metrics,
+    )
+    ok = gw.create(URL, TEMPLATE, "fast")
+    slow = gw.create(URL, TEMPLATE, "slow")
+    clock.t += 120
+    gw.status(ok["job_id"])
+    assert gw.status(ok["job_id"])["status"] == "ready"
+    clock.t += 600
+    assert gw.status(slow["job_id"])["status"] == "failed"
+    gw.status(slow["job_id"])  # a finished job is not counted twice
+    assert otel.metric_value("pkpipe.learning_timeouts_total") == 1
+    [point] = otel.metric_points("pkpipe.learning_generation_seconds")
+    assert point.count == 1 and point.sum == 120

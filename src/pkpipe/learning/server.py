@@ -19,7 +19,7 @@ from fastmcp.exceptions import ToolError
 
 from .config import GatewaySettings
 from .errors import LearningError
-from .gateway import LearningGateway
+from .gateway import LearningGateway, LearningMetrics
 
 DEFAULT_PORT = 8703
 _ITEM_ID = re.compile(r"[A-Za-z0-9_-]{0,64}")
@@ -71,7 +71,9 @@ def _check_loopback(host: str) -> str:
     return host
 
 
-def gateway_from_config(pack: Path | None, overlay: Path | None, environ=None) -> LearningGateway:
+def gateway_from_config(
+    pack: Path | None, overlay: Path | None, environ=None, *, metrics: LearningMetrics | None = None
+) -> LearningGateway:
     from pkpipe.engine.registry import ConfigError, load_effective
 
     try:
@@ -79,7 +81,9 @@ def gateway_from_config(pack: Path | None, overlay: Path | None, environ=None) -
         deny_file = ((cfg.data.get("security") or {}).get("url_filter") or {}).get("deny_list")
         found = cfg.find_file(deny_file) if deny_file else None
         deny_text = found.read_text(encoding="utf-8") if found else None
-        return GatewaySettings.from_config(cfg.data, deny_text=deny_text, environ=environ).build()
+        return GatewaySettings.from_config(cfg.data, deny_text=deny_text, environ=environ).build(
+            metrics=metrics
+        )
     except (ConfigError, LearningError, OSError) as exc:
         raise SystemExit(f"invalid configuration: {exc}") from None
 
@@ -93,7 +97,11 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     args = ap.parse_args(argv)
     host = _check_loopback(args.host)
-    server = build_server(gateway_from_config(args.pack, args.overlay))
+    from pkpipe import telemetry
+
+    # OTEL_* from the environment, like the app; the gateway records the learning metrics (constitution X)
+    tel = telemetry.configure()
+    server = build_server(gateway_from_config(args.pack, args.overlay, metrics=tel.metrics))
     if args.transport == "stdio":
         server.run(transport="stdio", show_banner=False)
     else:
