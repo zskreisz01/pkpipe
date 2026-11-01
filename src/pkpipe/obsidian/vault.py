@@ -12,7 +12,7 @@ from typing import Any
 
 from pkpipe.telemetry import set_span_attributes, tool_span
 
-from . import lists
+from . import improvements, lists
 from .atomic import dir_lock, update_text
 from .errors import NoteExists, NoteNotFound, PathRejected, VaultError
 from .notes import append_text, jsonable, parse_note, render_note
@@ -31,14 +31,21 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
         with tool_span(fn.__name__) as span:
             span.set_attribute("tool.server", "obsidian-vault")
             rows = kwargs.get("rows", args[0] if args else None)
-            if fn.__name__ in ("update_triage", "upsert_processing_list") and isinstance(rows, list):
+            if fn.__name__ in (
+                "update_triage",
+                "upsert_processing_list",
+                "update_improvements",
+            ) and isinstance(rows, list):
                 span.set_attribute("pkpipe.vault.rows", len(rows))
-                ids = [r.get("item_id") for r in rows if isinstance(r, dict)]
+                ids = [r.get("item_id") or r.get("id") for r in rows if isinstance(r, dict)]
                 if len(ids) == 1 and isinstance(ids[0], str):
                     set_span_attributes(span, item_id=ids[0])
             return fn(self, *args, **kwargs)
 
     return wrapper
+
+
+MAX_NOTES = 60
 
 
 class Vault:
@@ -125,6 +132,22 @@ class Vault:
             os.unlink(source)
         return {"from": src, "to": dst}
 
+    @_traced
+    def read_notes(self, paths: list[str]) -> dict[str, Any]:
+        """Read several notes at once (journal days). A missing note is listed in ``missing``, not an error;
+        a path outside the allowlist rejects the whole call."""
+        if not isinstance(paths, list) or len(paths) > MAX_NOTES:
+            raise PathRejected(f"give a list of at most {MAX_NOTES} paths")
+        targets = [(p, self.policy.resolve(p, "read_notes")) for p in paths]
+        notes, missing = [], []
+        for path, target in targets:
+            if not target.is_file() or is_conflict_name(target.name):
+                missing.append(path)
+                continue
+            note = parse_note(target.read_text(encoding="utf-8"))
+            notes.append({"path": path, "body": note.body})
+        return {"notes": notes, "missing": missing}
+
     def _writable(self, path: str, tool: str) -> Path:
         target = self.policy.resolve(path, tool)
         if is_conflict_name(target.name):
@@ -163,6 +186,16 @@ class Vault:
     def upsert_processing_list(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         path = self.policy.resolve(self.policy.processing_list, "upsert_processing_list")
         return lists.upsert_processing_list(path, rows)
+
+    @_traced
+    def read_improvements(self) -> dict[str, Any]:
+        path = self.policy.resolve(self.policy.improvement_file, "read_improvements")
+        return improvements.read_improvements(path)
+
+    @_traced
+    def update_improvements(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
+        path = self.policy.resolve(self.policy.improvement_file, "update_improvements")
+        return improvements.update_improvements(path, rows)
 
 
 def _fold(rel: str) -> str:

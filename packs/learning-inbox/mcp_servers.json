@@ -8,7 +8,10 @@
       "list_folder",
       "read_triage",
       "update_triage",
-      "upsert_processing_list"
+      "upsert_processing_list",
+      "read_notes",
+      "read_improvements",
+      "update_improvements"
     ]
   },
   "websearch": {
@@ -16,14 +19,16 @@
     "url": "http://127.0.0.1:8702/mcp",
     "allow": [
       "search"
-    ]
+    ],
+    "egress": true
   },
   "webfetch": {
     "transport": "streamable_http",
     "url": "http://127.0.0.1:8704/mcp",
     "allow": [
       "fetch_markdown"
-    ]
+    ],
+    "egress": true
   },
   "learning": {
     "transport": "streamable_http",
@@ -33,6 +38,7 @@
       "create",
       "status",
       "link"
-    ]
+    ],
+    "egress": true
   }
 }

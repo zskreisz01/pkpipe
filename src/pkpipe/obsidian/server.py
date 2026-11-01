@@ -74,6 +74,22 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         """Upsert processing-list rows by item_id; other rows, including manual edits, are preserved."""
         return _run(vault.upsert_processing_list, rows)
 
+    @mcp.tool
+    def read_notes(paths: list[str]) -> dict:
+        """Read several notes (for example journal days); missing notes are listed in `missing`."""
+        return _run(vault.read_notes, paths)
+
+    @mcp.tool
+    def read_improvements() -> dict:
+        """Return the improvement backlog rows, unreadable rows and sync conflicts."""
+        return _run(vault.read_improvements)
+
+    @mcp.tool
+    def update_improvements(rows: list[dict]) -> dict:
+        """Upsert backlog rows by id. New rows are always `proposed`; on existing rows only the weekly review
+        fields (evidence, verdict, reason, next_experiment, proposal) may change. All-or-nothing."""
+        return _run(vault.update_improvements, rows)
+
     return mcp
 
 
