@@ -2,6 +2,7 @@
 
 from tests.fakes.clock import FakeClock
 from tests.fakes.config import InMemoryConfig
+from tests.fakes.learning import FakeLearningBackend
 from tests.fakes.model import FakeModel
 from tests.fakes.notify import FakeNotify
 from tests.fakes.runs import InMemoryRunStore
@@ -11,6 +12,7 @@ from tests.fakes.tracer import RecordedSpan, RecordingTracer
 
 __all__ = [
     "FakeClock",
+    "FakeLearningBackend",
     "FakeModel",
     "FakeNotify",
     "FakeTools",

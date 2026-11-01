@@ -25,7 +25,7 @@ Run everything: `uv run pytest`. One level: `uv run pytest tests/unit`.
 
 | Marker | Meaning |
 | --- | --- |
-| `live` | Needs a real local service. `@pytest.mark.live` = LM Studio at `PKPIPE_MODEL_BASE_URL` (default `http://127.0.0.1:1234/v1`) with model `PKPIPE_MODEL_NAME` (default `qwen3.5-9b-mlx`). `@pytest.mark.live("judge")` = the eval judge model `PKPIPE_JUDGE_MODEL` (default `google/gemma-4-12b`) on the same server, different from the model under test (spec 013). Other services: `@pytest.mark.live("docker")`, `@pytest.mark.live("lightpanda")`, combinations allowed. |
+| `live` | Needs a real local service. `@pytest.mark.live` = LM Studio at `PKPIPE_MODEL_BASE_URL` (default `http://127.0.0.1:1234/v1`) with model `PKPIPE_MODEL_NAME` (default `qwen3.5-9b-mlx`). `@pytest.mark.live("judge")` = the eval judge model `PKPIPE_JUDGE_MODEL` (default `google/gemma-4-12b`) on the same server, different from the model under test (spec 013). `@pytest.mark.live("open_notebook")` = Open Notebook + Speaches (spec 012; the tests start `deploy/open-notebook` or `~/tools/open-notebook` when it is down and stop it again). Other services: `@pytest.mark.live("docker")`, `@pytest.mark.live("lightpanda")`, combinations allowed. |
 | `docs` | Builds the Docusaurus site (`npm run build`); skipped when `website/node_modules` is missing. |
 
 Live tests are **skipped** when the service is unreachable, so GitHub CI stays green. On the machine that owns the

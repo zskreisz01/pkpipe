@@ -15,7 +15,9 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable
 from functools import cache
+from pathlib import Path
 
+REPO_DEPLOY = Path(__file__).resolve().parents[2] / "deploy" / "open-notebook"
 DEFAULT_BASE_URL = "http://127.0.0.1:1234/v1"
 DEFAULT_MODEL = "qwen3.5-9b-mlx"
 DEFAULT_JUDGE_MODEL = "google/gemma-4-12b"
@@ -82,7 +84,48 @@ def _lightpanda() -> str | None:
     )
 
 
+def open_notebook_url() -> str:
+    return os.environ.get("PKPIPE_OPEN_NOTEBOOK_URL", "http://127.0.0.1:5055").rstrip("/")
+
+
+def open_notebook_healthy() -> bool:
+    try:
+        with urllib.request.urlopen(f"{open_notebook_url()}/health", timeout=2) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+
+
+def open_notebook_compose_dir() -> Path | None:
+    """The compose folder the tests may start: ``PKPIPE_OPEN_NOTEBOOK_DIR``, the repo's deploy folder when it
+    has a ``.env``, or the owner's prepared ``~/tools/open-notebook``."""
+    candidates = [os.environ.get("PKPIPE_OPEN_NOTEBOOK_DIR"), str(REPO_DEPLOY), "~/tools/open-notebook"]
+    for c in filter(None, candidates):
+        folder = Path(c).expanduser()
+        if (folder / "docker-compose.yml").is_file() and (
+            folder != REPO_DEPLOY or (folder / ".env").is_file()
+        ):
+            return folder
+    return None
+
+
+def _open_notebook() -> str | None:
+    """Open Notebook + Speaches: running already, or startable (Docker and a prepared compose folder)."""
+    if open_notebook_healthy():
+        return None
+    reason = _docker()
+    if reason:
+        return f"Open Notebook not reachable at {open_notebook_url()} and {reason}"
+    if open_notebook_compose_dir() is None:
+        return (
+            f"Open Notebook not reachable at {open_notebook_url()} and no compose folder found "
+            "(deploy/open-notebook/.env or PKPIPE_OPEN_NOTEBOOK_DIR)"
+        )
+    return None
+
+
 PROBES: dict[str, Callable[[], str | None]] = {
+    "open_notebook": _open_notebook,
     "lmstudio": _lmstudio,
     "judge": _judge,
     "docker": _docker,
