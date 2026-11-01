@@ -59,6 +59,17 @@ from pkpipe.steps.triage_code import category_menu, check_category, release_item
 from pkpipe.telemetry import attrs
 
 
+def parallel_map[T, R](items: list[T], fn: Callable[[T], R], concurrency: int = 1) -> list[R]:
+    """``fn`` per item with at most ``concurrency`` calls in flight. Results come back in input order whatever
+    the completion order (deterministic reports and metrics), each call runs in a copy of the caller's context
+    (its spans nest under the caller's span), and the first exception in input order is raised."""
+    if concurrency <= 1 or len(items) <= 1:
+        return [fn(item) for item in items]
+    with ThreadPoolExecutor(min(concurrency, len(items)), thread_name_prefix="pkpipe-eval") as pool:
+        futures = [pool.submit(contextvars.copy_context().run, fn, item) for item in items]
+        return [f.result() for f in futures]
+
+
 @dataclass
 class SuiteContext:
     """What a suite may use. ``model`` is the model under test (possibly a cassette); ``judge`` is ``None``
@@ -69,13 +80,13 @@ class SuiteContext:
     model: ModelPort | None = None
     judge: Judge | None = None
     judge_error: str | None = None
-    workers: int = 1
+    concurrency: int = 1
     limit: int | None = None
     case_span: Callable[[str], AbstractContextManager[Any]] = lambda case_id: nullcontext()
     options: dict[str, Any] = field(default_factory=dict)
 
     def map(self, cases: list[EvalCase], fn: Callable[[EvalCase], CaseResult]) -> list[CaseResult]:
-        """Run ``fn`` per case (in a span), in parallel when ``workers > 1``; order is kept."""
+        """Run ``fn`` per case (in a span), ``concurrency`` cases at once; order is kept."""
 
         def one(case: EvalCase) -> CaseResult:
             with self.case_span(case.id):
@@ -89,11 +100,7 @@ class SuiteContext:
                         details={"crashed": True},
                     )
 
-        if self.workers <= 1 or len(cases) <= 1:
-            return [one(c) for c in cases]
-        with ThreadPoolExecutor(max_workers=self.workers) as pool:
-            futures = [pool.submit(contextvars.copy_context().run, one, c) for c in cases]
-            return [f.result() for f in futures]
+        return parallel_map(cases, one, self.concurrency)
 
     def cases(self, relative: str, suite: str) -> list[EvalCase]:
         path = self.paths.find(relative)
@@ -534,19 +541,23 @@ def run_pairwise(
     model: ModelPort,
     judge: Judge,
     limit: int | None = None,
+    concurrency: int = 1,
 ) -> dict[str, Any]:
     """FR-003: generate the session output with the old and the new config for every case and let the judge
-    compare them pairwise. Returns outcomes and the candidate's score (0.5 = no difference)."""
+    compare them pairwise (``concurrency`` cases at once, outcomes in dataset order). Returns outcomes and the
+    candidate's score (0.5 = no difference)."""
     rubric = session_rubric(paths, new, target)
     if rubric is None:
         raise JudgeUnavailable(f"no rubric for session {target.name}")
     cases = load_jsonl(target.dataset, f"sessions:{target.name}")
     cases = cases[:limit] if limit else cases
-    outcomes = []
-    for case in cases:
+
+    def one(case: EvalCase) -> dict[str, Any]:
         before, _ = SessionsSuite.generate(old, target, case, model)
         after, _ = SessionsSuite.generate(new, target, case, model)
-        outcomes.append({"case_id": case.id, "outcome": judge.compare(rubric, case.input, before, after)})
+        return {"case_id": case.id, "outcome": judge.compare(rubric, case.input, before, after)}
+
+    outcomes = parallel_map(cases, one, concurrency)
     return {
         "session": target.name,
         "outcomes": outcomes,

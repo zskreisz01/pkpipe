@@ -17,8 +17,10 @@ jobs:
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
-      # live tests (LM Studio, Docker, Lightpanda) auto-skip here: the services are not reachable
-      - run: uv run pytest
+      # non-live tests in parallel (pytest-xdist); the live tests (LM Studio, Docker, Lightpanda) run serially
+      # and auto-skip here because the services are not reachable (tests/README.md)
+      - run: uv run pytest -q -n auto -m 'not live'
+      - run: uv run pytest -q -m live
 
   docs-build:
     runs-on: ubuntu-latest

@@ -63,7 +63,7 @@ Without these, triage still works (it only sees URL, title and note), but no web
 - [ ] Put secrets (webhooks, API keys, `HF_TOKEN`) in the macOS keychain or the environment; config files only reference them as `env:NAME`.
 - [ ] Start the helper services you chose: `docker compose -f deploy/docker-compose.yml up -d`
 - [ ] Validate the layered config: `uv run pkpipe validate`
-- [ ] Run the tests: `uv run pytest`
+- [ ] Run the tests: `uv run pytest -n auto -m 'not live'` (parallel); with LM Studio, Lightpanda and Docker set up, `scripts/lmstudio-test-setup.sh` and then `PKPIPE_REQUIRE_LIVE=1 uv run pytest -m live` (serial; see `tests/README.md`)
 - [ ] Start the app: `uv run pkpipe serve` and open the UI.
 - [ ] Do a first manual run: `uv run pkpipe run triage` with one or two test items in `0-INBOX`, and confirm the notification arrives.
 - [ ] Install a `launchd` agent that runs `uv run pkpipe serve`, so the app restarts on login and after crashes (an example for the vault server is in `deploy/launchd/`).

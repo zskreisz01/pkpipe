@@ -150,7 +150,7 @@ class PublishGate:
         paths: EvalPaths | None = None,
         mode: str = "live",
         identities: dict[str, str] | None = None,
-        workers: int = 1,
+        concurrency: int | None = None,
         limit: int | None = None,
         options: dict | None = None,
     ):
@@ -160,7 +160,7 @@ class PublishGate:
         self.paths = paths or EvalPaths.create()
         self.mode = mode
         self.identities = identities
-        self.workers = workers
+        self.concurrency = concurrency  # None: evals.concurrency of the draft
         self.limit = limit
 
     def runner(self, snapshot: ConfigSnapshot) -> EvalRunner:
@@ -170,7 +170,7 @@ class PublishGate:
             model=self.model,
             mode=self.mode,
             identities=self.identities,
-            workers=self.workers,
+            concurrency=self.concurrency,
             limit=self.limit,
             options=self.options,
         )
@@ -232,7 +232,14 @@ class PublishGate:
                 continue
             try:
                 res = run_pairwise(
-                    current, draft, target, paths=self.paths, model=model, judge=judge, limit=self.limit
+                    current,
+                    draft,
+                    target,
+                    paths=self.paths,
+                    model=model,
+                    judge=judge,
+                    limit=self.limit,
+                    concurrency=runner.concurrency,
                 )
             except KeyError:
                 continue  # a new session (absent from the published config): its absolute eval decides

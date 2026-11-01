@@ -17,21 +17,44 @@ REPO = Path(__file__).resolve().parent.parent
 PACK = REPO / "packs" / "learning-inbox"
 
 
-def pytest_configure(config: pytest.Config) -> None:
-    """No test (nor a CLI subprocess it starts) may use the real app DB: the data dir is a temp dir."""
-    if not os.environ.get("PKPIPE_TEST_DATA_DIR"):
-        import tempfile
+def xdist_worker() -> str | None:
+    """The pytest-xdist worker id (``gw0`` ...) of this process, or None in a plain (serial) run."""
+    return os.environ.get("PYTEST_XDIST_WORKER")
 
+
+def pytest_configure(config: pytest.Config) -> None:
+    """No test (nor a CLI subprocess it starts) may use the real app DB: the data dir is a temp dir. Every
+    pytest-xdist worker gets its own one, so parallel tests never share an app DB."""
+    import tempfile
+
+    if not os.environ.get("PKPIPE_TEST_DATA_DIR"):
         os.environ["PKPIPE_TEST_DATA_DIR"] = tempfile.mkdtemp(prefix="pkpipe-test-data-")
+    if xdist_worker() and not os.environ.get("PKPIPE_TEST_DATA_WORKER"):
+        # the controller set PKPIPE_TEST_DATA_DIR before it started the workers: nest one dir per worker
+        os.environ["PKPIPE_TEST_DATA_DIR"] = tempfile.mkdtemp(
+            prefix=f"{xdist_worker()}-", dir=os.environ["PKPIPE_TEST_DATA_DIR"]
+        )
+        os.environ["PKPIPE_TEST_DATA_WORKER"] = xdist_worker() or ""
     os.environ["PKPIPE_DATA_DIR"] = os.environ["PKPIPE_TEST_DATA_DIR"]
     os.environ.pop("PKPIPE_DB", None)
 
 
+SERIAL_LIVE = (
+    "live tests run serially: they share one LM Studio (and Lightpanda, Docker); run them without -n "
+    "(PKPIPE_REQUIRE_LIVE=1 uv run pytest -q -m live) and the rest with -n auto -m 'not live'"
+)
+
+
 def pytest_runtest_setup(item: pytest.Item) -> None:
-    """Skip (or, with PKPIPE_REQUIRE_LIVE=1, fail) live tests whose local service is unreachable."""
+    """Skip (or, with PKPIPE_REQUIRE_LIVE=1, fail) live tests whose local service is unreachable, and live
+    tests in a pytest-xdist worker (parallel requests to the shared services; tests/README.md)."""
     marker = item.get_closest_marker("live")
     if marker is None:
         return
+    if xdist_worker():
+        if os.environ.get("PKPIPE_REQUIRE_LIVE") == "1":
+            pytest.fail(SERIAL_LIVE, pytrace=False)
+        pytest.skip(SERIAL_LIVE)
     reason = live.unavailable_reason(*marker.args)
     if reason is None:
         return
@@ -80,6 +103,20 @@ def synthetic_vault(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return vault
+
+
+@pytest.fixture(scope="session")
+def live_eval_cassettes(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """One cassette directory per pytest session for live eval tests in ``auto`` mode (tests/README.md).
+
+    Several live tests send identical requests: the publish-gate tests change one instruction, yet the
+    security suite's secure-fetch Reader pages, the classifier texts, the unchanged sessions and the "before"
+    side of a pairwise comparison are exactly what the sessions + security test sends with the pack config.
+    The first test that sends a request gets the live answer and records it here; a later test with the
+    identical request (same prompt, schema and profile) gets that live answer back. Every changed request
+    still reaches the real model, and a test run on its own (``-k``) records everything itself.
+    """
+    return tmp_path_factory.mktemp("live-eval-cassettes")
 
 
 @pytest.fixture

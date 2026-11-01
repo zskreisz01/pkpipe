@@ -66,7 +66,8 @@ class EvalRunner:
     """Runs suites on one config snapshot.
 
     ``model`` is the real ``ModelPort`` (it serves every profile, judge included); it may be ``None`` in
-    ``replay`` mode, where only cassettes answer and nothing touches the network.
+    ``replay`` mode, where only cassettes answer and nothing touches the network. ``concurrency`` cases run at
+    once (default ``evals.concurrency``, 1); results, metrics and cassettes do not depend on it.
     """
 
     def __init__(
@@ -77,7 +78,7 @@ class EvalRunner:
         model: ModelPort | None = None,
         mode: str = "live",
         identities: dict[str, str] | None = None,
-        workers: int = 1,
+        concurrency: int | None = None,
         limit: int | None = None,
         options: dict[str, Any] | None = None,
     ):
@@ -90,10 +91,13 @@ class EvalRunner:
         self.model = model
         self.mode = mode
         self.identities = identities if identities is not None else profile_identities(snapshot)
-        self.workers = workers
         self.limit = limit
         self.options = options or {}
         self.config = evals_config(snapshot)
+        #: eval cases in flight at once: the argument (``pkpipe eval --concurrency``) or ``evals.concurrency``
+        self.concurrency = self.config.concurrency if concurrency is None else concurrency
+        if self.concurrency < 1:
+            raise ValueError(f"concurrency must be >= 1 (got {self.concurrency})")
         self.cassettes: dict[str, CassetteModel] = {}
         self.classifier_cassette: CassetteClassifier | None = None
         self._classifier: Any = None
@@ -168,6 +172,7 @@ class EvalRunner:
             span.set_attribute(attrs.EVAL_RUN_ID, run.run_id)
             span.set_attribute(attrs.CONFIG_VERSION, self.snapshot.version)
             span.set_attribute("eval.mode", self.mode)
+            span.set_attribute("eval.concurrency", self.concurrency)
             for name in names:
                 run.suites.append(self._run_suite(run.run_id, name))
             span.set_attribute("eval.passed", run.ok)
@@ -209,7 +214,7 @@ class EvalRunner:
                 model=model,
                 judge=judge,
                 judge_error=judge_error,
-                workers=self.workers,
+                concurrency=self.concurrency,
                 limit=self.limit,
                 case_span=case_span,
                 options=options,
