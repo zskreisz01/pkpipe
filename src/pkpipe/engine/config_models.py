@@ -37,6 +37,8 @@ class ModelProfile(_Strict):
     context: int | None = Field(default=None, gt=0)
     timeout_s: int = Field(default=120, gt=0)
     schema_retries: int = Field(default=1, ge=0, le=5)
+    retries: int = Field(default=0, ge=0, le=5)
+    retry_backoff_s: float = Field(default=2.0, ge=0.0, le=60.0)
     api_key: str | None = None
     fallback: str | None = None
 

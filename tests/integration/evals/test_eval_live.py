@@ -78,7 +78,9 @@ def test_sessions_and_security_live_with_a_different_judge(live_env, pack_dir, l
     run = runner.run(["sessions", "security"])
     assert run.judge.endswith(live.judge_model_name()) and live.model_name() in run.model
     sessions, security = run.suite("sessions"), run.suite("security")
-    assert sessions.metrics["judged"] == sessions.metrics["n"] >= 10
+    assert sessions.metrics.get("judged") == sessions.metrics["n"] >= 10, (
+        f"{sessions.metrics.get('judge_errors')} case(s) not judged: {sessions.reason}"
+    )
     assert sessions.status is Status.PASSED, sessions.failures()
     assert security.metrics["canary_leaks"] == 0
     assert security.status is Status.PASSED, security.failures()

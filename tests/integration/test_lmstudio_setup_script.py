@@ -16,13 +16,16 @@ from tests.conftest import REPO
 SCRIPT = REPO / "scripts" / "lmstudio-test-setup.sh"
 
 
-def _model(identifier: str, ttl: int | None, parallel: int, status: str = "idle") -> dict:
+def _model(
+    identifier: str, ttl: int | None, parallel: int, status: str = "idle", context: int = 32768
+) -> dict:
     return {
         "identifier": identifier,
         "modelKey": identifier,
         "ttlMs": ttl,
         "parallel": parallel,
         "status": status,
+        "contextLength": context,
     }
 
 
@@ -40,7 +43,9 @@ def lms(tmp_path: Path):
     )
     stub.chmod(0o755)
 
-    def run(models: list[dict], *args: str) -> tuple[subprocess.CompletedProcess, list[str]]:
+    def run(
+        models: list[dict], *args: str, **extra_env: str
+    ) -> tuple[subprocess.CompletedProcess, list[str]]:
         ps.write_text(json.dumps(models), encoding="utf-8")
         log.write_text("", encoding="utf-8")
         env = {**os.environ, "LMS": str(stub)}
@@ -51,6 +56,7 @@ def lms(tmp_path: Path):
             "PKPIPE_LMSTUDIO_CONTEXT",
         ):
             env.pop(name, None)
+        env.update(extra_env)
         result = subprocess.run(
             ["bash", str(SCRIPT), *args], env=env, capture_output=True, text=True, timeout=30
         )
@@ -76,9 +82,9 @@ def test_reloads_only_the_test_models_that_have_a_ttl_or_too_few_parallel_slots(
     assert result.returncode == 0, result.stderr
     assert _changes(calls) == [
         "unload qwen3.5-9b-mlx",
-        "load qwen3.5-9b-mlx --identifier qwen3.5-9b-mlx --parallel 4 --yes",
+        "load qwen3.5-9b-mlx --identifier qwen3.5-9b-mlx --parallel 4 --yes --context-length 32768",
         "unload google/gemma-4-12b",
-        "load google/gemma-4-12b --identifier google/gemma-4-12b --parallel 4 --yes",
+        "load google/gemma-4-12b --identifier google/gemma-4-12b --parallel 4 --yes --context-length 32768",
     ]
     assert not any("qwen3-4b" in c or "--ttl" in c for c in calls)
 
@@ -86,8 +92,27 @@ def test_reloads_only_the_test_models_that_have_a_ttl_or_too_few_parallel_slots(
 def test_loads_a_missing_model_and_leaves_a_correct_one_alone(lms):
     result, calls = lms([_model("google/gemma-4-12b", None, 4)])
     assert result.returncode == 0, result.stderr
-    assert _changes(calls) == ["load qwen3.5-9b-mlx --identifier qwen3.5-9b-mlx --parallel 4 --yes"]
+    assert _changes(calls) == [
+        "load qwen3.5-9b-mlx --identifier qwen3.5-9b-mlx --parallel 4 --yes --context-length 32768"
+    ]
     assert "google/gemma-4-12b: ok" in result.stdout
+
+
+def test_a_model_at_another_context_length_is_reloaded_with_the_bounded_context(lms):
+    """Both models are loaded with a bounded 32768-token context (the most models.json lets a prompt use)
+    instead of the 262144-token default, capping the KV caches of two models x 4 parallel slots; ``--check``
+    reports another context, and an empty PKPIPE_LMSTUDIO_CONTEXT accepts any context."""
+    models = [_model("qwen3.5-9b-mlx", None, 4, context=262144), _model("google/gemma-4-12b", None, 4)]
+    result, calls = lms(models)
+    assert result.returncode == 0, result.stderr
+    assert _changes(calls) == [
+        "unload qwen3.5-9b-mlx",
+        "load qwen3.5-9b-mlx --identifier qwen3.5-9b-mlx --parallel 4 --yes --context-length 32768",
+    ]
+    result, calls = lms(models, "--check")
+    assert result.returncode == 1 and "context 262144" in result.stdout and _changes(calls) == []
+    result, calls = lms(models, PKPIPE_LMSTUDIO_CONTEXT="")
+    assert result.returncode == 0 and _changes(calls) == []
 
 
 def test_check_only_reports_and_a_busy_model_is_not_reloaded_without_force(lms):

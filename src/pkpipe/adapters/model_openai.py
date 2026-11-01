@@ -11,7 +11,7 @@ import json
 import os
 import re
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -35,6 +35,9 @@ _CONTEXT_HINTS = (
     "n_ctx",
     "too many tokens",
 )
+# HTTP 4xx bodies that mean "the model is not ready right now" (LM Studio swaps, JIT-loads or TTL-unloads
+# models; a request that arrives meanwhile gets HTTP 400 "Model unloaded"): transient, like a 503.
+_TRANSIENT_HINTS = ("model unloaded", "model is unloaded", "model is loading", "model not loaded")
 
 
 class ProfileError(ModelError, ValueError):
@@ -66,6 +69,8 @@ class ResolvedProfile:
     context: int | None
     timeout_s: int
     schema_retries: int
+    retries: int
+    retry_backoff_s: float
     api_key: str | None
     fallback: str | None
 
@@ -96,6 +101,8 @@ def resolve_profile(name: str, models: ModelsConfig, environ: Mapping[str, str])
             context=p.context,
             timeout_s=p.timeout_s,
             schema_retries=p.schema_retries,
+            retries=p.retries,
+            retry_backoff_s=p.retry_backoff_s,
             api_key=resolve_value(p.api_key, environ) if p.api_key else None,
             fallback=p.fallback,
         )
@@ -136,6 +143,7 @@ class OpenAIModel:
         environ: Mapping[str, str] | None = None,
         client: httpx.Client | None = None,
         tracer: trace.Tracer | None = None,
+        sleep: Callable[[float], None] = time.sleep,
     ):
         self.models = (
             models if isinstance(models, ModelsConfig) else ModelsConfig.model_validate(dict(models))
@@ -143,6 +151,7 @@ class OpenAIModel:
         self.environ = os.environ if environ is None else environ
         self._client = client or httpx.Client()
         self._tracer = tracer or trace.get_tracer("pkpipe.model")
+        self._sleep = sleep
         self.last: Completion | None = None
 
     # -- ModelPort -----------------------------------------------------------------------------------
@@ -259,7 +268,7 @@ class OpenAIModel:
         last_err = ""
         last_raw = ""
         for attempt in range(1, p.schema_retries + 2):
-            content, usage, finish = self._request(p, messages, schema)
+            content, usage, finish = self._request_retrying(p, messages, schema, span)
             if usage:
                 have_usage = True
                 prompt_tokens += usage.get("prompt_tokens") or 0
@@ -316,6 +325,24 @@ class OpenAIModel:
             raise SchemaError(f"schema violation at {path}: {exc.message}", raw=content) from exc
         return obj
 
+    def _request_retrying(
+        self, p: ResolvedProfile, messages: list[dict[str, str]], schema: dict[str, Any] | None, span: Span
+    ) -> tuple[str, dict[str, Any], str | None]:
+        """:meth:`_request` with up to ``retries`` extra tries on a transient failure (connection, timeout,
+        5xx, 408/429, "Model unloaded"), waiting ``retry_backoff_s`` * 2^n between them. Each retry is a
+        ``model.retry`` span event; when every try fails the last :class:`ModelUnavailable` is raised (and a
+        configured fallback profile takes over)."""
+        for retry in range(p.retries + 1):
+            try:
+                return self._request(p, messages, schema)
+            except ModelUnavailable as exc:
+                if retry >= p.retries:
+                    raise
+                delay = p.retry_backoff_s * 2**retry
+                span.add_event("model.retry", {"retry": retry + 1, "delay_s": delay, "error": str(exc)[:300]})
+                self._sleep(delay)
+        raise AssertionError("unreachable")  # pragma: no cover
+
     def _request(
         self, p: ResolvedProfile, messages: list[dict[str, str]], schema: dict[str, Any] | None
     ) -> tuple[str, dict[str, Any], str | None]:
@@ -340,6 +367,8 @@ class OpenAIModel:
             text = resp.text
             if any(h in text.lower() for h in _CONTEXT_HINTS):
                 raise ContextOverflow(f"prompt does not fit the context window of '{p.model}': {text[:300]}")
+            if any(h in text.lower() for h in _TRANSIENT_HINTS):
+                raise ModelUnavailable(f"{p.base_url}: HTTP {resp.status_code}: {text[:300]}")
             raise ModelError(f"HTTP {resp.status_code} from {p.base_url}: {text[:300]}")
         try:
             payload = resp.json()

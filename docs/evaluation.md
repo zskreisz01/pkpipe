@@ -81,6 +81,10 @@ Measured 2026-11-01 on the reference machine (Apple silicon, LM Studio MLX, qwen
 
 Parallel predictions raise throughput by about a third on this machine, not by N: the GPU is already busy with one long reasoning answer, so 4 is the useful maximum. The larger saving in the live tests comes from not sending the same request twice (`tests/README.md`).
 
+The judged sessions suite (all 42 cases, model under test plus the `gemma-4-12b` judge, both loaded by the script) took 722 s with `--concurrency 1` and 520 s with 4 (all 42 judged, judge mean 4.9 in both). The script loads both models with a 32768-token context (the most a `models.json` prompt may use) instead of their 262144-token default; that changed neither speed nor scores (525 s at 262144) but caps the KV caches of two models x 4 slots on a 32 GB machine.
+
+**Stalls and transient errors.** When LM Studio stalls (seen once under memory pressure with near-full swap and another client using the same model: the judge produced two tokens in 25 minutes, and every request in flight hit its `timeout_s`), a request that times out used to leave its case unjudged at once. The `default` and `judge` profiles of the public pack now retry a transient failure (connection, timeout, 5xx, 408/429, HTTP 400 "Model unloaded") twice with backoff (`retries`, `retry_backoff_s`, [configuration](configuration.md#model-profiles)); a case is unjudged only after that, and the live test names the judge error. A stall longer than the retries is still a failure (fail closed): rerun when LM Studio is idle, and never share it with another heavy client during a live run.
+
 ## Datasets
 
 | Dataset | One entry | Shipped (synthetic) |

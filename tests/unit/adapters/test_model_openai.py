@@ -420,3 +420,105 @@ def test_fallback_event_is_recorded_even_without_a_caller_span():
     backup = next(s for s in exporter.get_finished_spans() if s.name == "model.complete backup")
     (event,) = [e for e in backup.events if e.name == "model.fallback"]
     assert dict(event.attributes) == {"from": "default", "to": "backup"}
+
+
+# -- transient retries (live eval robustness: LM Studio stalls, swaps and "Model unloaded") ------------------
+ONE = {"default": {"base_url": "http://x.invalid/v1", "model": "m", "retries": 2, "retry_backoff_s": 1.5}}
+
+
+def make_retrying(handler, models=None, tracer=None):
+    sleeps: list[float] = []
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    model = OpenAIModel(models or ONE, environ={}, client=client, tracer=tracer, sleep=sleeps.append)
+    return model, sleeps
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        lambda r: (_ for _ in ()).throw(httpx.ReadTimeout("timed out", request=r)),
+        lambda r: (_ for _ in ()).throw(httpx.ConnectError("refused", request=r)),
+        lambda r: httpx.Response(503, text="busy"),
+        lambda r: httpx.Response(400, json={"error": "Model unloaded."}),
+    ],
+    ids=["timeout", "connect", "503", "model-unloaded-400"],
+)
+def test_transient_failures_are_retried_with_exponential_backoff(failure):
+    """Spec 002 FR-003 / spec 013 FR-002: a transient endpoint failure (timeout, connection, 5xx, LM Studio's
+    HTTP 400 "Model unloaded") is retried ``retries`` times with backoff before the call (or a judge
+    score) fails; the answer after the retry is returned."""
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) <= 2:
+            return failure(request)
+        return httpx.Response(200, json=reply('{"category": "tool"}'))
+
+    model, sleeps = make_retrying(handler)
+    assert model.complete("s", "u", SCHEMA) == {"category": "tool"}
+    assert len(calls) == 3 and sleeps == [1.5, 3.0]
+
+
+def test_retries_exhausted_raise_model_unavailable_then_fallback_takes_over():
+    hosts = []
+
+    def handler(request):
+        hosts.append(request.url.host)
+        if request.url.host == "primary.invalid":
+            return httpx.Response(400, text='{"error":"Model unloaded."}')
+        return httpx.Response(200, json=reply('{"category": "tool"}'))
+
+    models = {**MODELS, "default": {**MODELS["default"], "retries": 1, "retry_backoff_s": 0.5}}
+    model, sleeps = make_retrying(handler, models)
+    assert model.complete("s", "u", SCHEMA) == {"category": "tool"}
+    assert hosts == ["primary.invalid", "primary.invalid", "backup.invalid"] and sleeps == [0.5]
+    with pytest.raises(ModelUnavailable, match="Model unloaded"):
+        make_retrying(lambda r: httpx.Response(400, text="Model unloaded."), ONE)[0].complete("s", "u")
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(400, text="bad request"),
+        httpx.Response(400, text="the prompt exceeds the context length"),
+        httpx.Response(200, json=reply("garbage")),
+    ],
+    ids=["client-error", "context-overflow", "schema-error"],
+)
+def test_non_transient_errors_are_never_retried(response):
+    """Only transient endpoint failures are retried: a client error, a context overflow and invalid output
+    (handled by ``schema_retries``) fail without extra requests or waits."""
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return response
+
+    model, sleeps = make_retrying(handler, {"default": {**ONE["default"], "schema_retries": 0}})
+    with pytest.raises(Exception) as exc:
+        model.complete("s", "u", SCHEMA)
+    assert not isinstance(exc.value, ModelUnavailable)
+    assert calls == [1] and sleeps == []
+
+
+def test_retry_is_recorded_as_span_event_and_default_is_no_retry():
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        return httpx.Response(503, text="busy") if len(calls) == 1 else httpx.Response(200, json=reply("{}"))
+
+    model, _ = make_retrying(handler, tracer=provider.get_tracer("t"))
+    model.complete("s", "u", {"type": "object"})
+    (span,) = exporter.get_finished_spans()
+    events = [e for e in span.events if e.name == "model.retry"]
+    assert len(events) == 1 and events[0].attributes["retry"] == 1 and "503" in events[0].attributes["error"]
+    calls.clear()
+    plain = {"default": {"base_url": "http://x.invalid/v1", "model": "m"}}
+    with pytest.raises(ModelUnavailable):
+        make_retrying(handler, plain)[0].complete("s", "u")
+    assert calls == [1]

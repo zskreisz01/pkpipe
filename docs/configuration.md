@@ -105,6 +105,8 @@ Steps name a profile (`default`, `judge`), never an endpoint. The `judge` profil
 | `context` | Context window in tokens. A prompt that certainly cannot fit (more than 6 characters per token) is refused with `ContextOverflow` before sending; a server-reported overflow raises the same error. Never truncated silently | none |
 | `timeout_s` | Request timeout | 120 |
 | `schema_retries` | Extra attempts after invalid JSON, then `SchemaError` | 1 |
+| `retries` | Extra tries after a transient endpoint failure (connection error, timeout, 5xx, 408/429, LM Studio's HTTP 400 "Model unloaded" while it swaps or loads a model), each recorded as a `model.retry` span event; after the last one the `fallback` profile takes over, else `ModelUnavailable`. Client errors, context overflow and invalid output are never retried this way. The public pack uses 2 | 0 |
+| `retry_backoff_s` | Wait before the first retry, doubled for each next one | 2 |
 | `api_key` | Optional bearer token, may be `env:NAME` | none |
 | `fallback` | Another profile used when the endpoint is down (connection, timeout, 5xx); recorded as a `model.fallback` span event. Cycles are rejected | none |
 

@@ -18,7 +18,7 @@ The suite has two parts that run differently:
 ```bash
 uv run pytest -q -n auto -m 'not live'                 # everything that needs no live service, in parallel (~30 s)
 PKPIPE_REQUIRE_LIVE=1 uv run pytest -q -m live         # live tests, serially (LM Studio, judge, Lightpanda, Docker, ...)
-scripts/lmstudio-test-setup.sh                         # once before live tests: both models loaded, no TTL, parallel 4
+scripts/lmstudio-test-setup.sh                         # once before live tests: both models loaded, no TTL, parallel 4, context 32768
 ```
 
 - **Non-live, parallel.** `-n auto` (pytest-xdist, a dev dependency; `--dist worksteal` is set in `pyproject.toml`)
@@ -35,9 +35,12 @@ scripts/lmstudio-test-setup.sh                         # once before live tests:
   `live_eval_cassettes` (`tests/conftest.py`), so the first test records the live answer and a later test
   with the same prompt replays it, while every changed request still reaches the model.
 - **LM Studio.** `scripts/lmstudio-test-setup.sh` loads the model under test and the judge together with no
-  idle TTL and 4 parallel predictions (`--check` only reports; other loaded models are left alone). Without
-  it, a TTL unload or a JIT load of one model while the other is serving shows up as "Model unloaded" (HTTP
-  400); rerun that test alone before calling it a failure.
+  idle TTL, 4 parallel predictions and a 32768-token context (`--check` only reports; other loaded models are
+  left alone). Without it, a TTL unload or a JIT load of one model while the other is serving shows up as
+  "Model unloaded" (HTTP 400); the pack's model profiles retry that and other transient errors twice
+  (`retries`). Keep other clients off LM Studio during a live run: a stalled server times out requests and
+  leaves eval cases unjudged (`docs/evaluation.md`, Concurrency); rerun that test alone before calling it a
+  failure.
 - Plain `uv run pytest` still runs everything serially.
 
 ## Rules

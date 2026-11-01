@@ -3,31 +3,35 @@
 #
 # Keeps the model under test and the judge model loaded at the same time, with no idle TTL and with parallel
 # predictions, so live tests and `pkpipe eval --concurrency 4` never wait for a model swap ("Model unloaded"
-# HTTP 400 under contention) and LM Studio serves several requests at once.
+# HTTP 400 under contention) and LM Studio serves several requests at once. Both get a bounded context
+# (32768 tokens, the most a models.json profile lets a prompt use) instead of the models' 262144-token
+# default, which caps the KV caches of two models x 4 parallel slots on a 32 GB machine that already runs
+# close to full swap (a stalled LM Studio times out judge requests: unjudged eval cases).
 #
 #   scripts/lmstudio-test-setup.sh            # load / reload the two models as needed, then show `lms ps`
 #   scripts/lmstudio-test-setup.sh --check    # only report; exit 1 when something is not as wanted
 #   scripts/lmstudio-test-setup.sh --force    # also reload a model that is busy generating right now
 #
 # Environment: PKPIPE_MODEL_NAME (default qwen3.5-9b-mlx), PKPIPE_JUDGE_MODEL (default google/gemma-4-12b),
-# PKPIPE_LMSTUDIO_PARALLEL (default 4), PKPIPE_LMSTUDIO_CONTEXT (context length; default: LM Studio's),
-# LMS (path of the lms CLI; default: lms on PATH, else ~/.lmstudio/bin/lms).
+# PKPIPE_LMSTUDIO_PARALLEL (default 4), PKPIPE_LMSTUDIO_CONTEXT (context length; default 32768; empty:
+# the model's own default), LMS (path of the lms CLI; default: lms on PATH, else ~/.lmstudio/bin/lms).
 #
 # Only these two models are touched: other loaded models stay loaded, nothing is downloaded or deleted, and no
-# other LM Studio setting changes. A model is reloaded only when it is loaded with a TTL or with fewer
-# parallel predictions than wanted (a reload drops requests in flight: run this when no test is running).
+# other LM Studio setting changes. A model is reloaded only when it is loaded with a TTL, with fewer
+# parallel predictions or with another context length than wanted (a reload drops requests in flight: run
+# this when no test is running).
 set -euo pipefail
 
 MODELS=("${PKPIPE_MODEL_NAME:-qwen3.5-9b-mlx}" "${PKPIPE_JUDGE_MODEL:-google/gemma-4-12b}")
 PARALLEL="${PKPIPE_LMSTUDIO_PARALLEL:-4}"
-CONTEXT="${PKPIPE_LMSTUDIO_CONTEXT:-}"
+CONTEXT="${PKPIPE_LMSTUDIO_CONTEXT-32768}"
 CHECK=0
 FORCE=0
 for arg in "$@"; do
   case "$arg" in
     --check) CHECK=1 ;;
     --force) FORCE=1 ;;
-    -h | --help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; exit 0 ;;
     *) echo "unknown option: $arg (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -47,7 +51,7 @@ if ! "$LMS" server status 2>&1 | grep -q "running"; then
   "$LMS" server start
 fi
 
-# state <model>: "absent", or "<status> <ttl_ms|none> <parallel>" of the instance whose identifier is <model>
+# state <model>: "absent", or "<status> <ttl_ms|none> <parallel> <context>" of the instance <model>
 state() {
   "$LMS" ps --json | python3 -c '
 import json, sys
@@ -55,7 +59,8 @@ want = sys.argv[1]
 for m in json.load(sys.stdin):
     if m.get("identifier") == want:
         ttl = m.get("ttlMs")
-        print(m.get("status", "?"), "none" if ttl is None else ttl, m.get("parallel") or 1)
+        print(m.get("status", "?"), "none" if ttl is None else ttl, m.get("parallel") or 1,
+              m.get("contextLength") or 0)
         break
 else:
     print("absent")
@@ -70,17 +75,18 @@ load() {
 
 problems=0
 for model in "${MODELS[@]}"; do
-  read -r status ttl parallel <<<"$(state "$model")"
+  read -r status ttl parallel context <<<"$(state "$model")"
   if [[ "$status" == "absent" ]]; then
     echo "$model: not loaded"
     if ((CHECK)); then problems=$((problems + 1)); else load "$model"; fi
     continue
   fi
-  if [[ "$ttl" == "none" && "$parallel" -ge "$PARALLEL" ]]; then
-    echo "$model: ok (no TTL, parallel $parallel)"
+  if [[ "$ttl" == "none" && "$parallel" -ge "$PARALLEL" && (-z "$CONTEXT" || "$context" == "$CONTEXT") ]]; then
+    echo "$model: ok (no TTL, parallel $parallel, context $context)"
     continue
   fi
-  echo "$model: loaded with TTL ${ttl} ms / parallel ${parallel}; wanted no TTL / parallel ${PARALLEL}"
+  echo "$model: loaded with TTL ${ttl} ms / parallel ${parallel} / context ${context};" \
+    "wanted no TTL / parallel ${PARALLEL} / context ${CONTEXT:-any}"
   if ((CHECK)); then
     problems=$((problems + 1))
     continue
