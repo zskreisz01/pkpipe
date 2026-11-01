@@ -84,6 +84,11 @@ class LightpandaBrowser:
             str(timeout_ms),
             "--terminate-ms",
             str(timeout_ms),
+            # full quiescence (no pending scripts or network), capped by --wait-ms: newer Lightpanda builds
+            # return at 'load' by default, before page JavaScript issues its requests, so subrequests to
+            # blocked addresses would never reach the proxy and the page would pass as clean
+            "--wait-until",
+            "done",
             "--wait-ms",
             str(min(self.wait_ms, timeout_ms)),
             "--log-level",
