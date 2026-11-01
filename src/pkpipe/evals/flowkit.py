@@ -16,7 +16,7 @@ from typing import Any
 from pkpipe.domain.triage import item_id_for
 from pkpipe.obsidian.policy import VaultPolicy
 from pkpipe.obsidian.vault import Vault
-from pkpipe.ports import ModelError
+from pkpipe.ports import Delivery, ModelError
 
 TRIAGE_FILE = "0-INBOX/Inbox-Triage.md"
 PROCESSING_LIST = "0-INBOX/Manual-Resource-Processing-List.md"
@@ -134,11 +134,15 @@ class VirtualClock:
 
 
 class CollectingNotify:
+    """NotifyPort that delivers nothing: it records ``(event, message)`` and reports one ok delivery per
+    target channel (the explicit ``channels``, else a single ``eval`` channel)."""
+
     def __init__(self) -> None:
         self.sent: list[tuple[str, str]] = []
 
-    def send(self, channel: str, message: str, actions: list[dict[str, str]] | None = None) -> None:
-        self.sent.append((channel, message))
+    def send(self, event: str, payload: dict[str, Any], channels: list[str] | None = None) -> list[Delivery]:
+        self.sent.append((event, str(payload.get("message", ""))))
+        return [Delivery(event, channel, True) for channel in (channels or ["eval"])]
 
 
 def owner_decides(vault_dir: Path, confirm: list[str] = (), override: dict[str, str] | None = None) -> None:
