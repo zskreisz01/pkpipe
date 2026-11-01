@@ -101,6 +101,19 @@ def test_release_only_confirmed_or_overridden_items():
     ]
 
 
+def test_release_returns_a_leftover_released_item_with_a_removed_category_to_pending():
+    """Spec 007 edge case: an item left ``released`` by a failed run whose category was removed afterwards
+    is neither processed nor left stuck in ``released``; it goes back to the owner as pending."""
+    rows = [
+        _row("r", cat="removed-cat", confirm=True, state="released"),
+        _row("ok", confirm=True, state="released"),
+    ]
+    out = CODE["triage.release"](_ctx(), triage={"rows": rows})
+    assert [i["id"] for i in out["released"]] == ["ok"]
+    assert out["pending"] == ["r"] and out["unknown_category"] == ["r"] and out["count_pending"] == 1
+    assert out["rows"] == [{"item_id": "r", "state": "pending"}]
+
+
 def test_finalize_marks_processed_quarantined_and_keeps_failed_released():
     results = [
         {

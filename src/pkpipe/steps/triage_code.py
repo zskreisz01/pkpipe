@@ -180,10 +180,10 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
     before = {i.id: i.state for i in items}
     released, pending = release(items)
     unknown = [i for i in released if i.effective_category not in cats]
-    for i in unknown:
-        i.state = ItemState.PENDING if before[i.id] is not ItemState.RELEASED else ItemState.RELEASED
+    for i in unknown:  # also a ``released`` item left over from a failed run: back to the owner, never stuck
+        i.state = ItemState.PENDING
     released = [i for i in released if i.effective_category in cats]
-    pending = pending + [i for i in unknown if i.state is ItemState.PENDING]
+    pending = pending + unknown
     rows = [
         {"item_id": i.id, "state": i.state.value} for i in released + pending if before[i.id] is not i.state
     ]
