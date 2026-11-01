@@ -83,8 +83,10 @@ def test_cli_lists_the_commands_and_stubs_fail_nonzero(tmp_path):
     help_out = pkpipe("--help").stdout
     for cmd in ("serve", "run", "runs", "eval", "validate"):
         assert cmd in help_out
-    r = pkpipe("eval")
+    r = pkpipe("serve")
     assert r.returncode == 1 and "not implemented" in r.stderr
+    r = pkpipe("eval", "--suite", "no_such_suite")  # spec 013 wired 'eval'
+    assert r.returncode == 2 and "unknown suite" in r.stderr
     r = pkpipe("run", "no_such_flow", "--db", str(tmp_path / "app.db"))  # spec 005 wired 'run'
     assert r.returncode == 1 and "unknown flow 'no_such_flow'" in r.stderr
 

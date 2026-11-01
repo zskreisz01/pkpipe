@@ -32,7 +32,7 @@ The 20:00 triage flow suggests a category per new INBOX item in an isolated sess
 
 ## Project Structure
 
-`packs/learning-inbox/flows/`, `src/pkpipe/domain/triage.py`, `evals/datasets/triage.sample.jsonl`.
+`packs/learning-inbox/flows/`, `src/pkpipe/domain/triage.py`, `evals/datasets/triage.jsonl`.
 
 ## Complexity Tracking
 

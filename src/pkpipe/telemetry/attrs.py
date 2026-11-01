@@ -10,7 +10,13 @@ ITEM_CATEGORY = "item.category"
 CONFIG_VERSION = "config.version"
 RUN_TRIGGER = "run.trigger"
 CONTENT_CAPTURE = "pkpipe.content_capture"
-SPAN_KIND = "pkpipe.span.kind"  # flow | step | llm | tool | notify
+SPAN_KIND = "pkpipe.span.kind"  # flow | step | llm | tool | notify | eval
+
+# Evaluation runs (spec 013 FR-004): every eval span carries the run id, suite and case.
+EVAL_RUN_ID = "eval.run_id"
+EVAL_SUITE = "eval.suite"
+EVAL_LEVEL = "eval.level"
+EVAL_CASE_ID = "eval.case_id"
 
 REQUIRED_STEP_ATTRIBUTES = (
     FLOW_ID,

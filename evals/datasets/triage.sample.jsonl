@@ -1,6 +1,0 @@
-{"resource": "https://example.com/course/intro-to-langgraph", "title": "Intro to LangGraph (video course)", "expected": "learning-material"}
-{"resource": "https://example.com/podcast/ep-42-agents", "title": "Podcast: building reliable agents", "expected": "learning-material"}
-{"resource": "https://example.com/tool/vector-db-x", "title": "VectorDB X – open-source vector database", "expected": "tool"}
-{"resource": "https://example.com/blog/headless-browser-y", "title": "Y: a headless browser for agents", "expected": "tool"}
-{"resource": "https://example.com/campaign/clever-billboard", "title": "A clever billboard campaign", "expected": "marketing"}
-{"resource": "https://example.com/random/recipe", "title": "Sourdough recipe", "expected": "misc"}

@@ -32,6 +32,10 @@ The app DB is one SQLite file: `$PKPIPE_DB`, else `$PKPIPE_DATA_DIR/pkpipe.db`, 
 
 A resumed run uses the config version it started with, even if a newer one was published. See [Flows](flows.md) for the flow format.
 
+## Evals
+
+`pkpipe eval --suite <suite|all>` runs the eval suites and exits 1 when a gate is red ([Evaluation](evaluation.md)). Reports (JSON + Markdown) go to `$PKPIPE_DATA_DIR/evals`; every eval span carries `eval.run_id`. CI replays recorded model responses (`--cassette replay`); after a prompt, instruction or model change, re-record them against the real model with `--cassette record --workers 4` and commit the changed `evals/cassettes/*.json`. The weekly health check is `pkpipe eval --suite production --db <app DB> --vault <vault>`: it alerts on failed runs, override, quarantine and learning-failure rates above the gates in `evals.json`.
+
 ## Release ladder
 
 ```mermaid

@@ -41,7 +41,7 @@ def test_no_command_prints_help(capsys):
     assert "usage: pkpipe" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("argv", [["serve"], ["eval"]])
+@pytest.mark.parametrize("argv", [["serve"]])
 def test_unwired_commands_fail_loudly_not_silently(argv, capsys):
     assert main(argv) == 1
     assert "not implemented" in capsys.readouterr().err
@@ -93,6 +93,7 @@ def test_schema_command_writes_one_schema_per_config_file(tmp_path, capsys):
             "categories",
             "security",
             "telemetry",
+            "evals",
             "flow",
         )
     } | {"triage-row.schema.json", "processing-list-row.schema.json"}

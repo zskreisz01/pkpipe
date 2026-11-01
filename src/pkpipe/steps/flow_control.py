@@ -203,6 +203,16 @@ class GuardConfig(StepConfig):
         return v
 
 
+def pattern_flags(patterns: list[str], text: str) -> list[dict[str, Any]]:
+    """Flags of the pattern detector: one per matching pattern (case-insensitive). Also used by the security
+    eval (spec 013), so the eval measures exactly what the guard step does."""
+    return [
+        {"detector": "pattern", "reason_code": f"pattern_{i}"}
+        for i, pattern in enumerate(patterns)
+        if re.search(pattern, text, re.IGNORECASE)
+    ]
+
+
 @register_step
 class GuardStep(StepExecutor):
     """Code raises the flag from patterns and classifier scores (constitution V); the flow routes on
@@ -222,10 +232,7 @@ class GuardStep(StepExecutor):
     def run(self, node, config: GuardConfig, ctx: StepContext) -> StepResult:
         value = ctx.resolve(config.input, required=False)
         text = value if isinstance(value, str) else ("" if value is None else repr(value))
-        flags: list[dict[str, Any]] = []
-        for i, pattern in enumerate(config.patterns):
-            if re.search(pattern, text, re.IGNORECASE):
-                flags.append({"detector": "pattern", "reason_code": f"pattern_{i}"})
+        flags = pattern_flags(config.patterns, text)
         for c in config.checks:
             result = call_tool(ctx, c.tool, ctx.render(c.arguments))
             score = lookup(result, c.score) if isinstance(result, dict) else result

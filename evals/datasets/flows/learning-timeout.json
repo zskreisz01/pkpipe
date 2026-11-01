@@ -1,0 +1,54 @@
+{
+  "id": "learning-timeout",
+  "source": "synthetic",
+  "description": "Learning branch: the generation never finishes; the wait hits its deadline and the item takes the failed path.",
+  "input": {
+    "vault": {
+      "0-INBOX/talk.md": "---\nsource: https://example.invalid/talk\n---\nA recorded conference talk worth a notebook.\n"
+    },
+    "model": [
+      {
+        "when": "conference talk",
+        "reply": {
+          "category": "learning-material",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "learning": {
+      "never": [
+        "0-INBOX/talk.md"
+      ]
+    },
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/talk.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "processing": {
+      "0-INBOX/talk.md": {
+        "status": "failed"
+      }
+    }
+  }
+}

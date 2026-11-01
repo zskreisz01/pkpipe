@@ -1,7 +1,7 @@
 """Command line entry point: ``serve``, ``run <flow>``, ``runs``, ``eval --suite``, ``validate`` (spec 001).
 
-``validate``, ``schema``, ``run`` and ``runs`` (spec 005) are real; ``serve`` and ``eval`` are wired by later
-specs (API, evals) by replacing their entry in :data:`HANDLERS`.
+``validate``, ``schema``, ``run``, ``runs`` (spec 005) and ``eval`` (spec 013) are real; ``serve`` is wired by
+a later spec (API) by replacing its entry in :data:`HANDLERS`.
 """
 
 from __future__ import annotations
@@ -116,6 +116,12 @@ def _runs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _eval(args: argparse.Namespace) -> int:
+    from pkpipe.evals.cli import eval_command
+
+    return eval_command(args)
+
+
 def _not_implemented(args: argparse.Namespace) -> int:
     print(f"'{args.cmd}' is not implemented yet", file=sys.stderr)
     return 1
@@ -126,7 +132,7 @@ HANDLERS: dict[str, Handler] = {
     "serve": _not_implemented,
     "run": _run,
     "runs": _runs,
-    "eval": _not_implemented,
+    "eval": _eval,
     "validate": _validate,
     "schema": _schema,
 }
@@ -152,8 +158,10 @@ def build_parser() -> argparse.ArgumentParser:
     runs.add_argument("--flow")
     runs.add_argument("--db")
     runs.add_argument("--json", action="store_true")
-    ev = sub.add_parser("eval", help="run an eval suite")
-    ev.add_argument("--suite", default="all")
+    ev = sub.add_parser("eval", help="run eval suites and check their gates")
+    from pkpipe.evals.cli import add_arguments
+
+    add_arguments(ev)
     val = sub.add_parser("validate", help="validate the layered config (pack + overlay)")
     val.add_argument("--pack", help="pack directory (default: packs/learning-inbox or PKPIPE_PACK_DIR)")
     val.add_argument("--overlay", help="overlay directory (default: PKPIPE_OVERLAY_DIR)")

@@ -18,7 +18,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [010-category-sessions](010-category-sessions/spec.md) | Category session plans and Process Other Resource | Draft | data-model |
 | [011-context-packs](011-context-packs/spec.md) | Context packs and weekly refresh | Draft |  |
 | [012-learning-gateway](012-learning-gateway/spec.md) | learning-gateway MCP and Process Learning Material | Draft | research · data-model |
-| [013-evaluation-framework](013-evaluation-framework/spec.md) | Evaluation framework and gates | Draft | research · data-model |
+| [013-evaluation-framework](013-evaluation-framework/spec.md) | Evaluation framework and gates | Completed | research · data-model |
 | [014-config-ui-and-app-mcp](014-config-ui-and-app-mcp/spec.md) | Config UI and app MCP server | Draft | research |
 | [015-self-improvement-cycle](015-self-improvement-cycle/spec.md) | Self-improvement cycle (overlay) | Draft | data-model |
 | [016-system-tool-candidates](016-system-tool-candidates/spec.md) | System tool candidates | Draft | data-model |

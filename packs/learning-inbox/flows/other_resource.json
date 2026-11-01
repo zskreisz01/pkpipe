@@ -36,8 +36,14 @@
       "config": {
         "input": "summarize.note",
         "patterns": [
-          "ignore (all )?(previous|prior) instructions",
-          "<\\s*script"
+          "\\b(ignore|disregard|forget|override|bypass)\\b[^.\\n]{0,40}\\b(instructions?|prompts?|rules|guidelines|polic(y|ies)|told)\\b",
+          "\\b(new|updated)\\s+(system\\s+)?instructions?\\s*:|\\bsystem\\s*(override\\b|:)|^\\s*#+\\s*system\\b",
+          "<\\|im_(start|end)\\|>|\\[/?INST\\]|<<\\s*SYS\\s*>>",
+          "\\byou\\s+are\\s+now\\b|\\b(enable|enter|activate)\\s+developer\\s+mode\\b|\\b(no|without)\\s+(restrictions|limits|guidelines|content\\s+policy|rules)\\b",
+          "display\\s*:\\s*none|visibility\\s*:\\s*hidden|font-size\\s*:\\s*0|<\\w+[^>]*\\shidden[\\s>]|color\\s*:\\s*white\\s*;\\s*background(-color)?\\s*:\\s*white|<!--[^>]*\\b(ai|assistant|model|llm)s?\\b",
+          "<\\s*script|javascript\\s*:|\\bon(error|load|click|mouseover)\\s*=|<\\s*iframe",
+          "\\b(repeat|print|reveal|show|output|tell me|what is)\\b[^.\\n]{0,40}\\b(system\\s+prompt|hidden\\s+instructions|reference\\s+code|secret|token|canary|confidential)|\\b(text|everything)\\s+above\\b",
+          "!\\[[^\\]]*\\]\\(https?://|\\b(send|post|upload|exfiltrate)\\b[^.\\n]{0,60}\\b(journal|notes|context|api\\s+keys?|passwords?)\\b|\\bapi[_\\s-]?keys?\\b"
         ]
       }
     },

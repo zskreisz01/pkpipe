@@ -18,6 +18,7 @@ from functools import cache
 
 DEFAULT_BASE_URL = "http://127.0.0.1:1234/v1"
 DEFAULT_MODEL = "qwen3.5-9b-mlx"
+DEFAULT_JUDGE_MODEL = "google/gemma-4-12b"
 
 
 def model_base_url() -> str:
@@ -26,6 +27,11 @@ def model_base_url() -> str:
 
 def model_name() -> str:
     return os.environ.get("PKPIPE_MODEL_NAME", DEFAULT_MODEL)
+
+
+def judge_model_name() -> str:
+    """The eval judge (spec 013): a different model than the one under test."""
+    return os.environ.get("PKPIPE_JUDGE_MODEL", DEFAULT_JUDGE_MODEL)
 
 
 @cache
@@ -48,6 +54,17 @@ def _lmstudio() -> str | None:
     return None
 
 
+def _judge() -> str | None:
+    reason = _lmstudio()
+    if reason:
+        return reason
+    if judge_model_name() == model_name():
+        return "judge model equals the model under test (set PKPIPE_JUDGE_MODEL)"
+    if judge_model_name() not in lmstudio_models():
+        return f"judge model '{judge_model_name()}' is not available in LM Studio"
+    return None
+
+
 @cache
 def _docker() -> str | None:
     if not shutil.which("docker"):
@@ -67,6 +84,7 @@ def _lightpanda() -> str | None:
 
 PROBES: dict[str, Callable[[], str | None]] = {
     "lmstudio": _lmstudio,
+    "judge": _judge,
     "docker": _docker,
     "lightpanda": _lightpanda,
 }

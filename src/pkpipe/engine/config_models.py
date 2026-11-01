@@ -267,6 +267,48 @@ class TelemetrySettings(_Strict):
     capture_content: CaptureContent = Field(default_factory=CaptureContent)
 
 
+# evals.json ------------------------------------------------------------------------------------------------
+class Threshold(_Strict):
+    """One gate condition on a suite metric: ``min`` (value must be >=) or ``max`` (value must be <=)."""
+
+    min: float | None = None
+    max: float | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one(self) -> Threshold:
+        if (self.min is None) == (self.max is None):
+            raise ValueError("a threshold has exactly one of 'min' or 'max'")
+        return self
+
+
+class SuiteGate(_Strict):
+    gate: dict[str, Threshold] = Field(default_factory=dict, description="metric -> threshold")
+
+
+class PairwiseSettings(_Strict):
+    min_score: float = Field(
+        default=0.4,
+        ge=0.0,
+        le=1.0,
+        description="A/B score of the new instruction (win = 1, tie = 0.5, loss = 0) needed to publish",
+    )
+
+
+class CalibrationSettings(_Strict):
+    max_gap: int = Field(default=1, ge=0, le=4, description="Judge/owner difference that counts as disagree")
+    max_disagreement_rate: float = Field(default=0.25, ge=0.0, le=1.0)
+
+
+class EvalsConfig(_Strict):
+    """Eval gates (spec 013 SC-001). Thresholds only move upwards (constitution IX): a publish that lowers a
+    ``min``, raises a ``max`` or drops a gate is refused."""
+
+    judge_profile: str = Field(default="judge", description="models.json profile of the LLM judge")
+    suites: dict[str, SuiteGate] = Field(default_factory=dict)
+    pairwise: PairwiseSettings = Field(default_factory=PairwiseSettings)
+    calibration: CalibrationSettings = Field(default_factory=CalibrationSettings)
+
+
 # registry --------------------------------------------------------------------------------------------------
 #: config file stem -> model. Order is the order used by the CLI.
 CONFIG_MODELS: dict[str, type[BaseModel]] = {
@@ -277,6 +319,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "categories": CategoriesConfig,
     "security": SecurityConfig,
     "telemetry": TelemetrySettings,
+    "evals": EvalsConfig,
 }
 
 

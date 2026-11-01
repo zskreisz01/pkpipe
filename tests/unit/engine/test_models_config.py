@@ -67,7 +67,8 @@ def test_public_pack_profiles_validate_and_resolve_without_any_env(pack_dir):
     d = resolve_profile("default", models, {})
     j = resolve_profile("judge", models, {})
     assert d.base_url == "http://127.0.0.1:1234/v1" and d.model == "qwen3.5-9b-mlx"
-    assert j.model == "qwen3.5-9b-mlx" and j.temperature == 0.0
+    # spec 013 FR-002: the judge is a different model than the one under test, out of the box
+    assert j.model == "google/gemma-4-12b" and j.model != d.model and j.temperature == 0.0
     env = {"PKPIPE_MODEL_BASE_URL": "http://localhost:11434/v1", "PKPIPE_JUDGE_MODEL": "judge-x"}
     assert resolve_profile("default", models, env).base_url == "http://localhost:11434/v1"
     assert resolve_profile("judge", models, env).model == "judge-x"
