@@ -99,3 +99,12 @@ def test_pack_reader_schema_matches_the_reader_extract_model():
     assert set(pack["properties"]) == set(model["properties"])
     assert pack["additionalProperties"] is False and model["additionalProperties"] is False
     assert set(model["required"]) <= set(pack["required"])
+    for name, prop in pack[
+        "properties"
+    ].items():  # the same bounds, so code rejects what the model may not send
+        mine = model["properties"][name]
+        mine = next((m for m in mine.get("anyOf", []) if m.get("type") == "string"), mine)
+        for key in ("maxLength", "maxItems"):
+            assert prop.get(key) == mine.get(key), (name, key)
+        if "items" in prop:
+            assert prop["items"].get("maxLength") == mine["items"].get("maxLength"), name

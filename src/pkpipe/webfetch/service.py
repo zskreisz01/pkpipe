@@ -20,13 +20,16 @@ import time
 from collections import Counter
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
-from pkpipe.security.urlfilter import Reason, Resolver, UrlPolicy
+from pkpipe.security.urlfilter import FLAG_REASONS, Reason, Resolver, UrlPolicy
 from pkpipe.webfetch.browsers import Browser, BrowserError, ChromiumBrowser, LightpandaBrowser, Page
 from pkpipe.webfetch.proxy import FilteringProxy
 
 #: The page plus its scripts and styles may use this multiple of ``max_bytes`` in total.
 BUDGET_FACTOR = 4
+#: Default of ``SecureFetcher(fallback=...)``: Playwright + Chromium. Pass ``None`` for no fallback.
+DEFAULT_FALLBACK = object()
 
 
 def content_kind(content_type: str | None) -> str:
@@ -49,14 +52,15 @@ class SecureFetcher:
         policy: UrlPolicy,
         *,
         primary: Browser | None = None,
-        fallback: Browser | None = None,
+        fallback: Browser | None | object = DEFAULT_FALLBACK,
         resolve: Resolver | None = None,
         timeout_s: float = 30.0,
         stats_file: Path | None = None,
     ):
         self.policy = policy
         self.primary = primary or LightpandaBrowser()
-        self.fallback = fallback if fallback is not None else ChromiumBrowser()
+        # ``None`` means no fallback at all; only the default builds the Chromium one
+        self.fallback: Browser | None = ChromiumBrowser() if fallback is DEFAULT_FALLBACK else fallback  # type: ignore[assignment]
         self.resolve = resolve
         self.timeout_s = timeout_s
         self.stats_file = stats_file
@@ -114,7 +118,7 @@ class SecureFetcher:
                 except BrowserError as exc:
                     page, error = None, exc
                 record = proxy.record
-            blocked = self._blocked(record, error)
+            blocked = self._blocked(record, error, page)
             extra = {"fetcher": browser.name, "fallback_used": i > 0}
             if i > 0:
                 extra["fallback_reason"] = first_error
@@ -135,15 +139,25 @@ class SecureFetcher:
         )
 
     @staticmethod
-    def _blocked(record, error: BrowserError | None) -> str | None:
-        """A policy block anywhere in the fetch (main URL, redirect, sub-request to a private address)."""
+    def _blocked(record, error: BrowserError | None, page: Page | None = None) -> str | None:
+        """A policy block anywhere in the fetch: the main URL or a redirect hop (deny-list, private network),
+        a sub-request to a private address, or the size budget. Only flag reasons count: a third-party host
+        that does not resolve is not a security flag."""
         if record.too_large or (error is not None and error.reason == "too_large"):
             return Reason.SIZE
-        for b in record.blocked:
+        flags = [b for b in record.blocked if b["reason"] in FLAG_REASONS]
+        for b in flags:
             if b["reason"] == Reason.PRIVATE:
                 return Reason.PRIVATE
-        if error is not None and record.blocked:
-            return record.blocked[0]["reason"]
+        if page is not None and flags:
+            # the navigation itself ended on the proxy's refusal (e.g. a redirect to a deny-listed domain):
+            # the browser reports the proxy's 403 as the page, which must not pass as an HTTP error
+            host = (urlsplit(page.final_url or "").hostname or "").rstrip(".")
+            for b in flags:
+                if b["host"] == host:
+                    return b["reason"]
+        if error is not None and flags:
+            return flags[0]["reason"]
         return None
 
     @staticmethod

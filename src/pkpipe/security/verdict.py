@@ -6,7 +6,7 @@ Reader's ``injection_suspected`` raises a security flag. A model never decides t
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -40,11 +40,15 @@ class ReaderExtract(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(max_length=300)
-    summary: str = Field(description="At most 200 words")
-    facts: list[str] = Field(default_factory=list, description="Short factual bullets")
-    links: list[str] = Field(default_factory=list, description="Relevant outbound links")
+    summary: str = Field(max_length=2000, description="At most 200 words")
+    facts: list[Annotated[str, Field(max_length=400)]] = Field(
+        default_factory=list, max_length=12, description="Short factual bullets"
+    )
+    links: list[Annotated[str, Field(max_length=500)]] = Field(
+        default_factory=list, max_length=10, description="Relevant outbound links"
+    )
     injection_suspected: bool
-    evidence: str | None = Field(default=None, description="Quoted suspicious text")
+    evidence: str | None = Field(default=None, max_length=1000, description="Quoted suspicious text")
 
 
 class Verdict(BaseModel):
@@ -125,7 +129,9 @@ def evaluate(
     if reader is not None:
         if reader.get("canary_leaked"):
             flag("canary", "canary_leak")
-        if reader.get("injection_suspected"):
+        if reader.get("invalid_output"):
+            flag("reader", "reader_invalid_output")  # not a ReaderExtract: fail closed
+        elif reader.get("injection_suspected"):
             flag("reader", "injection_suspected")
     if flags:
         return Verdict(

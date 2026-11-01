@@ -18,12 +18,12 @@ Notation: **NEW** = introduced by this spec · **EXISTING** = already in the cod
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `title` | str | yes |  |
-| `summary` | str | yes | ≤ 200 words |
-| `facts` | list[str] | yes | Short factual bullets |
-| `links` | list[str] | no | Relevant outbound links |
+| `title` | str | yes | ≤ 300 chars |
+| `summary` | str | yes | ≤ 200 words (≤ 2000 chars enforced) |
+| `facts` | list[str] | yes | Short factual bullets (≤ 12, each ≤ 400 chars) |
+| `links` | list[str] | no | Relevant outbound links (≤ 10, each ≤ 500 chars; only http(s) leave secure fetch) |
 | `injection_suspected` | bool | yes |  |
-| `evidence` | str|null | no | Quoted suspicious text |
+| `evidence` | str|null | no | Quoted suspicious text (≤ 1000 chars; never leaves secure fetch) |
 
 ### NEW `Verdict`
 
@@ -72,5 +72,5 @@ erDiagram
 
 ## Storage
 
-- Pydantic models in `pkpipe.security.verdict`; JSON Schemas exported by `pkpipe schema` (`fetch-result`, `reader-extract`, `verdict`). The Reader's structured-output schema is `packs/learning-inbox/schemas/reader_extract.json` (a test keeps both in line).
+- Pydantic models in `pkpipe.security.verdict`; JSON Schemas exported by `pkpipe schema` (`fetch-result`, `reader-extract`, `verdict`). The Reader's structured-output schema is `packs/learning-inbox/schemas/reader_extract.json` (a test keeps fields and bounds in line). The Reader step validates every reply strictly against the model; a reply that does not validate is flagged (`reader_invalid_output`).
 - Nothing new is persisted beyond the run checkpoints; the verdict sets `item.fetch_status`, `item.extract` (clean only), `item.flagged`, `item.security_flags`. The web-fetch server can append one JSON line per fetch (`--stats-file`, no URLs) for the fallback rate.

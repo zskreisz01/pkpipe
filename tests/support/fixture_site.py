@@ -109,6 +109,8 @@ def _handler(site: FixtureSite, other_port: int):
                 return self._send(302, b"", Location="http://169.254.169.254/latest/meta-data/")
             if path == "/redirect-private-ip":
                 return self._send(302, b"", Location="http://192.168.1.1/")
+            if path == "/redirect-denied":  # a domain of the pack's deny-list (security/deny_list.txt)
+                return self._send(302, b"", Location="http://cdn.denied.example/landing")
             if path == "/redirect-other-port":  # loopback, but not the allowed port
                 return self._send(302, b"", Location=f"http://127.0.0.1:{other_port}/clean")
             if path == "/big":

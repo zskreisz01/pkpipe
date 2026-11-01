@@ -64,6 +64,14 @@ def test_redirect_to_a_private_address_is_blocked(site, make, path):
 
 
 @pytest.mark.parametrize("make", BACKENDS)
+def test_redirect_to_a_deny_listed_domain_is_blocked(site, make):
+    """FR-001 on a redirect hop: the browser shows the proxy's 403 as the page; it must end as ``blocked``
+    (security flag), not as a failed fetch with ``http_403``."""
+    res = make(site, deny=frozenset({"denied.example"})).fetch(site.url("/redirect-denied"))
+    assert res["status"] == "blocked" and res["reason"] == "deny_list"
+
+
+@pytest.mark.parametrize("make", BACKENDS)
 def test_page_that_calls_private_addresses_is_blocked(site, make):
     """SSRF from page JavaScript (fetch to 10.x and the metadata service) is refused and reported."""
     res = make(site).fetch(site.url("/subrequest-private"))

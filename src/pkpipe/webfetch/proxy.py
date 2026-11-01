@@ -53,6 +53,7 @@ class FilteringProxy:
         self._server: asyncio.base_events.Server | None = None
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        self._writers: set[asyncio.StreamWriter] = set()  # open client and upstream connections
 
     # -- lifecycle ---------------------------------------------------------------------------------------
     def __enter__(self) -> FilteringProxy:
@@ -78,14 +79,19 @@ class FilteringProxy:
             self.port = self._server.sockets[0].getsockname()[1]
             ready.set()
             self._loop.run_forever()
+            # shut down without waiting for clients: a browser killed mid-request (timeout) or a stalled
+            # upstream must not keep the proxy (and the fetch) alive
             self._server.close()
-            with contextlib.suppress(Exception):
-                self._loop.run_until_complete(self._server.wait_closed())
             tasks = asyncio.all_tasks(self._loop)
             for task in tasks:
                 task.cancel()
             with contextlib.suppress(Exception):
                 self._loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+            for w in list(self._writers):
+                with contextlib.suppress(Exception):
+                    w.close()
+            with contextlib.suppress(Exception):
+                self._loop.run_until_complete(asyncio.wait_for(self._server.wait_closed(), 2))
             self._loop.close()
 
         self._thread = threading.Thread(target=run, name="pkpipe-fetch-proxy", daemon=True)
@@ -114,6 +120,13 @@ class FilteringProxy:
 
     # -- protocol ----------------------------------------------------------------------------------------
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        self._writers.add(writer)
+        try:
+            await self._serve(reader, writer)
+        finally:
+            self._writers.discard(writer)
+
+    async def _serve(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
             head = await reader.readuntil(b"\r\n\r\n")
         except (asyncio.IncompleteReadError, asyncio.LimitOverrunError, ConnectionError):
@@ -155,10 +168,12 @@ class FilteringProxy:
             await self._reply(writer, 403, decision.reason or "blocked")
             return None
         try:
-            return await asyncio.wait_for(asyncio.open_connection(decision.addresses[0], port), 15)
+            upstream = await asyncio.wait_for(asyncio.open_connection(decision.addresses[0], port), 15)
         except (OSError, TimeoutError):
             await self._reply(writer, 502, "upstream_unreachable")
             return None
+        self._writers.add(upstream[1])
+        return upstream
 
     async def _connect(self, target: str, reader, writer) -> None:
         host, _, port_s = target.rpartition(":")
@@ -220,5 +235,6 @@ class FilteringProxy:
         await down()
         up_task.cancel()
         for w in (u_writer, writer):
+            self._writers.discard(w)
             with contextlib.suppress(Exception):
                 w.close()

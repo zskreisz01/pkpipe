@@ -137,3 +137,53 @@ def test_content_kind():
         "video",
         "other",
     ]
+
+
+class ThroughProxy:
+    """A browser stand-in that really sends its requests through the filtering proxy (httpx)."""
+
+    def __init__(self, name, urls, *, error=None, final_url=None):
+        self.name, self.urls, self.error, self.final_url = name, urls, error, final_url
+
+    def load(self, url, *, proxy_url, max_bytes, timeout_s):
+        import httpx
+
+        status = None
+        with httpx.Client(proxy=proxy_url, timeout=5, trust_env=False) as client:
+            for u in self.urls:
+                status = client.get(u).status_code
+        if self.error:
+            raise BrowserError(self.error)
+        return Page(url, self.final_url or url, status, {"content-type": "text/plain"}, "blocked")
+
+
+def test_redirect_to_a_deny_listed_domain_is_blocked_not_an_http_error():
+    """FR-001 on a redirect hop: the proxy refuses the deny-listed target with 403; the browser reports that
+    403 as the page, which must end as ``blocked`` (security flag), not as a failed fetch (``http_403``)."""
+    denied = "http://cdn.denied.example/landing"
+    browser = ThroughProxy("lightpanda", [denied], final_url=denied)
+    res = fetcher(browser, None, deny=frozenset({"denied.example"})).fetch(URL)
+    assert res["status"] == "blocked" and res["reason"] == "deny_list"
+
+
+def test_unresolvable_third_party_host_is_not_a_flag():
+    """A sub-request to a host without DNS plus a timeout is a failed fetch, not a security flag."""
+
+    def resolve(host):
+        if host == "gone.example":
+            raise OSError("NXDOMAIN")
+        return ["93.184.215.14"]
+
+    browser = ThroughProxy("lightpanda", ["http://gone.example/tracker.js"], error="timeout")
+    f = SecureFetcher(UrlPolicy(), primary=browser, fallback=None, resolve=resolve, timeout_s=5)
+    res = f.fetch(URL)
+    assert res["status"] == "failed" and res["reason"] == "timeout"
+
+
+def test_fallback_none_means_no_fallback_and_the_default_is_chromium():
+    from pkpipe.webfetch.browsers import ChromiumBrowser
+
+    lp = FakeBrowser("lightpanda", error="navigation_error")
+    res = fetcher(lp, None).fetch(URL)
+    assert res["status"] == "failed" and res["fallback_used"] is False and res["reason"] == "navigation_error"
+    assert isinstance(SecureFetcher(UrlPolicy(), primary=lp).fallback, ChromiumBrowser)

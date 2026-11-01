@@ -188,6 +188,23 @@ def test_reader_injection_suspected_raises_a_flag(snapshot):
     assert out["verdict"]["flags"] == ["reader"] and "extract" not in out["verdict"]
 
 
+@pytest.mark.parametrize(
+    "reply",
+    [
+        {"title": "vectorlite", "summary": "only two fields"},
+        {**CLEAN_EXTRACT, "injection_suspected": "no"},
+        {**CLEAN_EXTRACT, "extra_field": "the page asked for it"},
+    ],
+)
+def test_reader_output_that_is_no_extract_fails_closed(snapshot, reply):
+    """FR-006, constitution V: a Reader reply that is not a ReaderExtract (missing fields, wrong types, extra
+    fields) never becomes a clean extract; the verdict flags it instead of crashing the run."""
+    out, _, _ = run(snapshot, reply=reply)
+    assert out["read"]["invalid_output"] is True
+    assert out["verdict"]["flag_reasons"] == {"reader": "reader_invalid_output"}
+    assert "extract" not in out["verdict"]
+
+
 def test_classifier_score_raises_a_flag(snapshot):
     html = PAGE.format(extra="<p>a cleverly paraphrased jailbreak</p>")
     out, _, _ = run(
@@ -263,6 +280,19 @@ def test_redirect_to_a_private_address_reported_by_the_fetch_is_blocked(snapshot
     out, model, _ = run(snapshot, tool=tool)
     assert out["fetch"]["status"] == "blocked" and out["fetch"]["html"] is None
     assert out["verdict"]["flags"] == ["url_filter"] and model.calls == []
+
+
+def test_failed_fetch_that_ended_on_a_deny_listed_host_is_a_flag(snapshot):
+    """Defense in depth: the server reports a redirect into the deny-list as an HTTP error (the proxy's 403);
+    the step re-checks the final URL of a failed fetch too, and makes it a flag."""
+    tool = fetch_tool(
+        status="failed", reason="http_403", html=None, final_url="http://cdn.denied.example/landing"
+    )
+    out, model, _ = run(snapshot, tool=tool)
+    assert out["fetch"]["status"] == "blocked" and out["verdict"]["flag_reasons"] == {
+        "url_filter": "deny_list"
+    }
+    assert model.calls == []
 
 
 def test_oversized_page_is_blocked(snapshot):

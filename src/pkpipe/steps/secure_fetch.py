@@ -18,7 +18,7 @@ import json
 from typing import Any
 from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from pkpipe.ports import ClassifierUnavailable
 from pkpipe.security import heuristics
@@ -135,9 +135,11 @@ class FetchStep(StepExecutor):
             if result["status"] == "ok" and len(body) > max_bytes:
                 result.update(status="blocked", reason=Reason.SIZE, html=None)
             final = result.get("final_url")
-            if result["status"] == "ok" and final and final != url:
+            if result["status"] != "blocked" and final and final != url:
+                # also after a failure: a redirect to a deny-listed or private target ends in the proxy's
+                # refusal, which a browser reports as an HTTP error page
                 hop = policy.check_url(final, _resolver(ctx))
-                if not hop.allowed:
+                if not hop.allowed and (hop.flag or result["status"] == "ok"):
                     status = "blocked" if hop.flag else "failed"
                     result.update(status=status, reason=hop.reason, html=None)
             for key in ("status", "kind", "fetcher", "reason"):
@@ -245,8 +247,12 @@ def reader_system(system: str, canary: str) -> str:
 
 def reader_reply(reply: dict[str, Any], canary: str) -> dict[str, Any]:
     """Schema-checked Reader fields plus the code-made canary check (on the whole reply, every field)."""
-    out = dict(reply)
-    out["canary_leaked"] = leaked(canary, json.dumps(reply, ensure_ascii=False))
+    out = dict(reply) if isinstance(reply, dict) else {"reply": reply}
+    out["canary_leaked"] = leaked(canary, json.dumps(reply, ensure_ascii=False, default=str))
+    try:
+        ReaderExtract.model_validate({k: v for k, v in out.items() if k != "canary_leaked"}, strict=True)
+    except ValidationError:
+        out["invalid_output"] = True  # never trusted as an extract: the verdict flags it (fail closed)
     return out
 
 

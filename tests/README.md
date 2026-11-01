@@ -42,5 +42,8 @@ the test-only allowance for exactly that port: `fetch_test_loopback` in the run'
 `PKPIPE_WEBFETCH_TEST_LOOPBACK=127.0.0.1:<port>` for the web-fetch server process (`tests/support/webfetch_mcp.py`).
 It is not a config key and must never be set in a deployment. The Prompt Guard 2 test
 (`tests/integration/security/test_promptguard_live.py`) skips with its reason while the gated model is not
-installed; that skip is not a live-service skip, so `PKPIPE_REQUIRE_LIVE=1` keeps it a skip.
+installed; that skip is not a live-service skip, so `PKPIPE_REQUIRE_LIVE=1` keeps it a skip. The adapter's real
+transformers backend (tokenizer, special tokens, 512-token window, batching, label lookup) is covered by
+`tests/integration/security/test_promptguard_backend.py` on a tiny DeBERTa-v2 classifier built in a temporary
+directory (no download); it needs `uv sync --extra promptguard` and skips without it.
 

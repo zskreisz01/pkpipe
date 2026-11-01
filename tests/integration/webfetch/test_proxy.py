@@ -82,3 +82,30 @@ def test_budget_cuts_an_oversized_response(site):
         except httpx.HTTPError:
             pass  # or the client notices the cut connection
     assert proxy.record.too_large and proxy.record.bytes_in <= 100_000 + 64 * 1024
+
+
+def test_stop_does_not_wait_for_hanging_connections(site):
+    """A browser killed mid-request (timeout) and a stalled upstream (the fixture's /slow page) must not keep
+    the proxy alive: every fetch stops its proxy at once, without a thread left behind."""
+    import socket
+    import threading
+    import time
+
+    proxy = FilteringProxy(UrlPolicy(test_loopback=site.allowance), budget_bytes=10**6)
+    proxy.start()
+    half = socket.create_connection(("127.0.0.1", proxy.port))
+    half.sendall(b"GET http://exa")  # an unfinished request line
+    stalled = threading.Thread(target=lambda: _quietly(proxy, site.url("/slow")), daemon=True)
+    stalled.start()
+    time.sleep(0.5)
+    started = time.monotonic()
+    proxy.stop()
+    assert time.monotonic() - started < 3 and not proxy._thread.is_alive()
+    half.close()
+
+
+def _quietly(proxy, url):
+    try:
+        _get(proxy, url)
+    except httpx.HTTPError:
+        pass

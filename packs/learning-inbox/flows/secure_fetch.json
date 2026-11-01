@@ -15,7 +15,7 @@
     {
       "id": "fetch",
       "type": "fetch",
-      "bpmn_element": "Fetch as Markdown",
+      "bpmn_element": "Fetch page",
       "config": {
         "url": "${url_check.url}",
         "tool": "webfetch:fetch_page"

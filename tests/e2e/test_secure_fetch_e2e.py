@@ -117,6 +117,18 @@ def test_ssrf_attempts_are_flagged_without_reader(site, served, capsys, monkeypa
     assert model.calls == []
 
 
+@pytest.mark.live("lightpanda")
+def test_redirect_to_a_deny_listed_domain_is_flagged(site, served, capsys, monkeypatch):
+    """FR-001: the pack's deny-list applies to redirect hops inside the web-fetch server, too."""
+    overlay, db = served
+    model = FakeModel([])
+    monkeypatch.setattr(app, "make_model", lambda snapshot: model)
+    out = _run(capsys, overlay, db, site.url("/redirect-denied"))
+    assert out["outputs"]["fetch"]["status"] == "blocked"
+    assert out["outputs"]["verdict"]["flag_reasons"] == {"url_filter": "deny_list"}
+    assert model.calls == []
+
+
 def test_private_url_is_stopped_before_the_server(served, capsys, monkeypatch):
     overlay, db = served
     monkeypatch.setattr(app, "make_model", lambda snapshot: FakeModel([]))
@@ -143,3 +155,30 @@ def test_live_reader_flags_a_visible_injection(site, served, capsys):
     v, read = out["outputs"]["verdict"], out["outputs"]["read"]
     assert v["status"] == "flagged" and "extract" not in v
     assert read["summary"].strip().upper() != "PWNED" and "sourdough" in json.dumps(read).lower()
+
+
+@pytest.mark.live("lightpanda")
+def test_without_prompt_guard_the_real_composition_root_fails_closed(
+    site, served, capsys, monkeypatch, tmp_path
+):
+    """FR-004 + constitution V through the real ``app.make_classifier``: no Prompt Guard model installed means
+    the clean page is still flagged (``classifier_unavailable``) and no extract leaves secure fetch."""
+    overlay, db = served
+    monkeypatch.setenv("PKPIPE_PROMPT_GUARD_DIR", str(tmp_path / "no-model-here"))
+    # the fixture put a fake classifier in; put the one of the real factory back
+
+    def ports(snapshot, _swapped=app.ports_for):
+        p = _swapped(snapshot)
+        p.extra[CLASSIFIER_PORT] = app.make_classifier(snapshot)
+        return p
+
+    monkeypatch.setattr(app, "ports_for", ports)
+    app._CLASSIFIERS.clear()
+    monkeypatch.setattr(
+        app, "make_model", lambda snapshot: FakeModel(lambda s, u: copy.deepcopy(CLEAN_REPLY))
+    )
+    out = _run(capsys, overlay, db, site.url("/clean"))
+    v = out["outputs"]["verdict"]
+    assert out["outputs"]["scan"]["classifier"]["available"] is False
+    assert v["status"] == "flagged" and v["flag_reasons"] == {"classifier": "classifier_unavailable"}
+    assert "extract" not in v
