@@ -22,7 +22,14 @@ from pkpipe.evals.gate import PublishGate
 from pkpipe.serve import build_services
 from tests.conftest import REPO
 from tests.fakes import FakeClock, FakeModel, FakeNotify, RecordingTracer
-from tests.support.evals import IDS, ProfileModel, mini_evals, triage_case
+from tests.support.evals import (
+    IDS,
+    SECURE_FETCH_CASES,
+    ProfileModel,
+    mini_evals,
+    reader_reply,
+    triage_case,
+)
 from tests.support.flows import make_ports
 from tests.support.pack_runtime import PACK_ROUTES, FakeLearning, fake_model_reply, vault_tools
 from tests.support.vault_mcp import free_port
@@ -55,6 +62,8 @@ def make_overlay_repo(root: Path, files: dict[str, str] | None = None) -> Path:
 
 def gate_model(*, triage_right: bool = True) -> ProfileModel:
     def subject(system, user):
+        if reader := reader_reply(system):
+            return reader
         if "zz-cli" in user:
             return {"category": "tool" if triage_right else "misc", "confidence": 0.9, "reason": "r"}
         if "zz-ad" in user:
@@ -102,6 +111,7 @@ def gate_paths(root: Path):
             "datasets/triage.jsonl": triage,
             "datasets/security.jsonl": security,
             "datasets/injection.jsonl": injection,
+            "datasets/secure_fetch.jsonl": SECURE_FETCH_CASES,
             "datasets/sessions/other_resource/summarize.jsonl": session,
             **flows,
         },
