@@ -20,7 +20,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | File | Describes |
 | --- | --- |
 | `models.json` | Model profiles: endpoint, model, temperature, context, fallback (`default`, `judge`) |
-| `mcp_servers.json` | MCP registration: transport, URL, allowed tools, backend |
+| `mcp_servers.json` | MCP registration: transport, URL, allowed tools; for `learning` also `backend` and `options` ([learning gateway](#learning-gateway)) |
 | `channels.json` | Notification channels and routing per event type |
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
@@ -79,6 +79,20 @@ Steps name a profile (`default`, `judge`), never an endpoint. The `judge` profil
 `env:NAME` reads an environment variable and fails with a clear error when unset; `env:NAME|other` falls back to `other` (another `env:` reference or a literal). The public pack uses `env:PKPIPE_MODEL_BASE_URL|http://127.0.0.1:1234/v1` and `env:PKPIPE_MODEL_NAME|qwen3.5-9b-mlx`, so LM Studio works out of the box and Ollama is a `models.json` or environment change only.
 
 With a JSON schema the adapter sends `response_format: json_schema`, strips `<think>` blocks (and anything before a lone `</think>`), extracts the first JSON object and validates it locally. When `content` is empty (Qwen on LM Studio puts schema-constrained answers into `reasoning_content`), the reasoning is used only if it is exactly one JSON object; reasoning prose is never mined for drafts. Output cut by `max_tokens` is an error in both JSON and text mode. Every call emits a span (`llm.model_name`, token counts, latency).
+
+## Learning gateway
+
+The `learning` entry of `mcp_servers.json` selects and tunes the backend of the learning-gateway MCP server (spec 012); the flows only know the four tools `create`, `status`, `link`, `audio`. Switching the backend is an overlay change.
+
+| Setting | Meaning | Default |
+| --- | --- | --- |
+| `backend` | `open_notebook`, `notebooklm_browser` (needs `backend_options.driver`), `fake` (tests) | `open_notebook` |
+| `options.timeout_s` | A generation that is still running after this many seconds fails with the reason `timeout after N min`; keep `learning_material.wait_generation.deadline_s` (6000) above it | 5400 (90 minutes, local TTS is slow) |
+| `options.data_dir` | Job store (`jobs.db`) and, below it, `audio/` | `$PKPIPE_DATA_DIR/learning` |
+| `options.audio_dir` | Where downloaded podcasts go | `<data_dir>/audio` |
+| `options.backend_options` | Passed to the backend. Open Notebook: `api_url` (`http://127.0.0.1:5055`), `ui_url` (`http://127.0.0.1:8502`), `episode_profile` (`pkpipe_overview`), `speaker_profile` (`pkpipe_duo`), `password_env` (name of the environment variable that holds the API password, if authentication is on), `request_timeout_s` | see the left |
+
+The URL filter comes from `security.json` `url_filter` (`block_private_networks`, `deny_list`). Run the server with `uv run python -m pkpipe.learning.server` (port 8703, loopback only); the stack is described in `deploy/open-notebook/README.md`. Unknown option names are rejected.
 
 ## Sessions instead of skills
 

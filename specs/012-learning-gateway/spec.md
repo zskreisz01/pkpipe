@@ -1,7 +1,8 @@
 ---
 spec_id: 012-learning-gateway
 title: learning-gateway MCP and Process Learning Material
-status: Draft
+status: Active
+status_reason: SC-002 (podcast quality on 5 samples) is a manual owner check; the optional NotebookLM browser backend ships as interface and contract tests without a driver; the output guard of derived text belongs to spec 009
 description: An MCP server that hides the learning backend (Open Notebook with local TTS by default, NotebookLM via browser automation optional, fake for tests) and the learning-material process with polling and timeout.
 relevant_when:
   - learning-gateway
@@ -12,16 +13,16 @@ relevant_when:
   - Speaches
   - Kokoro
 related: [005-flow-engine, 009-output-guard-and-quarantine]
-updated: 2026-10-31
+updated: 2026-11-01
 ---
 
 # Feature Specification: learning-gateway MCP and Process Learning Material
 
 **Feature Branch**: `spec/012-learning-gateway`
 **Created**: 2026-10-31
-**Status**: Draft
+**Status**: Active
 **Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
-**Companions**: [research.md](research.md) · [data-model.md](data-model.md)
+**Companions**: [research.md](research.md) · [data-model.md](data-model.md) · [contracts/learning-gateway.md](contracts/learning-gateway.md)
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -55,9 +56,11 @@ The owner switches to NotebookLM without touching flows.
 
 ### Functional Requirements
 
-- **FR-001**: Tools: `create(url, template)`, `status(job_id)`, `link(nb_id)`, `audio(job_id)`.
-- **FR-002**: The notebook agent sees only URL and template (constitution IV).
-- **FR-003**: Timeout configurable (default 90 min for local TTS); failure reasons recorded.
+- **FR-001**: Tools: `create(url, template)`, `status(job_id)`, `link(nb_id)`, `audio(job_id)` (`create` also takes an optional `item_id` that makes it idempotent per item; contract in [contracts/learning-gateway.md](contracts/learning-gateway.md)).
+- **FR-002**: The notebook agent sees only URL and template (constitution IV). The flow is deterministic (no model reads the note); `learning.prepare` hands the gateway the source URL and the template only, and the gateway filters the URL (scheme, private networks, deny list) before the backend sees it.
+- **FR-003**: Timeout configurable (default 90 min for local TTS, `options.timeout_s`); failure reasons recorded (job store, `item.failure_reason`).
+- **FR-004**: The backend is configuration (`mcp_servers.json` `learning.backend`: `open_notebook`, `notebooklm_browser`, `fake`); flows are identical for every backend.
+- **FR-005**: The default stack (Open Notebook, SurrealDB, Speaches with the Kokoro voice) ships as a digest-pinned compose file and an idempotent setup script (`deploy/open-notebook/`); no secret is committed.
 
 ### Key Entities
 
@@ -66,7 +69,8 @@ The owner switches to NotebookLM without touching flows.
 ## Success Criteria *(mandatory)*
 
 - **SC-001**: Fake-backend flow covers ready, failed and timeout.
-- **SC-002**: Podcast quality acceptable to the owner on 5 samples (manual).
+- **SC-002**: Podcast quality acceptable to the owner on 5 samples (manual, open: the live test only proves that a spoken MP3 is produced).
+- **SC-003**: A learning item with a private-network URL is quarantined and creates no notebook; a failed or timed-out generation is listed as failed with a recorded reason; a service that is down fails the item and the next run retries it.
 
 ## Clarifications
 
@@ -77,3 +81,10 @@ The owner switches to NotebookLM without touching flows.
 ## Out of Scope
 
 - Video generation.
+
+### Session 2026-11-01
+
+- Q: Which language models write the podcast? → A: Open Notebook's outline and transcript need plain JSON, and Qwen3.5 writes its reasoning in front of it (the pipeline fails with "Invalid json output"). The setup script therefore assigns `google/gemma-4-12b` (LM Studio, already the eval judge model) to the episode profile (`--podcast-model`); chat and transformations use the pack's default model.
+- Q: Why does `create` start the podcast instead of a separate tool? → A: FR-001 lists four tools and the notebook is useless without its generation; the BPMN steps "Create notebook + source" and "Start podcast generation" are one tool call, the process picture is unchanged.
+- Q: Where does the output guard of the BPMN (after "Get audio + link") go? → A: Spec 009 (guard of derived text); nothing in this flow is model output, only ids, a link and a file path.
+- Q: NotebookLM? → A: Behind the same interface only (`NotebookLMDriver`); no driver is shipped and no test uses a Google account.

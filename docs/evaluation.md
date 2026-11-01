@@ -19,7 +19,7 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- |
 | 1. Deterministic | `deterministic` (+ `pytest`) | Release rule, category check, state transitions, new-item selection on the effective config; parsers, PARA paths, list writers, canary, query guard in `pytest` | Pass rate | Every commit | 100% |
 | 2. Step | `triage`, `sessions`, `calibration` | Categorization and every session with a dataset, fixed input | Accuracy, per-category F1, confusion; schema, required / forbidden elements; LLM-judge rubric | On instruction or model change; weekly full | Triage accuracy ≥ 0.90, macro F1 ≥ 0.90, min category F1 ≥ 0.85, schema 100%; sessions schema 100%, checks ≥ 0.90, rubric ≥ 4.0 / 5 |
-| 3. Flow | `flows` | Learning branch (ready, failed, timeout), other branch, guard quarantine, release logic | Assertions on a temp vault with scripted tool and model responses | Every PR | 100% |
+| 3. Flow | `flows` | Learning branch (ready, failed, gateway timeout, wait deadline, blocked URL, no URL, service down; the real learning gateway runs over its fake backend), other branch, guard quarantine, release logic | Assertions on a temp vault with scripted tool and model responses | Every PR | 100% |
 | 4. Security | `security` | Injection, jailbreak, hidden HTML, script, canary extraction and exfiltration samples against the output guard; prompt injection and canary leaks through the triage session | Detection rate, false positive rate, leaks, obeyed injections | Security changes and weekly | Detection ≥ 0.80, FP ≤ 0.05, leaks 0, obeyed ≤ 0.10 |
 | 5. Production | `production` | Override rate per category, quarantine rate, learning failures, failed runs, run time | Rates from the app DB and the vault's triage file and processing list | Continuously (weekly report) | Alert above: failed runs 0.10, override 0.30, quarantine 0.20, learning failures 0.20 |
 
@@ -70,7 +70,7 @@ Every run is traced: an `eval run` span, one `eval <suite>` span per suite and o
 | `datasets/triage.jsonl` | URL, title, owner's note → expected category | 92, 23 per category |
 | `datasets/sessions/<flow>/<node>.jsonl` | Fixed node inputs + `must_include` / `must_not` / `must_not_match` / `max_words` | `other_resource/summarize`: 12 |
 | `datasets/calibration/<rubric>.jsonl` | Inputs + an output + the owner's 1-5 score | `resource_note`: 20 |
-| `datasets/flows/*.json` | Initial vault + scripted model / learning responses + owner decisions → expected end state | 8 |
+| `datasets/flows/*.json` | Initial vault + scripted model / learning responses + owner decisions → expected end state | 13 |
 | `datasets/security.jsonl` | Text → `malicious` (with type) or `benign` | 40 attack + 40 clean |
 | `datasets/injection.jsonl` | INBOX item with an embedded attack → true category, attacker's category or marker | 15 |
 | `datasets/deterministic.jsonl` | Rows / suggestion / state change → expected code decision | 17 |
