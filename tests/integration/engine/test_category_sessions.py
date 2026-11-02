@@ -128,6 +128,7 @@ def _kind(schema: dict | None) -> str:
         ("fit", "adoption_cost"),
         ("synthesize", "recommendation"),
         ("compare", "alternatives"),
+        ("system_relevance", "relevance"),
         ("triage", "category"),
     ):
         if key in props:
@@ -156,6 +157,7 @@ def test_tool_item_runs_its_plan_in_order_and_lands_in_para_and_the_list(world):
         "fit",  # personal
         "fit",  # enterprise
         "synthesize",
+        "system_relevance",  # spec 016: after the note session, with the system context
     ]
     note = world.note("3-Resources/Tools", "vectorlite.md")
     assert (

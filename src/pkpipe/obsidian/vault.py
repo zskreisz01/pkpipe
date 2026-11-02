@@ -14,7 +14,7 @@ from typing import Any
 from pkpipe.security import quarantine
 from pkpipe.telemetry import set_span_attributes, tool_span
 
-from . import improvements, lists
+from . import improvements, lists, tool_candidates
 from .atomic import dir_lock, update_text
 from .errors import NoteExists, NoteNotFound, PathRejected, VaultError
 from .notes import append_text, dump_front_matter, jsonable, parse_note, render_note
@@ -37,6 +37,7 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
                 "update_triage",
                 "upsert_processing_list",
                 "update_improvements",
+                "update_tool_candidates",
             ) and isinstance(rows, list):
                 span.set_attribute("pkpipe.vault.rows", len(rows))
                 ids = [r.get("item_id") or r.get("id") for r in rows if isinstance(r, dict)]
@@ -300,6 +301,16 @@ class Vault:
     def update_improvements(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         path = self.policy.resolve(self.policy.improvement_file, "update_improvements")
         return improvements.update_improvements(path, rows)
+
+    @_traced
+    def read_tool_candidates(self) -> dict[str, Any]:
+        path = self.policy.resolve(self.policy.tool_candidates_file, "read_tool_candidates")
+        return tool_candidates.read_tool_candidates(path)
+
+    @_traced
+    def update_tool_candidates(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
+        path = self.policy.resolve(self.policy.tool_candidates_file, "update_tool_candidates")
+        return tool_candidates.update_tool_candidates(path, rows)
 
 
 def _fold(rel: str) -> str:

@@ -24,6 +24,7 @@ from typing import Any
 from pydantic import Field
 
 from pkpipe.domain import session_plan as plans
+from pkpipe.domain import tool_candidate as tcs
 from pkpipe.engine.config_models import Session
 from pkpipe.ports import ModelError
 from pkpipe.steps.base import (
@@ -218,10 +219,13 @@ def plan(ctx: StepContext, note: dict[str, Any]) -> StepResult:
 
 
 @register_code("category.note")
-def note(ctx: StepContext, sessions: dict[str, Any]) -> dict[str, Any]:
+def note(
+    ctx: StepContext, sessions: dict[str, Any], candidates: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """The note to store, rendered from the validated output of the plan's note session (after the output
-    guard): path below the category's PARA folder, Markdown body, front matter, and the agent task of a
-    new-category suggestion if a session made one."""
+    guard): path below the category's PARA folder, Markdown body, front matter, the agent task of a
+    new-category suggestion if a session made one, and (spec 016) the system relevance: a section of the
+    note and, for a new candidate, its row (``candidates`` is the list's current content)."""
     item = ctx.item or {}
     outputs = (sessions or {}).get("sessions") or {}
     note_id = (sessions or {}).get("note_session")
@@ -235,6 +239,9 @@ def note(ctx: StepContext, sessions: dict[str, Any]) -> dict[str, Any]:
     title = plans.note_title(output, extract.get("title") or f"Item {item['id']}")
     body = plans.render_note_body({**output, "title": title}, source=source or None)
     path = plans.note_path(item["para_path"], title, item["id"])
+    relevance = system_relevance(ctx, outputs, tool=title, note_path=path, candidates=candidates)
+    if relevance["section"]:
+        body = body.rstrip("\n") + "\n\n## System relevance\n\n" + relevance["section"] + "\n"
     front = {
         "type": "resource_note",
         "source": source,
@@ -251,12 +258,63 @@ def note(ctx: StepContext, sessions: dict[str, Any]) -> dict[str, Any]:
         "body": body,
         "front_matter": front,
         "has_task": False,
+        "has_candidate": relevance["row"] is not None,
+        "candidate_rows": [relevance["row"]] if relevance["row"] else [],
+        "system_relevance": relevance["reason"],
     }
     suggestion = plans.suggestion_of(outputs, set(categories_of(ctx)))
     if suggestion:
         task_path, task_body, task_front = plans.agent_task_note(suggestion, item_id=item["id"], note=path)
         out.update(has_task=True, task_path=task_path, task_body=task_body, task_front_matter=task_front)
     return out
+
+
+#: What the note says about the system relevance, by the outcome of ``tool_candidate.propose``.
+_RELEVANCE_TEXT = {
+    "in_use": "In use: pkpipe already uses this tool.",
+    "adopted": "In use: this tool was adopted for the system.",
+    "rejected": "Rejected earlier as a system tool; not proposed again without new evidence.",
+    "listed": "Already on the system tool candidate list.",
+    "unknown_component": "Judged relevant, but the component is not part of the system context: not listed.",
+}
+
+
+def system_relevance(
+    ctx: StepContext,
+    outputs: dict[str, Any],
+    *,
+    tool: str,
+    note_path: str,
+    candidates: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Spec 016: what the system relevance session (``system_relevance``) means for this tool. Code decides
+    (constitution V): the row is added only for a component of the system context, never for a tool already
+    in use or adopted and never again for a rejected one (SC-001)."""
+    output = outputs.get("system_relevance")
+    if not isinstance(output, dict) or _skipped(output):
+        return {"section": "", "row": None, "reason": "none"}
+    context = ctx.snapshot.asset("contexts/system.md") or ""
+    existing = {
+        str(r.get("id")): r
+        for r in (candidates or {}).get("rows") or []
+        if isinstance(r, dict) and r.get("id")
+    }
+    name = (outputs.get("research") or {}).get("name") if isinstance(outputs.get("research"), dict) else None
+    proposal = tcs.propose(
+        output,
+        tool=str(name or tool),
+        evaluation_note=note_path,
+        components=tcs.context_components(context),
+        in_use=tcs.context_in_use(context),
+        existing=existing,
+    )
+    if proposal.action == "add" and proposal.row:
+        text = (
+            f"Candidate for {proposal.row['component']} (effort {proposal.row['effort']}): "
+            f"{proposal.row['benefit']} Listed in the system tool candidates."
+        )
+        return {"section": text, "row": proposal.row, "reason": "candidate"}
+    return {"section": _RELEVANCE_TEXT.get(proposal.reason, ""), "row": None, "reason": proposal.reason}
 
 
 _REASON = re.compile(r"[^\w .,:'()/-]+")

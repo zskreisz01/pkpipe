@@ -28,6 +28,8 @@ TOOLS = (
     "read_notes",
     "read_improvements",
     "update_improvements",
+    "read_tool_candidates",
+    "update_tool_candidates",
     "quarantine_note",
 )
 PARA = ("0-INBOX", "1-Projects", "2-Areas", "3-Resources", "4-Archive")
@@ -43,6 +45,8 @@ DEFAULT_ALLOW: dict[str, list[str]] = {
     "read_notes": list(PARA),
     "read_improvements": ["2-Areas"],
     "update_improvements": ["2-Areas"],
+    "read_tool_candidates": ["2-Areas"],
+    "update_tool_candidates": ["2-Areas"],
     # source notes that may be quarantined; the quarantine folder itself is fixed (``quarantine_dir``)
     "quarantine_note": ["0-INBOX"],
 }
@@ -62,6 +66,7 @@ class VaultPolicy(BaseModel):
     triage_file: str = "0-INBOX/Inbox-Triage.md"
     processing_list: str = "0-INBOX/Manual-Resource-Processing-List.md"
     improvement_file: str = "2-Areas/Self-Improvement/Improvement-Backlog.md"
+    tool_candidates_file: str = "2-Areas/System/System-Tool-Candidates.md"
     #: Only ``quarantine_note`` writes here (inert form) and only the owner's release moves a note out.
     quarantine_dir: str = "0-INBOX/_quarantine"
 
@@ -96,8 +101,8 @@ class VaultPolicy(BaseModel):
         return self.vault_dir.resolve()
 
     @property
-    def managed_files(self) -> tuple[str, str, str]:
-        return (self.triage_file, self.processing_list, self.improvement_file)
+    def managed_files(self) -> tuple[str, str, str, str]:
+        return (self.triage_file, self.processing_list, self.improvement_file, self.tool_candidates_file)
 
     def prefixes(self, tool: str) -> list[tuple[str, ...]]:
         if tool not in TOOLS:

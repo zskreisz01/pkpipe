@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "required": [
+    "relevance",
+    "component",
+    "benefit",
+    "effort"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "relevance": {
+      "type": "string",
+      "enum": [
+        "none",
+        "candidate"
+      ]
+    },
+    "component": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "benefit": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "effort": {
+      "type": "string",
+      "enum": [
+        "S",
+        "M",
+        "L"
+      ]
+    }
+  }
+}

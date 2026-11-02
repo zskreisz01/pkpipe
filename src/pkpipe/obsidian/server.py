@@ -91,6 +91,17 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         return _run(vault.update_improvements, rows)
 
     @mcp.tool
+    def read_tool_candidates() -> dict:
+        """Return the system tool candidate rows, unreadable rows, rule violations and sync conflicts."""
+        return _run(vault.read_tool_candidates)
+
+    @mcp.tool
+    def update_tool_candidates(rows: list[dict]) -> dict:
+        """Add system tool candidates (always status `candidate`). Existing rows are never changed by the
+        pipeline: a rejected or adopted tool stays as it is. All-or-nothing."""
+        return _run(vault.update_tool_candidates, rows)
+
+    @mcp.tool
     def quarantine_note(
         item_id: str,
         path: str | None = None,

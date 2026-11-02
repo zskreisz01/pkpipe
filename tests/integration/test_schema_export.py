@@ -19,6 +19,7 @@ def test_exported_schema_files_validate_the_pack_and_reject_a_broken_overlay(tmp
             "triage-row",
             "processing-list-row",
             "improvement-item",
+            "tool-candidate",
             "fetch-result",
             "reader-extract",
             "verdict",
