@@ -29,7 +29,7 @@
     {
       "id": "no_plan",
       "type": "code",
-      "bpmn_element": "Load category session plan (sessions, instructions, context)",
+      "bpmn_element": "List item as failed (reason in the processing list)",
       "config": {
         "function": "item.set",
         "args": {
@@ -41,7 +41,7 @@
     {
       "id": "no_url",
       "type": "code",
-      "bpmn_element": "Secure fetch",
+      "bpmn_element": "List item as failed (reason in the processing list)",
       "config": {
         "function": "item.set",
         "args": {
@@ -61,7 +61,7 @@
     {
       "id": "fetch_failed",
       "type": "code",
-      "bpmn_element": "Secure fetch",
+      "bpmn_element": "List item as failed (reason in the processing list)",
       "config": {
         "function": "item.set",
         "args": {
@@ -82,7 +82,7 @@
     {
       "id": "session_failed",
       "type": "code",
-      "bpmn_element": "Run category sessions",
+      "bpmn_element": "List item as failed (reason in the processing list)",
       "config": {
         "function": "category.session_failed",
         "args": {

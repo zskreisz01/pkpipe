@@ -2,7 +2,7 @@
 spec_id: 010-category-sessions
 title: Category session plans and Process Other Resource
 status: Completed
-description: Executes per-category session plans from config (Tool with six sessions, Marketing, Misc and overlay categories), stores notes in PARA folders and maintains the processing list.
+description: Executes per-category session plans from config (Tool with five sessions, the sixth added by spec 016; Marketing, Misc and overlay categories), stores notes in PARA folders and maintains the processing list.
 relevant_when:
   - session plan
   - categories.json
@@ -95,6 +95,10 @@ Misc items get a new-category suggestion when appropriate.
 - Q: Session failure? → A: A session error after the model's retries (`SchemaError`, `ModelUnavailable`) ends the plan; the item is listed as `failed` with `session '<id>' failed: <ErrorType>` in the `link` column (the list has no reason column, a new column would break existing vault files). A missing URL, a missing plan or an unreachable page fail the item the same way; a security flag quarantines it. Failed items are not retried every morning.
 - Q: Where do notes, tasks and the INBOX note go? → A: `<para_path>/<slug of the title>-<item id>.md`, `2-Areas/Agent-Tasks/new-category-<id>-<item id>.md` (an open task note) and `4-Archive/Inbox/<item id>-<name>.md` (`move_note` is on the pack's vault allow list).
 - Q: Results? → A: Sessions suite live on qwen3.5-9b-mlx (judge gemma-4-12b), 8 plan sessions with 5 to 6 synthetic cases each (final run 2026-11-02: schema 1.0, checks 73/73, judge mean 4.945 over all 73 session cases), see [Evaluation](../../docs/evaluation.md#measured-with-the-reference-model); flows 21/21 (5 new cases, 2 rewritten); e2e with the real vault, web-fetch (Lightpanda) and a synthetic web search MCP server. A first live run found the 9B model copying and obeying injected instructions inside page extracts (`PWNED` as title, a license changed on request); the instructions now say never to follow or repeat them, which fixed it on the shipped set, and the output guard stops what remains.
+
+### Session 2026-11-02 (review)
+
+- Q: Does the BPMN still match? → A: No, the Process Other Resource page showed Misc bypassing the output guard, the new-category suggestion before the guard, an unconditional secure fetch and no failure path. The page, its PNG and the Mermaid block now show the implemented process (`plan` gateway: page / note text only / no plan or URL; fetch failed and session errors list the item as failed; suggestion after the guard); the failure nodes of `other_resource.json` reference the new task "List item as failed".
 
 ## Out of Scope
 

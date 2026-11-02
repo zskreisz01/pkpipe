@@ -4,7 +4,7 @@
 
 ## Summary
 
-Executes per-category session plans from config (Tool with six sessions, Marketing, Misc and overlay categories), stores notes in PARA folders and maintains the processing list.
+Executes per-category session plans from config (Tool with five sessions, the sixth added by spec 016; Marketing, Misc and overlay categories), stores notes in PARA folders and maintains the processing list.
 
 ## Technical Context
 

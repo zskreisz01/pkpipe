@@ -359,6 +359,39 @@ def test_regression_without_the_query_guard_the_blocked_query_would_leave(monkey
     assert outcome.ok and searched == ["Project Falcon"]
 
 
+def test_the_query_guard_checks_only_calls_that_leave_the_machine():
+    """FR-002 scope: a local tool (no ``egress``) may carry a blocked name (it never leaves the machine), a
+    web-search call may not."""
+    plan = cat(s("research", ["item.extract"], tools=["t:read", "websearch:search"], output_schema="a_out"))
+    calls = iter(
+        [
+            {"action": "call", "tool": "t:read", "arguments": {"path": "Project Falcon.md"}},
+            {"action": "call", "tool": "websearch:search", "arguments": {"query": "project-falcon"}},
+        ]
+    )
+    read, searched = [], []
+
+    def fn(system, user, schema=None):
+        props = set((schema or {}).get("properties", {}))
+        if props == {"action", "tool", "arguments", "answer"}:
+            return next(calls, {"action": "final", "answer": "ok"})
+        return {"x": "out"}
+
+    tools = FakeTools(
+        {
+            "t:done": lambda path: {},
+            "t:read": lambda path: read.append(path) or READ(path),
+            "websearch:search": lambda query, **kw: searched.append(query) or {},
+        }
+    )
+    outcome, _, _, tracer = run([item()], categories=[plan], model=Model(fn), tools=tools)
+    assert outcome.ok, outcome.error
+    assert "Project Falcon.md" in read and searched == []
+    assert [f for f in tracer.flags if f["detector"] == "query_guard"] == [
+        {"detector": "query_guard", "action": "block", "reason_code": "blocked_term"}
+    ]
+
+
 def test_schema_error_after_retries_fails_the_item_with_a_safe_reason():
     """Edge case: the item is failed with the session and error type; model output and page text stay out."""
 
@@ -367,11 +400,14 @@ def test_schema_error_after_retries_fails_the_item_with_a_safe_reason():
             return SchemaError("model said: SECRET PAGE TEXT")
         return reply_for(system, user, schema)
 
-    outcome, model, tools, _ = run([item()], model=Model(fn))
+    outcome, model, tools, tracer = run([item()], model=Model(fn))
     assert outcome.ok, outcome.error
     out = flat(outcome)["it1"]
     assert out["item"]["processing_status"] == "failed"
     assert out["item"]["failure_reason"] == "session 'b' failed: SchemaError"
+    # constitution X: the failing session's own span names the model error, the others stay clean
+    spans = {sp.name: sp.failed for sp in tracer.of("step") if sp.name.startswith("run_sessions.")}
+    assert spans == {"run_sessions.a": None, "run_sessions.b": "SchemaError"}
     assert "SECRET" not in json.dumps(out)
     assert len(model.calls) == 2  # the synthesizer never ran
     assert not [c for c in tools.calls if c[0] == "t:done"]  # nothing was written

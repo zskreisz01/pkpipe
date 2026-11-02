@@ -33,4 +33,4 @@ Format: `- [ ] T001 [USx] Description` · `[USx]` = user story
 
 - [x] T007 CI green (ruff, pytest)
 - [x] T008 Eval gates passed where applicable (sessions suite live on qwen3.5-9b-mlx with the gemma-4-12b judge; flows 21/21, sessions 73/73 checks, judge 4.95)
-- [x] T009 Docs, BPMN image and Mermaid updated if behaviour changed (constitution XI): the process pages and the BPMN already show this process; only the prose and the config / flow docs changed
+- [x] T009 Docs, BPMN image and Mermaid updated if behaviour changed (constitution XI): the BPMN page Process Other Resource, its PNG and Mermaid now show the conditional secure fetch, Misc as a plan that passes the output guard, the suggestion after the guard and the failed-item path; config / flow docs updated
