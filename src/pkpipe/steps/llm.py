@@ -14,6 +14,7 @@ from typing import Any
 
 from pydantic import Field
 
+from pkpipe.domain.context_pack import strip_markers
 from pkpipe.security import query_guard
 from pkpipe.security.canary import canary_notice, run_canary
 from pkpipe.steps.base import (
@@ -95,6 +96,8 @@ def build_prompt(config: LlmConfig, ctx: StepContext) -> tuple[str, str, dict[st
         raise StepError(f"system prompt '{config.system}' missing from the pinned config")
     instruction = ctx.snapshot.asset(f"instructions/{config.instruction}") if config.instruction else None
     context = ctx.snapshot.asset(f"contexts/{config.context}.md") if config.context else None
+    if context:
+        context = strip_markers(context)  # the refresh's bookkeeping comments (spec 011) are no context
     schema = ctx.snapshot.json_asset(f"schemas/{config.output_schema}.json") if config.output_schema else None
     inputs = {ref: _text(v) for ref, v in ctx.inputs.items() if v is not None}
     token = datamark_token(*inputs.values())

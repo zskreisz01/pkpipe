@@ -62,6 +62,25 @@ def test_improvement_extraction_live_passes_its_gate(live_env, pack_dir):
     assert report.status is Status.PASSED, report.failures()
 
 
+@pytest.mark.live
+def test_context_leak_suite_live_passes_its_gate(live_env, pack_dir):
+    """Spec 011 SC-001 live: the synthetic enterprise notes of context_leak.jsonl through the real enterprise
+    summary session and the flow's anonymization code; no forbidden name in any pack (gate: 0 leaks), and the
+    packs keep their technologies."""
+    snap = load_effective(pack_dir, None).snapshot()
+    runner = EvalRunner(
+        snap,
+        paths=EvalPaths.create(REPO / "evals"),
+        model=app.make_model(snap),
+        concurrency=LIVE_EVAL_CONCURRENCY,
+    )
+    report = runner.run(["context_leak"]).suite("context_leak")
+    assert report.metrics["n"] >= 24 and report.metrics["schema_valid_rate"] == 1.0
+    assert report.metrics["leaks"] == 0, [c.case_id for c in report.cases if c.details.get("final_leak")]
+    assert {g.metric for g in report.gate} == set(evals_config(snap).suites["context_leak"].gate)
+    assert report.status is Status.PASSED, report.failures()
+
+
 @pytest.mark.live("lmstudio", "judge")
 def test_sessions_and_security_live_with_a_different_judge(live_env, pack_dir, live_eval_cassettes):
     """FR-002 live: the session eval is judged by another model; the security suite's injection cases go

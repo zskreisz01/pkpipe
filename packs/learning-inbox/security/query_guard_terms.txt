@@ -1,0 +1,4 @@
+# Terms that no web query of a session with tools may contain: client, project and people names.
+# One term per line, '#' starts a comment; matching ignores case, accents and punctuation (whole words).
+# The weekly context_refresh flow appends the names of the enterprise notes to the overlay's copy of this
+# file (<overlay>/security/query_guard_terms.txt); it never removes a line, so prune it yourself.

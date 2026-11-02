@@ -21,7 +21,7 @@ from pkpipe.engine.registry import load_effective
 from pkpipe.engine.runs import RunService
 from pkpipe.engine.runtime_defaults import SystemClock
 from pkpipe.engine.snapshot import ConfigSnapshot
-from pkpipe.ports import ClassifierPort, ModelPort, NotifyPort, SecurityLogPort, ToolPort
+from pkpipe.ports import ClassifierPort, ContextStorePort, ModelPort, NotifyPort, SecurityLogPort, ToolPort
 from pkpipe.steps import StepPorts
 
 DB_ENV = "PKPIPE_DB"
@@ -98,18 +98,32 @@ def make_security_log(snapshot: ConfigSnapshot, overlay_dir: Path | None = None)
     return FileSecurityLog(directory)
 
 
+def make_context_store(overlay_dir: Path | None = None) -> ContextStorePort | None:
+    """The overlay's ``contexts/`` and ``security/`` files for the context refresh (spec 011); ``None``
+    without an overlay (the public pack is never written: the refresh then fails naming the overlay)."""
+    from pkpipe.adapters.context_store_files import FileContextStore
+    from pkpipe.engine.registry import overlay_dir_from_env
+
+    overlay = overlay_dir if overlay_dir is not None else overlay_dir_from_env()
+    return FileContextStore(overlay) if overlay is not None else None
+
+
 def ports_for(snapshot: ConfigSnapshot, overlay_dir: Path | None = None) -> StepPorts:
     """Adapters for one pinned config (model profiles and tool servers come from that version)."""
+    extra: dict = {
+        "classifier": make_classifier(snapshot),
+        "security_log": make_security_log(snapshot, overlay_dir),
+    }
+    store = make_context_store(overlay_dir)
+    if store is not None:
+        extra["context_store"] = store
     return StepPorts(
         clock=SystemClock(),
         tracer=OtelTracer(),
         model=make_model(snapshot),
         tools=make_tools(snapshot),
         notify=make_notify(snapshot),
-        extra={
-            "classifier": make_classifier(snapshot),
-            "security_log": make_security_log(snapshot, overlay_dir),
-        },
+        extra=extra,
     )
 
 

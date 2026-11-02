@@ -168,12 +168,15 @@ def test_backlog_path_stays_inside_the_tools_allowlist(tmp_path):
 
 
 # -- read_notes ---------------------------------------------------------------------------------------------
-def test_read_notes_returns_bodies_and_lists_missing_notes(vault):
+def test_read_notes_returns_front_matter_bodies_and_lists_missing_notes(vault):
+    """Spec 011: the context refresh reads the front matter (client, project) of project notes too."""
     root = vault.policy.root
     (root / "2-Areas/Journal/2026-10-30.md").write_text("---\nk: v\n---\nBody one.\n", encoding="utf-8")
     res = vault.read_notes(["2-Areas/Journal/2026-10-30.md", "2-Areas/Journal/2026-10-31.md"])
     assert res == {
-        "notes": [{"path": "2-Areas/Journal/2026-10-30.md", "body": "Body one.\n"}],
+        "notes": [
+            {"path": "2-Areas/Journal/2026-10-30.md", "front_matter": {"k": "v"}, "body": "Body one.\n"}
+        ],
         "missing": ["2-Areas/Journal/2026-10-31.md"],
     }
     assert vault.read_notes([]) == {"notes": [], "missing": []}

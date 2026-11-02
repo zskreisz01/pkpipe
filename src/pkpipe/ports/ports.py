@@ -73,6 +73,20 @@ class SecurityLogPort(Protocol):
 
 
 @runtime_checkable
+class ContextStorePort(Protocol):
+    """The private config files the context refresh maintains (spec 011): ``contexts/<pack>.md`` (and its
+    ``.proposed`` sibling) and the query guard's terms file. Paths are relative to the config overlay and
+    limited to ``contexts/`` and ``security/``; anything else raises ``ValueError``. ``read`` returns ``None``
+    for a file that does not exist; ``remove`` is a no-op for one that does not."""
+
+    def read(self, relative: str) -> str | None: ...
+
+    def write(self, relative: str, text: str) -> None: ...
+
+    def remove(self, relative: str) -> None: ...
+
+
+@runtime_checkable
 class ToolPort(Protocol):
     def list_tools(self, allow: list[str]) -> list[str]: ...
 

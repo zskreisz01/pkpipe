@@ -43,7 +43,7 @@ flowchart LR
 | `id` | Flow id; must equal the file name | required |
 | `description` | What the flow does | `""` |
 | `bpmn` | Process page (`docs/process/<bpmn>.md`) the flow implements | none |
-| `data_classes` | Private data the flow handles (`journal`, `context`): prompt capture is forced off. `journal` flows are also validated as local only: no tool sessions, loopback model profiles, no `egress` MCP server, journal subflows only | `[]` |
+| `data_classes` | Private data the flow handles (`journal`, `context`): prompt capture is forced off. Both are also validated as local only: no tool sessions, loopback model profiles (checked again against the environment on every run, also for the sessions of subflows), no `egress` MCP server, subflows of the same data class only. A code function that handles such data (`context.*`) requires its class in the flow | `[]` |
 | `start` | Entry node, or use edges from `START` (conditional start) | required unless `START` edges |
 | `nodes` | Steps, see below | required |
 | `edges` | Transitions, see below | `[]` |
@@ -88,7 +88,7 @@ Flagged items go to the `handle_security_flag` subflow (log URL, deny-list, iner
 
 Raw external text never reaches a session with tools: `fetch`, `sanitize` and `reader` outputs (like `tool`, `wait`, `llm_tools` and `subflow` outputs) are refused as `llm_tools` inputs; take the secure-fetch verdict's `extract` (`item.extract`) instead.
 
-Built-in `code` functions: `category.plan`, `category.note`, `category.session_failed` ([Category session plans](#category-session-plans-spec-010)), `secure_fetch.url_check`, `secure_fetch.scan`, `secure_fetch.verdict`, `item.set`, `inbox.select_new`, `triage.category_menu`, `triage.check_category`, `triage.suggested_rows`, `triage.backlog`, `triage.release`, `triage.finalize`, and the self-improvement functions `improvement.locate_journal`, `improvement.section`, `improvement.new_rows`, `improvement.select_review`, `improvement.attach_journals`, `improvement.check_evidence`, `improvement.propose`, `improvement.no_evidence`, `improvement.review_rows`, `improvement.proposal_rows`, `improvement.summary` ([Self-Improvement Cycle](process/self-improvement-cycle.md)).
+Built-in `code` functions: `category.plan`, `category.note`, `category.session_failed` ([Category session plans](#category-session-plans-spec-010)), `secure_fetch.url_check`, `secure_fetch.scan`, `secure_fetch.verdict`, `item.set`, `inbox.select_new`, `triage.category_menu`, `triage.check_category`, `triage.suggested_rows`, `triage.backlog`, `triage.release`, `triage.finalize`, the context refresh functions `context.scopes`, `context.select`, `context.prepare`, `context.no_notes`, `context.assemble`, `context.write`, `context.summary` ([Context refresh](#context-refresh-spec-011)), and the self-improvement functions `improvement.locate_journal`, `improvement.section`, `improvement.new_rows`, `improvement.select_review`, `improvement.attach_journals`, `improvement.check_evidence`, `improvement.propose`, `improvement.no_evidence`, `improvement.review_rows`, `improvement.proposal_rows`, `improvement.summary` ([Self-Improvement Cycle](process/self-improvement-cycle.md)).
 
 ### Category session plans (spec 010)
 
@@ -103,6 +103,19 @@ Built-in `code` functions: `category.plan`, `category.note`, `category.session_f
 | `note`, `write`, `agent_task`, `record`, `archive` | `category.note` renders the validated output of the plan's note session (`note_session`, default `synthesize`, else the last session) to `<para_path>/<slug of the title>-<item id>.md` with front matter (`type`, `source`, `category`, `pkpipe_item`, `inbox_note`) and a section per field; a session output with a field named like a skipped session loses that field. A new-category `suggestion` of a session becomes a note `2-Areas/Agent-Tasks/new-category-<id>-<item id>.md`. The processing list row says `done`; the INBOX note moves to `4-Archive/Inbox/<item id>-<name>.md` (a failed move is only recorded) |
 
 The processing list has no reason column: a failed item shows its reason in the `link` column.
+
+### Context refresh (spec 011)
+
+`context_refresh` (Sunday 19:00 and on demand; data class `context`) builds the context packs, [Refresh Project Contexts](process/refresh-project-contexts.md). `scopes` lists the packs, `refresh_each` runs the subflow `context_pack` per scope in parallel (`max_parallel` 2, `on_item_error: continue`: a failing scope never stops the other and is reported), `summary` and `notify` tell the owner:
+
+| Step of `context_pack` | What it does |
+| --- | --- |
+| `list`, `select`, `read`, `prepare` | `obsidian:list_folder`, `context.select` (the folder's `.md` notes, sorted, at most `max_notes`), `obsidian:read_notes` (body and front matter), `context.prepare` (the session text within `max_chars`, notes with `context_exclude: true` skipped, enterprise: the names the notes declare) |
+| `summarize_personal`, `summarize_enterprise` | One local session without tools, input `prepare.text` only. The enterprise session also returns `names`, every private name as the notes write it |
+| `assemble_personal`, `assemble_enterprise`, `assemble_empty` | `context.assemble`: renders the pack within `max_tokens`, enterprise: scrub and verify the names, refuse a pack that trips the injection heuristics. `assemble_empty` (no folder, no note) renders the empty pack with a warning |
+| `write`, `review` | `context.write` (terms file first, then the pack or the proposal, see [Configuration](configuration.md#weekly-refresh-spec-011)) and the review note `2-Areas/Context-Review/<pack>.md` through `obsidian:write_note` (only when something changed) |
+
+Writing needs the private overlay (`PKPIPE_OVERLAY_DIR` or `--overlay`): the `context_store` port writes `<overlay>/contexts/` and `<overlay>/security/` only, and a run without an overlay fails its scopes with a message naming it.
 
 ### Triage and release (spec 007)
 

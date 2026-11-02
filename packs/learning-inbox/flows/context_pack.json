@@ -1,0 +1,264 @@
+{
+  "id": "context_pack",
+  "description": "Subflow of context_refresh, one scope (a personal or enterprise pack): read the project notes of its folder, summarize them with a local session without tools, build the pack within its token budget (enterprise: names scrubbed and verified, terms handed to the query guard), keep the owner's edits (a diff is proposed instead of an overwrite) and write a review note.",
+  "bpmn": "refresh-project-contexts",
+  "data_classes": [
+    "context"
+  ],
+  "start": "list",
+  "nodes": [
+    {
+      "id": "list",
+      "type": "tool",
+      "bpmn_element": "Read project notes",
+      "config": {
+        "tool": "obsidian:list_folder",
+        "arguments": {
+          "path": "${item.folder}"
+        }
+      }
+    },
+    {
+      "id": "select",
+      "type": "code",
+      "bpmn_element": "Read project notes",
+      "config": {
+        "function": "context.select",
+        "args": {
+          "listing": "${list}",
+          "folder": "${item.folder}",
+          "max_notes": "${item.max_notes}"
+        }
+      }
+    },
+    {
+      "id": "read",
+      "type": "tool",
+      "bpmn_element": "Read project notes",
+      "config": {
+        "tool": "obsidian:read_notes",
+        "arguments": {
+          "paths": "${select.paths}"
+        }
+      }
+    },
+    {
+      "id": "prepare",
+      "type": "code",
+      "bpmn_element": "Read project notes",
+      "config": {
+        "function": "context.prepare",
+        "args": {
+          "notes": "${read}",
+          "kind": "${item.kind}",
+          "max_chars": "${item.max_chars}"
+        }
+      }
+    },
+    {
+      "id": "summarize_personal",
+      "type": "llm",
+      "bpmn_element": "Summarize personal context (local model)",
+      "config": {
+        "system": "context_analyst",
+        "instruction": "context/personal.md",
+        "output_schema": "context_personal"
+      },
+      "inputs": [
+        "prepare.text"
+      ]
+    },
+    {
+      "id": "summarize_enterprise",
+      "type": "llm",
+      "bpmn_element": "Summarize enterprise context (anonymize, local model only)",
+      "config": {
+        "system": "context_analyst",
+        "instruction": "context/enterprise.md",
+        "output_schema": "context_enterprise"
+      },
+      "inputs": [
+        "prepare.text"
+      ]
+    },
+    {
+      "id": "assemble_personal",
+      "type": "code",
+      "bpmn_element": "Build the pack within its token budget",
+      "config": {
+        "function": "context.assemble",
+        "args": {
+          "kind": "personal",
+          "pack": "${item.pack}",
+          "max_tokens": "${item.max_tokens}",
+          "summary": "${summarize_personal}",
+          "prepared": "${prepare}"
+        }
+      }
+    },
+    {
+      "id": "assemble_enterprise",
+      "type": "code",
+      "bpmn_element": "Anonymize: scrub and verify private names",
+      "config": {
+        "function": "context.assemble",
+        "args": {
+          "kind": "enterprise",
+          "pack": "${item.pack}",
+          "max_tokens": "${item.max_tokens}",
+          "summary": "${summarize_enterprise}",
+          "prepared": "${prepare}"
+        }
+      }
+    },
+    {
+      "id": "no_notes",
+      "type": "code",
+      "bpmn_element": "Build the pack within its token budget",
+      "config": {
+        "function": "context.no_notes",
+        "args": {
+          "folder": "${item.folder}",
+          "listed_by": "list"
+        }
+      }
+    },
+    {
+      "id": "assemble_empty",
+      "type": "code",
+      "bpmn_element": "Build the pack within its token budget",
+      "config": {
+        "function": "context.assemble",
+        "args": {
+          "kind": "${item.kind}",
+          "pack": "${item.pack}",
+          "max_tokens": "${item.max_tokens}"
+        }
+      }
+    },
+    {
+      "id": "write",
+      "type": "code",
+      "bpmn_element": "Keep manual edits: write the pack or propose a diff",
+      "config": {
+        "function": "context.write",
+        "args": {
+          "pack": "${item.built}",
+          "review_folder": "2-Areas/Context-Review"
+        }
+      }
+    },
+    {
+      "id": "review",
+      "type": "tool",
+      "bpmn_element": "Keep manual edits: write the pack or propose a diff",
+      "config": {
+        "tool": "obsidian:write_note",
+        "arguments": {
+          "path": "${item.built.review_path}",
+          "body": "${item.built.review_body}",
+          "front_matter": {
+            "type": "context_review",
+            "pack": "${item.built.name}",
+            "status": "${item.built.status}"
+          },
+          "overwrite": true
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "list",
+      "to": "select"
+    },
+    {
+      "from": "list",
+      "to": "no_notes",
+      "on": "error"
+    },
+    {
+      "from": "select",
+      "to": "read",
+      "when": {
+        "path": "select.count",
+        "gt": 0
+      }
+    },
+    {
+      "from": "select",
+      "to": "no_notes",
+      "default": true
+    },
+    {
+      "from": "read",
+      "to": "prepare"
+    },
+    {
+      "from": "prepare",
+      "to": "summarize_personal",
+      "when": {
+        "all": [
+          {
+            "path": "prepare.count",
+            "gt": 0
+          },
+          {
+            "path": "item.kind",
+            "eq": "personal"
+          }
+        ]
+      }
+    },
+    {
+      "from": "prepare",
+      "to": "summarize_enterprise",
+      "when": {
+        "path": "prepare.count",
+        "gt": 0
+      }
+    },
+    {
+      "from": "prepare",
+      "to": "no_notes",
+      "default": true
+    },
+    {
+      "from": "summarize_personal",
+      "to": "assemble_personal"
+    },
+    {
+      "from": "summarize_enterprise",
+      "to": "assemble_enterprise"
+    },
+    {
+      "from": "no_notes",
+      "to": "assemble_empty"
+    },
+    {
+      "from": "assemble_personal",
+      "to": "write"
+    },
+    {
+      "from": "assemble_enterprise",
+      "to": "write"
+    },
+    {
+      "from": "assemble_empty",
+      "to": "write"
+    },
+    {
+      "from": "write",
+      "to": "review",
+      "when": {
+        "path": "item.built.review_path",
+        "truthy": true
+      }
+    },
+    {
+      "from": "write",
+      "to": "END",
+      "default": true
+    }
+  ]
+}

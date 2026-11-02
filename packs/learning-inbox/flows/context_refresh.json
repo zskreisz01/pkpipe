@@ -1,0 +1,91 @@
+{
+  "id": "context_refresh",
+  "description": "Sunday 19:00 and on demand: rebuild the personal and enterprise context packs from the project notes, the two scopes in parallel. The enterprise pack is anonymized with the local model only and its names go to the query guard; edits the owner made to a pack are kept (the new version is proposed as a diff). Notifies the owner to review.",
+  "bpmn": "refresh-project-contexts",
+  "data_classes": [
+    "context"
+  ],
+  "start": "scopes",
+  "max_parallel": 2,
+  "nodes": [
+    {
+      "id": "scopes",
+      "type": "code",
+      "bpmn_element": "Refresh project contexts (parallel)",
+      "config": {
+        "function": "context.scopes",
+        "args": {
+          "scopes": [
+            {
+              "id": "personal",
+              "kind": "personal",
+              "folder": "1-Projects/Personal",
+              "pack": "personal",
+              "max_tokens": 1500
+            },
+            {
+              "id": "enterprise",
+              "kind": "enterprise",
+              "folder": "1-Projects/Enterprise",
+              "pack": "enterprise",
+              "max_tokens": 1500
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "refresh_each",
+      "type": "subflow",
+      "bpmn_element": "Refresh project contexts (parallel)",
+      "config": {
+        "flow": "context_pack"
+      },
+      "for_each": "scopes.scopes",
+      "on_item_error": "continue"
+    },
+    {
+      "id": "summary",
+      "type": "code",
+      "bpmn_element": "Notify: review context diff",
+      "config": {
+        "function": "context.summary",
+        "args": {
+          "results": "${refresh_each}"
+        }
+      }
+    },
+    {
+      "id": "notify",
+      "type": "notify",
+      "bpmn_element": "Notify: review context diff",
+      "config": {
+        "event": "context_review",
+        "message": "${summary.message}"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "scopes",
+      "to": "refresh_each"
+    },
+    {
+      "from": "refresh_each",
+      "to": "summary"
+    },
+    {
+      "from": "summary",
+      "to": "notify",
+      "when": {
+        "path": "summary.total",
+        "gt": 0
+      }
+    },
+    {
+      "from": "summary",
+      "to": "END",
+      "default": true
+    }
+  ]
+}

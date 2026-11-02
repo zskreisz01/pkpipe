@@ -111,6 +111,19 @@
           "min": 1.0
         }
       }
+    },
+    "context_leak": {
+      "gate": {
+        "leaks": {
+          "max": 0
+        },
+        "retained_rate": {
+          "min": 0.8
+        },
+        "schema_valid_rate": {
+          "min": 1.0
+        }
+      }
     }
   },
   "pairwise": {

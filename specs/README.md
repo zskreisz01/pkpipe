@@ -16,7 +16,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [008-secure-fetch](008-secure-fetch/spec.md) | Secure fetch | Completed | research · data-model |
 | [009-output-guard-and-quarantine](009-output-guard-and-quarantine/spec.md) | Output guard and quarantine | Completed | research · data-model |
 | [010-category-sessions](010-category-sessions/spec.md) | Category session plans and Process Other Resource | Completed | data-model |
-| [011-context-packs](011-context-packs/spec.md) | Context packs and weekly refresh | Draft |  |
+| [011-context-packs](011-context-packs/spec.md) | Context packs and weekly refresh | Completed | data-model |
 | [012-learning-gateway](012-learning-gateway/spec.md) | learning-gateway MCP and Process Learning Material | Active | research · data-model · contracts |
 | [013-evaluation-framework](013-evaluation-framework/spec.md) | Evaluation framework and gates | Completed | research · data-model |
 | [014-config-ui-and-app-mcp](014-config-ui-and-app-mcp/spec.md) | Config UI and app MCP server | Completed | research · data-model · contracts |

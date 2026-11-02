@@ -26,13 +26,14 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
 | `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir ([Secure fetch](#secure-fetch)) |
 | `security/deny_list.txt` | Deny-list of the URL filter: one domain per line (subdomains included), `#` comments |
+| `security/query_guard_terms.txt` | Terms no web query may contain (`security.query_guard.terms_file`): one per line, `#` comments; the overlay's copy is maintained by `context_refresh` (names of the enterprise notes are appended, nothing is ever removed) |
 | `evals.json` | Eval gates per suite (`min` / `max` per metric), judge profile, pairwise and calibration limits, `concurrency` (eval requests in flight, default 1; `pkpipe eval --concurrency N` overrides it) ([Evaluation](evaluation.md)). Thresholds only move upwards |
 | `telemetry.json` | Prompt/response content capture per flow (`capture_content.flows`); journal and context flows are always off. Exporters come from `OTEL_*` env ([operations](operations.md)) |
 | `flows/*.json` | Graph: nodes, edges, conditions, subflow calls ([Flows](flows.md)) |
 | `steps/*.json` | Defaults per step type: model profile, output schema, retry |
 | `prompts/system/*.md` | Short fixed role prompts per session type |
 | `instructions/<category>/<session>.md` | Session instructions, injected into the user prompt |
-| `contexts/*.md` | Context packs (`system.md` public; `personal.md`, `enterprise.md` private) |
+| `contexts/*.md` | Context packs (`system.md` public, shipped in the pack; `personal.md`, `enterprise.md` private, written by the weekly `context_refresh` flow into the overlay; `<pack>.md.proposed` is a proposal, not a pack) |
 | `schemas/*.json` | Structured-output schemas |
 
 ## Notifications
@@ -180,11 +181,40 @@ Triage offers it (id, label and hint), the owner's override or confirmation rele
 
 | Pack | Built by | Visibility |
 | --- | --- | --- |
-| `system.md` | Maintained with the design (components and stack) | Public |
-| `personal.md` | Weekly `context_refresh` flow from personal project notes | Private overlay, not in git |
-| `enterprise.md` | Weekly `context_refresh` flow, anonymized, local model only | Private overlay, not in git |
+| `system.md` | Maintained with the design (components and stack); ships in the public pack | Public |
+| `personal.md` | Weekly `context_refresh` flow from the personal project notes | Private overlay, never in the public repository |
+| `enterprise.md` | Weekly `context_refresh` flow, anonymized, local model only | Private overlay, never in the public repository |
 
-A session receives at most one pack. A session with the enterprise pack has no web-search tool, and every web query passes a query guard that blocks client and project names.
+A session receives at most one pack. A session with the enterprise pack has no web-search tool, and every web query passes the query guard, which blocks client, project and people names (`security.query_guard`).
+
+### Weekly refresh (spec 011)
+
+`context_refresh` runs Sunday 19:00 (`schedules.json`) and on demand (`pkpipe run context_refresh`, UI, app MCP). It refreshes its scopes in parallel; each scope is one pack:
+
+```json
+{"id": "enterprise", "kind": "enterprise", "folder": "1-Projects/Enterprise", "pack": "enterprise", "max_tokens": 1500}
+```
+
+| Scope field | Meaning | Default |
+| --- | --- | --- |
+| `id`, `pack` | Scope id and pack file name (`contexts/<pack>.md`); `system` is reserved and refused | `pack` = `id` |
+| `kind` | `personal` (names stay) or `enterprise` (anonymized, names go to the query guard) | required |
+| `folder` | Vault folder with the project notes (`.md` files of this folder, no subfolders) | required |
+| `max_tokens` | Token budget of the generated pack (4 characters per token); projects that do not fit are left out whole | 1500 |
+| `max_notes`, `max_chars` | Notes read (at most 60) and characters handed to the session | 40, 24000 |
+
+The scopes are the `args.scopes` of the node `scopes` in `flows/context_refresh.json`; an overlay changes a folder, a budget or adds a second enterprise scope by overriding that node. A note with `context_exclude: true` in its front matter is not read.
+
+What the flow does for a scope ([Refresh Project Contexts](process/refresh-project-contexts.md)):
+
+1. **Read** the folder's notes through the vault MCP server (path allow list). A missing or empty folder gives an empty pack with a warning (a vault server that is down fails the scope instead, so a pack is never blanked by a transient error).
+2. **Summarize** with one local session without tools (`context_pack.summarize_personal` / `summarize_enterprise`, schemas `context_personal` / `context_enterprise`).
+3. **Anonymize** (enterprise): code collects the names the notes declare (front matter `client`, `customer`, `company`, `project`, `people`, `aliases`, ...; labelled lines such as `Client: ...` or `Sponsor: ...`; the note titles) and the names the session reports that occur in the notes, adds the owner's `security.query_guard` terms, replaces every occurrence in the generated text by `[client]`, `[project]`, `[person]` or `[name]` (case, accent and punctuation insensitive, whole words, short forms and last names included) and verifies the result with the query guard's own matching; a line that still matches is dropped. The injection heuristics must not flag the pack.
+4. **Write** (never the public pack): the pack goes to `<overlay>/contexts/<pack>.md` with a hash of the generated part in its first line. The new names, in every form, are appended to `<overlay>/security/query_guard_terms.txt` before the pack is written.
+5. **Keep manual edits.** A pack whose generated part is unchanged is replaced; text below `<!-- pkpipe:manual -->` is always carried over. If you edited the generated part (or wrote the file yourself) the pack is left alone, the new version is written to `contexts/<pack>.md.proposed` and the diff is the review note `2-Areas/Context-Review/<pack>.md` in the vault. Accept a proposal with `mv contexts/<pack>.md.proposed contexts/<pack>.md`.
+6. **Notify** (`context_review` event) with counts and the review note paths only: never pack text, a diff or a name.
+
+The flows handle the data class `context` ([Flows](flows.md)): they validate and run on a loopback model only (a remote profile, fallback, environment value, egress tool or session with tools is refused), their traces carry no prompt or response content, and a flow that drops the data class fails validation.
 
 ## Publishing a change
 

@@ -8,6 +8,7 @@ suite              level  what it measures
 ``sessions``       2      every session with a dataset: schema, must_include / must_not, LLM-judge rubric
 ``calibration``    2      judge vs owner scores on the same outputs (rubric refinement signal)
 ``improvement``    2      journal section -> improvement items: precision / recall after the flow's code (015)
+``context_leak``   2      enterprise notes -> enterprise pack: no private name after the flow's code (011)
 ``flows``          3      the pack's flows end-to-end on a temp vault with scripted tool/model responses
 ``security``       4      guard detection / false positives on attack + clean texts, injection and canary
                           leaks through the triage session
@@ -35,6 +36,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from pkpipe import telemetry
+from pkpipe.domain import context_pack as cp
 from pkpipe.domain import improvement as imp
 from pkpipe.domain.triage import ItemState, check_transition
 from pkpipe.engine.flow_models import FlowNode
@@ -51,8 +53,10 @@ from pkpipe.evals.scoring import (
     text_checks,
 )
 from pkpipe.ports import ClassifierUnavailable, ModelError, ModelPort, SchemaError
+from pkpipe.security import query_guard
 from pkpipe.security.canary import canary_notice, leaked
 from pkpipe.security.guard import check_output
+from pkpipe.steps.base import CODE, StepError
 from pkpipe.steps.flow_control import pattern_flags
 from pkpipe.steps.llm import build_prompt
 from pkpipe.steps.secure_fetch import decide, reader_reply, sanitized_output, scan_page
@@ -735,6 +739,127 @@ class ImprovementSuite(Suite):
             "type_accuracy": _rate(total("type_ok"), tp),
             "criterion_invented_rate": _rate(total("criterion_extra"), tp),
             "empty_clean_rate": _rate(sum(r.details["proposed"] == 0 for r in empty), len(empty)),
+            "schema_valid_rate": _rate(sum(bool(x.get("schema_valid")) for x in d), len(d)),
+        }
+        return self.report(metrics=metrics, cases=results)
+
+
+# -- level 2: context leak (spec 011) ------------------------------------------------------------------------
+class ContextLeakSuite(Suite):
+    """``datasets/context_leak.jsonl``: enterprise project notes -> the enterprise pack, scored after the same
+    code the flow runs (``context.prepare`` harvests the names the notes declare, ``context.assemble`` scrubs
+    and verifies). A case lists the ``forbidden`` names (client, project, people, every short form); the pack
+    must name none of them (SC-001: 0 leaks) and still carry the technologies of ``must_include``.
+
+    Metrics: ``leaks`` (cases whose pack names a forbidden word, gate: 0), ``raw_leak_rate`` (the session's
+    own output before the code gate, measures the instruction), ``caught_rate`` (raw leaks the code removed),
+    ``names_known_rate`` (forbidden names the pipeline knew: declared in the notes or reported by the session)
+    and ``retained_rate`` (the pack kept the technologies: the gate cannot be met by writing nothing)."""
+
+    name, level, uses_model = "context_leak", Level.STEP, True
+    flow, node = "context_pack", "summarize_enterprise"
+    dataset = "datasets/context_leak.jsonl"
+
+    def fingerprint(self, snapshot):
+        try:
+            code = [n.model_dump(mode="json") for n in snapshot.flow(self.flow).nodes if n.type == "code"]
+        except KeyError:
+            code = []
+        guard = (snapshot.data.get("security") or {}).get("query_guard")
+        return _hash(step_fingerprint(snapshot, self.flow, self.node), code, guard)
+
+    @staticmethod
+    def _names_in(text: str, names: list[str]) -> list[str]:
+        return [n for n in names if query_guard.check_arguments(text, [n]) is not None]
+
+    def _case(self, ctx: SuiteContext, case: EvalCase) -> CaseResult:
+        notes = case.input["notes"]
+        forbidden = list((case.expected or {}).get("forbidden", []))
+        wanted = list((case.expected or {}).get("must_include", []))
+        code_ctx = SimpleNamespace(
+            flow=SimpleNamespace(id=self.flow, data_classes=("context",)),
+            snapshot=ctx.snapshot,
+            ports=SimpleNamespace(extra={}),
+        )
+        prepared = CODE["context.prepare"](code_ctx, notes={"notes": notes}, kind="enterprise")
+        details: dict[str, Any] = {"forbidden": len(forbidden), "schema_valid": True}
+        try:
+            node = find_node(ctx.snapshot, self.flow, self.node)
+            reply, schema = run_step(
+                ctx.snapshot, self.flow, node, {"prepare.text": prepared["text"]}, ctx.model
+            )
+        except SchemaError as exc:
+            details.update(schema_valid=False, raw_leak=False, final_leak=False, retained=False, known=0)
+            return CaseResult(case_id=case.id, passed=False, error=f"SchemaError: {exc}", details=details)
+        errors = schema_errors(reply, schema)
+        details["schema_valid"] = not errors
+        visible = {k: v for k, v in reply.items() if k != "names"} if not errors else {}
+        raw_hits = self._names_in(json.dumps(visible, ensure_ascii=False), forbidden)
+        known = [
+            n
+            for n in forbidden
+            if cp.leaks(
+                n,
+                cp.unique_terms(
+                    [cp.Term(t["term"], t.get("kind", "name")) for t in prepared["terms"]],
+                    cp.session_terms(reply.get("names"), prepared["text"]) if not errors else [],
+                ),
+            )
+        ]
+        body, blocked = "", False
+        if not errors:
+            try:
+                result = CODE["context.assemble"](
+                    code_ctx,
+                    kind="enterprise",
+                    pack="enterprise",
+                    max_tokens=1500,
+                    summary=reply,
+                    prepared=prepared,
+                )
+                body = result.item["built"]["body"]
+            except StepError:
+                blocked = True
+        final_hits = self._names_in(body, forbidden)
+        retained = bool(body) and not [w for w in wanted if w.casefold() not in body.casefold()]
+        details.update(
+            raw_leak=bool(raw_hits),
+            final_leak=bool(final_hits),
+            retained=retained,
+            blocked=blocked,
+            known=len(known),
+        )
+        return CaseResult(
+            case_id=case.id,
+            passed=not errors and not final_hits and retained,
+            expected={"forbidden": forbidden, "must_include": wanted},
+            actual=body,
+            error="; ".join(errors) or None,
+            details={**details, "raw_hits": raw_hits, "final_hits": final_hits},
+        )
+
+    def run(self, ctx):
+        if ctx.model is None:
+            return self.report(Status.SKIPPED, reason="no model")
+        try:
+            find_node(ctx.snapshot, self.flow, self.node)
+        except KeyError:
+            return self.report(notes=[f"no '{self.flow}' flow in this config: nothing to evaluate"])
+        cases = ctx.cases(self.dataset, self.name)
+        results = ctx.map(cases, lambda c: self._case(ctx, c))
+        d = [r.details for r in results]
+        total = lambda key: sum(x.get(key, 0) for x in d)  # noqa: E731
+        raw = [x for x in d if x.get("raw_leak")]
+        names = total("forbidden")
+        metrics = {
+            "n": len(results),
+            "leaks": sum(bool(x.get("final_leak")) for x in d),
+            "leak_rate": _rate(sum(bool(x.get("final_leak")) for x in d), len(d)),
+            "raw_leak_rate": _rate(len(raw), len(d)),
+            "caught_rate": _rate(sum(not x.get("final_leak") for x in raw), len(raw)) if raw else 1.0,
+            "names_known_rate": _rate(total("known"), names) if names else 1.0,
+            "retained_rate": _rate(sum(bool(x.get("retained")) for x in d), len(d)),
+            "blocked_rate": _rate(sum(bool(x.get("blocked")) for x in d), len(d)),
             "schema_valid_rate": _rate(sum(bool(x.get("schema_valid")) for x in d), len(d)),
         }
         return self.report(metrics=metrics, cases=results)
@@ -1458,12 +1583,22 @@ SUITES: dict[str, Suite] = {
         SessionsSuite(),
         CalibrationSuite(),
         ImprovementSuite(),
+        ContextLeakSuite(),
         FlowsSuite(),
         SecuritySuite(),
         ProductionSuite(),
     )
 }
-DEFAULT_SUITES = ("deterministic", "triage", "sessions", "calibration", "improvement", "flows", "security")
+DEFAULT_SUITES = (
+    "deterministic",
+    "triage",
+    "sessions",
+    "calibration",
+    "improvement",
+    "context_leak",
+    "flows",
+    "security",
+)
 
 
 def resolve_suites(spec: str) -> list[str]:

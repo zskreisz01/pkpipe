@@ -11,6 +11,7 @@ from pkpipe.engine.expr import MISSING, evaluate, lookup
 from pkpipe.engine.flow_models import Condition
 from pkpipe.steps.base import (
     CODE,
+    CODE_DATA_CLASS,
     StepConfig,
     StepContext,
     StepError,
@@ -40,6 +41,15 @@ class CodeStep(StepExecutor):
         if config.function not in CODE:
             return [f"node '{node.id}': unknown code function '{config.function}'"], []
         return [], []
+
+    def check_flow(self, flow, node, config: CodeConfig):
+        needed = CODE_DATA_CLASS.get(config.function)
+        if needed and needed not in flow.data_classes:
+            return [
+                f"node '{node.id}': '{config.function}' handles {needed} data, so the flow must declare "
+                f"data class '{needed}' (local model only, no trace content capture)"
+            ]
+        return []
 
     def run(self, node, config: CodeConfig, ctx: StepContext) -> StepResult:
         out = CODE[config.function](ctx, **ctx.render(config.args))

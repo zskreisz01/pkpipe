@@ -1,0 +1,49 @@
+{
+  "type": "object",
+  "required": [
+    "overview",
+    "projects"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "overview": {
+      "type": "string",
+      "maxLength": 800
+    },
+    "projects": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "summary",
+          "stack"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "status": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "stack": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            }
+          }
+        }
+      }
+    }
+  }
+}

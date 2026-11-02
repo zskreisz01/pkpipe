@@ -192,11 +192,18 @@ def register_step(cls: type[StepExecutor]) -> type[StepExecutor]:
     return cls
 
 
-def register_code(name: str) -> Callable[[CodeFunction], CodeFunction]:
+#: name -> data class (``journal``, ``context``) the flow must declare to call the function, so a flow that
+#: touches private data cannot lose the local-only rules (validation) by dropping ``data_classes``.
+CODE_DATA_CLASS: dict[str, str] = {}
+
+
+def register_code(name: str, *, data_class: str | None = None) -> Callable[[CodeFunction], CodeFunction]:
     def deco(fn: CodeFunction) -> CodeFunction:
         if name in CODE and CODE[name] is not fn:
             raise ValueError(f"code function '{name}' is already registered")
         CODE[name] = fn
+        if data_class:
+            CODE_DATA_CLASS[name] = data_class
         return fn
 
     return deco

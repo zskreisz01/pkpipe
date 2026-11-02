@@ -214,8 +214,9 @@ def _unvalidated_source(flow: Flow, ref: str, registry: StepRegistry) -> bool:
     return source.type == "llm" and not source.config.get("output_schema")
 
 
-#: Data classes whose flows stay on this machine: local model, no tool that sends data away (spec 015 FR-002).
-LOCAL_ONLY_CLASSES = frozenset({"journal"})
+#: Data classes whose flows stay on this machine: local model, no tool that sends data away (spec 015 FR-002
+#: for journals, spec 011 for the context packs: the enterprise notes are summarized by the local model only).
+LOCAL_ONLY_CLASSES = frozenset({"journal", "context"})
 
 
 def _is_loopback(url: str) -> bool:
@@ -250,17 +251,20 @@ def _resolved_url(value: str, environ: Mapping[str, str]) -> str | None:
 def private_data_errors(
     flow: Flow, snapshot: ConfigSnapshot, environ: Mapping[str, str] | None = None
 ) -> list[str]:
-    """Spec 015 FR-002 / constitution VII: a flow handling journal data is local only. Its sessions have no
-    tools and use a model profile (and fallbacks) on a loopback address, its tool nodes call no MCP server
-    marked ``egress``, and it only starts subflows that are journal flows too (so capture stays off).
+    """Spec 015 FR-002 / constitution VII: a flow handling journal data (or, spec 011, context pack data) is
+    local only. Its sessions have no tools and use a model profile (and fallbacks) on a loopback address, its
+    tool nodes call no MCP server marked ``egress``, and it only starts subflows of the same data classes (so
+    capture stays off).
 
     Without ``environ`` (config validation) the configured default of each ``env:`` chain is checked. With
     ``environ`` (every run, when it compiles a flow) only the value the chain resolves to right now is
     checked, so an environment variable pointing the profile at another host stops that run before any
     journal text is sent, while the rest of the config still loads."""
-    if not LOCAL_ONLY_CLASSES & set(flow.data_classes):
+    local = LOCAL_ONLY_CLASSES & set(flow.data_classes)
+    if not local:
         return []
-    where = f"flow '{flow.id}' (journal data)"
+    label = " and ".join(sorted(local))
+    where = f"flow '{flow.id}' ({label} data)"
     errors: list[str] = []
     models = snapshot.data.get("models") or {}
     servers = snapshot.data.get("mcp_servers") or {}
@@ -279,7 +283,7 @@ def private_data_errors(
                 if current is not None and not _is_loopback(current):
                     errors.append(
                         f"{where}: node '{node_id}' uses model profile '{name}' whose base_url resolves "
-                        "to a non-loopback address in this environment; journal data is processed "
+                        f"to a non-loopback address in this environment; {label} data is processed "
                         "locally only"
                     )
             else:
@@ -287,18 +291,43 @@ def private_data_errors(
                 if url is None or not _is_loopback(url):
                     errors.append(
                         f"{where}: node '{node_id}' uses model profile '{name}' that is not on a loopback "
-                        "address; journal data is processed locally only"
+                        f"address; {label} data is processed locally only"
                     )
             name = profile.get("fallback") or ""
+
+    def nested_sessions(target: str, seen: set[str]) -> list[tuple[str, dict[str, Any]]]:
+        """The sessions of a (static) subflow and of the subflows below it: ``(flow.node, config)``."""
+        if target in seen or target not in flows:
+            return []
+        seen.add(target)
+        found: list[tuple[str, dict[str, Any]]] = []
+        for inner in flows[target].get("nodes") or []:
+            inner_cfg = inner.get("config") or {}
+            if inner.get("type") in ("llm", "llm_tools", "reader"):
+                found.append((f"{target}.{inner.get('id')}", inner_cfg))
+            sub = inner_cfg.get("flow")
+            if inner.get("type") == "subflow" and isinstance(sub, str) and "${" not in sub:
+                found += nested_sessions(sub, seen)
+        return found
 
     for node in flow.nodes:
         cfg = node.config
         if node.type in ("llm", "llm_tools", "reader"):
             profile_errors(node.id, str(cfg.get("profile", "default")))
+        sub_target = cfg.get("flow")
+        if (
+            environ is not None
+            and node.type == "subflow"
+            and isinstance(sub_target, str)
+            and "${" not in sub_target
+        ):
+            # a run stops before it starts a subflow whose sessions would reach a remote host
+            for where_node, inner_cfg in nested_sessions(sub_target, {flow.id}):
+                profile_errors(where_node, str(inner_cfg.get("profile", "default")))
         if environ is not None:
             continue
         if node.type == "llm_tools":
-            errors.append(f"{where}: node '{node.id}' is a session with tools; journal sessions have none")
+            errors.append(f"{where}: node '{node.id}' is a session with tools; {label} sessions have none")
         tools = [cfg["tool"]] if node.type in ("tool", "wait") and isinstance(cfg.get("tool"), str) else []
         if node.type == "fetch":  # secure fetch (spec 008) always leaves the machine
             tools.append(str(cfg.get("tool") or "webfetch:fetch_page"))
@@ -314,9 +343,9 @@ def private_data_errors(
                 )
         target = cfg.get("flow")
         if node.type == "subflow" and isinstance(target, str) and "${" not in target:
-            if LOCAL_ONLY_CLASSES - set((flows.get(target) or {}).get("data_classes", [])):
+            if local - set((flows.get(target) or {}).get("data_classes", [])):
                 errors.append(
-                    f"{where}: node '{node.id}' starts subflow '{target}' that is not a journal flow "
+                    f"{where}: node '{node.id}' starts subflow '{target}' that is not a {label} flow "
                     "(it would not be local only and its traces could capture content)"
                 )
     return errors
