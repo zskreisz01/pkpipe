@@ -1,7 +1,8 @@
 """Spec 013 live: suites end-to-end against the real local model (LM Studio, qwen3.5-9b-mlx) and the judge
 model (a different model, FR-002), checking the configured gates.
 
-Requests go out ``LIVE_EVAL_CONCURRENCY`` (4) at a time; the sessions + security test and the publish-gate
+Requests go out ``live.eval_concurrency()`` at a time (``LIVE_EVAL_CONCURRENCY`` = 4, lowered by the session's
+system preflight when the machine is degraded); the sessions + security test and the publish-gate
 test share identical requests through ``live_eval_cassettes`` (tests/conftest.py)."""
 
 from __future__ import annotations
@@ -13,7 +14,6 @@ from pkpipe.engine.registry import load_effective
 from pkpipe.evals import EvalPaths, EvalRunner, PublishGate, Status, evals_config
 from tests.conftest import REPO
 from tests.support import live
-from tests.support.live import LIVE_EVAL_CONCURRENCY
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def test_triage_suite_live_passes_its_gate(live_env, pack_dir):
         snap,
         paths=EvalPaths.create(REPO / "evals"),
         model=app.make_model(snap),
-        concurrency=LIVE_EVAL_CONCURRENCY,
+        concurrency=live.eval_concurrency(),
     )
     run = runner.run(["triage"])
     report = run.suite("triage")
@@ -53,7 +53,7 @@ def test_improvement_extraction_live_passes_its_gate(live_env, pack_dir):
         snap,
         paths=EvalPaths.create(REPO / "evals"),
         model=app.make_model(snap),
-        concurrency=LIVE_EVAL_CONCURRENCY,
+        concurrency=live.eval_concurrency(),
     )
     report = runner.run(["improvement"]).suite("improvement")
     assert report.metrics["n"] >= 20 and report.metrics["schema_valid_rate"] == 1.0
@@ -72,7 +72,7 @@ def test_context_leak_suite_live_passes_its_gate(live_env, pack_dir):
         snap,
         paths=EvalPaths.create(REPO / "evals"),
         model=app.make_model(snap),
-        concurrency=LIVE_EVAL_CONCURRENCY,
+        concurrency=live.eval_concurrency(),
     )
     report = runner.run(["context_leak"]).suite("context_leak")
     assert report.metrics["n"] >= 24 and report.metrics["schema_valid_rate"] == 1.0
@@ -92,7 +92,7 @@ def test_sessions_and_security_live_with_a_different_judge(live_env, pack_dir, l
         paths=EvalPaths.create(REPO / "evals", None, live_eval_cassettes),
         model=app.make_model(snap),
         mode="auto",
-        concurrency=LIVE_EVAL_CONCURRENCY,
+        concurrency=live.eval_concurrency(),
     )
     run = runner.run(["sessions", "security"])
     assert run.judge.endswith(live.judge_model_name()) and live.model_name() in run.model
@@ -125,7 +125,7 @@ def test_publish_gate_live_on_a_changed_session_instruction(
         model=app.make_model(draft),
         paths=EvalPaths.create(REPO / "evals", None, live_eval_cassettes),
         mode="auto",
-        concurrency=LIVE_EVAL_CONCURRENCY,
+        concurrency=live.eval_concurrency(),
         limit=6,
     )
     decision = gate.check(current, draft)

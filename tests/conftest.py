@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.support import live
+from tests.support import live, preflight
 
 REPO = Path(__file__).resolve().parent.parent
 PACK = REPO / "packs" / "learning-inbox"
@@ -46,8 +46,9 @@ SERIAL_LIVE = (
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
-    """Skip (or, with PKPIPE_REQUIRE_LIVE=1, fail) live tests whose local service is unreachable, and live
-    tests in a pytest-xdist worker (parallel requests to the shared services; tests/README.md)."""
+    """Skip (or, with PKPIPE_REQUIRE_LIVE=1, fail) live tests whose local service is unreachable, live tests
+    in a pytest-xdist worker (parallel requests to the shared services; tests/README.md), and live tests the
+    system preflight blocks (critical memory or thermal state; tests/support/preflight.py)."""
     marker = item.get_closest_marker("live")
     if marker is None:
         return
@@ -56,11 +57,37 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
             pytest.fail(SERIAL_LIVE, pytrace=False)
         pytest.skip(SERIAL_LIVE)
     reason = live.unavailable_reason(*marker.args)
+    if reason is None and preflight.needs_preflight(marker.args):
+        preflight.ensure_started()  # system preflight + sampler (tests/support/preflight.py)
+        blocked = preflight.blocked_reason()
+        if blocked:
+            if os.environ.get("PKPIPE_REQUIRE_LIVE") == "1":
+                pytest.fail(
+                    f"PKPIPE_REQUIRE_LIVE=1 but the system preflight blocks: {blocked}", pytrace=False
+                )
+            pytest.skip(f"system preflight blocks live tests: {blocked}")
     if reason is None:
         return
     if os.environ.get("PKPIPE_REQUIRE_LIVE") == "1":
         pytest.fail(f"PKPIPE_REQUIRE_LIVE=1 but live service unavailable: {reason}", pytrace=False)
     pytest.skip(f"live service unavailable: {reason}")
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Stop the live sampler (and restore the model timeout multiplier) once the tests are done."""
+    preflight.session.stop()
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus: int, config: pytest.Config) -> None:
+    """End-of-session system summary of a live run: decision, swap range, thermal events, concurrency
+    changes."""
+    lines = preflight.session.report_lines()
+    if lines:
+        terminalreporter.section("system preflight")
+        for line in lines:
+            terminalreporter.line(line)
+    preflight.reset()
 
 
 @pytest.fixture(scope="session")

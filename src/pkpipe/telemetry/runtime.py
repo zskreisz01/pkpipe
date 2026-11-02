@@ -53,6 +53,18 @@ class Metrics:
         self.export_failures = meter.create_counter(attrs.M_EXPORT_FAILURES)
         self.learning_seconds = meter.create_histogram(attrs.M_LEARNING_SECONDS, unit="s")
         self.tokens_per_second = meter.create_histogram(attrs.M_TOKENS_PER_SECOND, unit="{token}/s")
+        self.system_gauges = {
+            name: meter.create_gauge(name, description=desc)
+            for name, desc in (
+                (attrs.M_SYSTEM_MEMORY_PRESSURE, "Kernel memory pressure: 0 normal, 1 warn, 2 critical"),
+                (attrs.M_SYSTEM_MEMORY_AVAILABLE, "Available memory / total"),
+                (attrs.M_SYSTEM_SWAP_USED, "Swap in use (bytes)"),
+                (attrs.M_SYSTEM_THERMAL, "Thermal state: 0 nominal, 1 fair, 2 serious, 3 critical"),
+                (attrs.M_SYSTEM_LOAD, "1-minute load average per CPU"),
+                (attrs.M_SYSTEM_DECISION, "Preflight decision: 0 ok, 1 degraded, 2 blocked"),
+                (attrs.M_SYSTEM_CONCURRENCY, "Eval concurrency the preflight recommends"),
+            )
+        }
         meter.create_observable_gauge(
             attrs.M_BACKLOG, callbacks=[self._observe_backlog], description="INBOX backlog"
         )
@@ -79,6 +91,15 @@ class Metrics:
         """``pkpipe.tokens_per_second{llm.model_name}`` of one model call; ignored for empty or 0 s calls."""
         if seconds > 0 and completion_tokens > 0:
             self.tokens_per_second.record(completion_tokens / seconds, {"llm.model_name": model})
+
+    def system_sample(
+        self, values: dict[str, float | None], attributes: dict[str, str] | None = None
+    ) -> None:
+        """Record the system gauges (``pkpipe.system.*``) of one preflight / sampler reading; ``None`` values
+        (not measured on this host) are skipped."""
+        for name, value in values.items():
+            if value is not None and name in self.system_gauges:
+                self.system_gauges[name].set(value, attributes or {})
 
     def learning_generation(self, seconds: float) -> None:
         """``pkpipe.learning_generation_seconds``: wall time of one learning-material generation."""

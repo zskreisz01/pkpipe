@@ -1,4 +1,5 @@
-"""Command line entry point: ``serve``, ``run <flow>``, ``runs``, ``eval --suite``, ``validate`` (spec 001).
+"""Command line entry point: ``serve``, ``run <flow>``, ``runs``, ``eval --suite``, ``doctor``,
+``validate`` (spec 001).
 
 ``validate``, ``schema``, ``run``, ``runs`` (spec 005), ``eval`` (spec 013) and ``serve`` (spec 014) are real.
 """
@@ -128,6 +129,12 @@ def _eval(args: argparse.Namespace) -> int:
     return eval_command(args)
 
 
+def _doctor(args: argparse.Namespace) -> int:
+    from pkpipe.system.cli import doctor_command
+
+    return doctor_command(args)
+
+
 def _serve(args: argparse.Namespace) -> int:
     from pkpipe.serve import serve_command
 
@@ -145,6 +152,7 @@ HANDLERS: dict[str, Handler] = {
     "run": _run,
     "runs": _runs,
     "eval": _eval,
+    "doctor": _doctor,
     "validate": _validate,
     "schema": _schema,
 }
@@ -177,6 +185,12 @@ def build_parser() -> argparse.ArgumentParser:
     from pkpipe.evals.cli import add_arguments
 
     add_arguments(ev)
+    doc = sub.add_parser(
+        "doctor", help="system preflight: memory, swap, thermal, load, LLM server -> decision"
+    )
+    from pkpipe.system.cli import add_arguments as add_doctor_arguments
+
+    add_doctor_arguments(doc)
     val = sub.add_parser("validate", help="validate the layered config (pack + overlay)")
     val.add_argument("--pack", help="pack directory (default: packs/learning-inbox or PKPIPE_PACK_DIR)")
     val.add_argument("--overlay", help="overlay directory (default: PKPIPE_OVERLAY_DIR)")

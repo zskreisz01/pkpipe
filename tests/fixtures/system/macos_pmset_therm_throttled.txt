@@ -1,0 +1,6 @@
+Note: No performance warning level has been recorded
+Thermal warning level has been recorded: 2
+2026-11-02 14:03:11 +0100 CPU Power notify
+	CPU_Scheduler_Limit 	= 100
+	CPU_Available_CPUs 	= 10
+	CPU_Speed_Limit 	= 70

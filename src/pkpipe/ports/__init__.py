@@ -17,6 +17,7 @@ from pkpipe.ports.ports import (
     SecurityLogPort,
     SpanPort,
     StatePort,
+    SystemProbePort,
     ToolPort,
     TracerPort,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "SecurityLogPort",
     "SpanPort",
     "StatePort",
+    "SystemProbePort",
     "ToolPort",
     "TracerPort",
 ]
