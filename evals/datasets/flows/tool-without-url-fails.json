@@ -1,0 +1,56 @@
+{
+  "id": "tool-without-url-fails",
+  "source": "synthetic",
+  "description": "A tool note that names no URL cannot be fetched: the item is listed as failed with the reason, nothing is stored (spec 010).",
+  "input": {
+    "vault": {
+      "0-INBOX/nolink.md": "Remember to look at that fictional tool called nolink.\n"
+    },
+    "model": [
+      {
+        "when": "fictional tool",
+        "reply": {
+          "category": "tool",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/nolink.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/nolink.md": {
+        "state": "processed"
+      }
+    },
+    "processing": {
+      "0-INBOX/nolink.md": {
+        "category": "tool",
+        "status": "failed",
+        "link": "no source URL in the note"
+      }
+    }
+  }
+}

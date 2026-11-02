@@ -1,4 +1,4 @@
-Rubric for a short resource note written for the owner's knowledge base (session `other_resource.summarize`).
+Rubric for a short resource note written for the owner's knowledge base (sessions with the output schema `resource_note`, for example `marketing.synthesize`).
 
 Score the output from 1 to 5:
 

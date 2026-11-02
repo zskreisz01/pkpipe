@@ -1,0 +1,69 @@
+{
+  "id": "session-schema-error-fails-item",
+  "source": "synthetic",
+  "description": "A session whose output stays invalid after the model's retries: the item is listed as failed with the reason (the session and the error type), no note is written, the other items are unaffected (spec 010 edge case).",
+  "input": {
+    "vault": {
+      "0-INBOX/broken.md": "A note that makes the model fail, about gadgets.\n"
+    },
+    "model": [
+      {
+        "error": "SchemaError",
+        "fields": [
+          "suggestion"
+        ]
+      },
+      {
+        "when": "gadgets",
+        "reply": {
+          "category": "misc",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/broken.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/broken.md": {
+        "state": "processed"
+      }
+    },
+    "files": {
+      "0-INBOX/broken.md": {
+        "contains": [
+          "gadgets"
+        ]
+      }
+    },
+    "processing": {
+      "0-INBOX/broken.md": {
+        "category": "misc",
+        "status": "failed",
+        "link": "session 'evaluate' failed: SchemaError"
+      }
+    }
+  }
+}

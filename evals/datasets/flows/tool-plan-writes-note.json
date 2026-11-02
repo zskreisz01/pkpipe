@@ -1,0 +1,158 @@
+{
+  "id": "tool-plan-writes-note",
+  "source": "synthetic",
+  "description": "Tool category (owner override misc -> tool): secure fetch, the plan's sessions run in order (research and compare use the web search tool, the personal and enterprise fit sessions are skipped because their private context packs are not in the public pack), the evaluation note is written into the PARA folder, the INBOX note is archived and the processing list says done (spec 010 US1).",
+  "input": {
+    "vault": {
+      "0-INBOX/thing.md": "---\nsource: https://example.invalid/thing\n---\nSome page about a fictional key-value store.\n"
+    },
+    "web": {
+      "https://example.invalid/thing": "<html><head><title>minikv</title></head><body><h1>minikv</h1><p>minikv is an embeddable key-value store written in Go.</p></body></html>"
+    },
+    "model": [
+      {
+        "reply": {
+          "action": "final",
+          "answer": "done"
+        },
+        "fields": [
+          "action"
+        ]
+      },
+      {
+        "reply": {
+          "title": "minikv",
+          "summary": "A synthetic page about minikv.",
+          "facts": [
+            "a fact"
+          ],
+          "links": [],
+          "injection_suspected": false,
+          "evidence": null
+        },
+        "fields": [
+          "injection_suspected"
+        ]
+      },
+      {
+        "reply": {
+          "name": "minikv",
+          "summary": "An embeddable key-value store.",
+          "maintainer": "unknown",
+          "license": "MIT",
+          "pricing": "free",
+          "maturity": "young",
+          "ecosystem": "go",
+          "sources": [
+            "https://example.org/minikv"
+          ]
+        },
+        "fields": [
+          "maintainer"
+        ]
+      },
+      {
+        "reply": {
+          "title": "minikv",
+          "summary": "minikv is an embeddable key-value store.",
+          "alternatives": [
+            "badgerkv: also embeddable"
+          ],
+          "recommendation": "trial",
+          "justification": "Small and permissive."
+        },
+        "fields": [
+          "recommendation"
+        ]
+      },
+      {
+        "reply": {
+          "alternatives": [
+            {
+              "name": "badgerkv",
+              "license": "Apache-2.0",
+              "cost": "free",
+              "runs_locally": "yes",
+              "api": "yes",
+              "maturity": "mature"
+            }
+          ]
+        },
+        "fields": [
+          "alternatives"
+        ]
+      },
+      {
+        "when": "key-value store",
+        "reply": {
+          "category": "misc",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "override": {
+            "0-INBOX/thing.md": "tool"
+          }
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/thing.md": {
+        "ai_suggested_category": "misc",
+        "override": "tool",
+        "state": "processed"
+      }
+    },
+    "files": {
+      "3-Resources/Tools/minikv-{id:0-INBOX/thing.md}.md": {
+        "contains": [
+          "# minikv",
+          "Source: https://example.invalid/thing",
+          "## Recommendation",
+          "trial",
+          "## Alternatives",
+          "badgerkv",
+          "pkpipe_item: {id:0-INBOX/thing.md}",
+          "category: tool"
+        ],
+        "not_contains": [
+          "Fit personal",
+          "Fit enterprise"
+        ]
+      },
+      "4-Archive/Inbox/{id:0-INBOX/thing.md}-thing.md": {
+        "contains": [
+          "fictional key-value store"
+        ]
+      },
+      "0-INBOX/thing.md": {
+        "exists": false
+      }
+    },
+    "processing": {
+      "0-INBOX/thing.md": {
+        "category": "tool",
+        "status": "done"
+      }
+    }
+  }
+}
