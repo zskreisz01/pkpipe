@@ -17,6 +17,9 @@
     ],
     "weekly_review": [
       "discord_main"
+    ],
+    "context_review": [
+      "discord_main"
     ]
   }
 }

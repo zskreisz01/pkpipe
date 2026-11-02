@@ -98,8 +98,10 @@ def text_checks(
     ``max_words`` (per string field) on every string in the output. Structured outputs add ``fields``
     (field equals value), ``min_items`` / ``max_items`` (list length per field) and ``quotes_from``
     (``{"field": "evidence", "key": "quote", "source": "item.journal"}``: every listed ``key`` must occur
-    verbatim, whitespace and case aside, in the case input ``source``, so a quote can never be invented).
-    Returns failures by check name."""
+    verbatim, whitespace and case aside, in the case input ``source``, so a quote can never be invented) and
+    ``must_not_in`` (``{"overview": ["Acme"]}``: the substrings must not occur in that field's text only, for
+    an output that may list a name in one field and must not write it in another). Returns failures by
+    check name."""
     expected = expected or {}
     text = _flatten_text(output)
     low = text.lower()
@@ -125,6 +127,14 @@ def text_checks(
     ]
     if wrong:
         out["fields"] = wrong
+    elsewhere = [
+        f"{field}:{s}"
+        for field, terms in (expected.get("must_not_in") or {}).items()
+        for s in terms
+        if s.lower() in _flatten_text(output.get(field) if isinstance(output, Mapping) else None).lower()
+    ]
+    if elsewhere:
+        out["must_not_in"] = elsewhere
     few = [f for f, n in (expected.get("min_items") or {}).items() if len(_items_of(output, f)) < int(n)]
     if few:
         out["min_items"] = few

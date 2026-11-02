@@ -114,7 +114,7 @@ flowchart LR
 
 - **What:** check the rebuilt context packs (`personal.md`, `enterprise.md`) that sessions use for fit evaluations.
 - **When:** after the Sunday 19:00 "review diff" notification.
-- **How:** open the diff from the notification or in the UI. Check that the enterprise pack names no client or project you would not want in a prompt, and that nothing is outdated. Edit the pack directly where needed; your edits are kept and the next run shows them as a diff instead of overwriting them.
+- **How:** open the review notes `2-Areas/Context-Review/<pack>.md` named in the notification (a diff of the pack). Check that the enterprise pack names no client, project or person you would not want in a prompt (code removes the names it knows; a name that appears only in the prose and that the local model neither hides nor reports can slip through, so this check is yours) and that nothing is outdated. Add lasting rules below the `<!-- pkpipe:manual -->` line of the pack: that text is never rewritten. If you edit the generated part, the refresh leaves the pack alone and writes its new version to `contexts/<pack>.md.proposed` with the diff in the review note: merge what you want, or `mv contexts/<pack>.md.proposed contexts/<pack>.md`. Commit the overlay (the UI or git) so the next config load carries the packs. Add private names that the notes never mention to `security/query_guard_terms.txt`; the refresh only appends to it.
 
 ### Weekly improvement review
 

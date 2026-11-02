@@ -11,6 +11,7 @@ from pkpipe.engine.registry import config_version
 from tests.fakes import (
     FakeClassifier,
     FakeClock,
+    FakeContextStore,
     FakeModel,
     FakeNotify,
     FakeSecurityLog,
@@ -34,6 +35,7 @@ FAKES = {
     "ConfigPort": InMemoryConfig(),
     "ClassifierPort": FakeClassifier(),
     "SecurityLogPort": FakeSecurityLog(),
+    "ContextStorePort": FakeContextStore(),
 }
 
 

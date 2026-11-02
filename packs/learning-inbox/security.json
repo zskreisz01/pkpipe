@@ -29,5 +29,8 @@
     "max_bytes": 2000000,
     "deny_list": "security/deny_list.txt"
   },
-  "quarantine_dir": "0-INBOX/_quarantine"
+  "quarantine_dir": "0-INBOX/_quarantine",
+  "query_guard": {
+    "terms_file": "security/query_guard_terms.txt"
+  }
 }

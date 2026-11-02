@@ -10,7 +10,7 @@ from pkpipe.engine.registry import load_effective
 from pkpipe.evals import EvalPaths, EvalRunner, Status, evals_config
 from tests.conftest import REPO
 
-LLM_SUITES = ["triage", "sessions", "calibration", "improvement", "security"]
+LLM_SUITES = ["triage", "sessions", "calibration", "improvement", "context_leak", "security"]
 
 
 @pytest.fixture

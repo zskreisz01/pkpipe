@@ -137,8 +137,8 @@ class Vault:
 
     @_traced
     def read_notes(self, paths: list[str]) -> dict[str, Any]:
-        """Read several notes at once (journal days). A missing note is listed in ``missing``, not an error;
-        a path outside the allowlist rejects the whole call."""
+        """Read several notes at once (journal days, project notes). A missing note is listed in ``missing``,
+        not an error; a path outside the allowlist rejects the whole call."""
         if not isinstance(paths, list) or len(paths) > MAX_NOTES:
             raise PathRejected(f"give a list of at most {MAX_NOTES} paths")
         targets = [(p, self.policy.resolve(p, "read_notes")) for p in paths]
@@ -148,7 +148,7 @@ class Vault:
                 missing.append(path)
                 continue
             note = parse_note(target.read_text(encoding="utf-8"))
-            notes.append({"path": path, "body": note.body})
+            notes.append({"path": path, "front_matter": jsonable(note.front_matter), "body": note.body})
         return {"notes": notes, "missing": missing}
 
     def _writable(self, path: str, tool: str) -> Path:

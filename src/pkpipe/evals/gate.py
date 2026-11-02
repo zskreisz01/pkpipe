@@ -32,6 +32,7 @@ from pkpipe.evals.models import EvalRun
 from pkpipe.evals.runner import EvalRunner, evals_config
 from pkpipe.evals.suites import (
     SUITES,
+    ContextLeakSuite,
     ImprovementSuite,
     SessionsSuite,
     TriageSuite,
@@ -44,8 +45,17 @@ from pkpipe.steps.llm import LLM_STEP_TYPES
 from pkpipe.telemetry import attrs
 
 #: suites a publish may run, in order (production is monitoring only)
-GATED_SUITES = ("deterministic", "triage", "sessions", "calibration", "improvement", "flows", "security")
-LLM_SUITES = ("triage", "sessions", "improvement")
+GATED_SUITES = (
+    "deterministic",
+    "triage",
+    "sessions",
+    "calibration",
+    "improvement",
+    "context_leak",
+    "flows",
+    "security",
+)
+LLM_SUITES = ("triage", "sessions", "improvement", "context_leak")
 
 
 @dataclass
@@ -115,6 +125,8 @@ def unevaluated_steps(current: ConfigSnapshot | None, draft: ConfigSnapshot, pat
     covered = {f"{TriageSuite.flow}.{TriageSuite.node}"} | {t.name for t in session_targets(paths)}
     if paths.find(ImprovementSuite.dataset) is not None:
         covered.add(f"{ImprovementSuite.flow}.{ImprovementSuite.node}")
+    if paths.find(ContextLeakSuite.dataset) is not None:
+        covered.add(f"{ContextLeakSuite.flow}.{ContextLeakSuite.node}")
     out = []
     for name in llm_steps(draft):
         if name in covered:
