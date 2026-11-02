@@ -16,7 +16,7 @@ class FakeModel:
 
     def __init__(
         self,
-        replies: list[dict[str, Any] | Exception] | Callable[[str, str], dict[str, Any]] | None = None,
+        replies: list[dict[str, Any] | Exception] | Callable[..., dict[str, Any]] | None = None,
         schema_check: bool = False,
     ):
         self._replies = replies if replies is not None else []
@@ -32,7 +32,11 @@ class FakeModel:
     ) -> dict[str, Any]:
         self.calls.append({"system": system, "user": user, "json_schema": json_schema, "profile": profile})
         if callable(self._replies):
-            reply = self._replies(system, user)
+            # a callable that sets ``wants_schema`` also receives the requested JSON schema
+            if getattr(self._replies, "wants_schema", False):
+                reply = self._replies(system, user, json_schema)
+            else:
+                reply = self._replies(system, user)
         elif not self._replies:
             raise AssertionError("FakeModel has no scripted reply left")
         else:

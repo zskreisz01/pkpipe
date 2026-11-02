@@ -3,13 +3,14 @@ learning backend, FakeModel, FakeNotify, FakeClock (spec 005 SC-001)."""
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
 
 from pkpipe.obsidian.policy import VaultPolicy
 from pkpipe.obsidian.vault import Vault
-from tests.fakes import FakeTools
+from tests.fakes import FakeSearch, FakeTools, FakeWeb
 
 TRIAGE_FILE = "0-INBOX/Inbox-Triage.md"
 PACK_ROUTES = {e: ["discord_main"] for e in ("triage_ready", "daily_summary", "security_flag")}
@@ -45,11 +46,28 @@ class FakeLearning:
         return {k.replace("job-", "nb-", 1): v for k, v in self.backend.polls.items()}
 
 
-def vault_tools(vault_dir: Path, learning: FakeLearning | None = None) -> FakeTools:
+TOOL_PAGE = "<html><head><title>Example tool</title></head><body><p>A fictional CLI tool.</p></body></html>"
+
+
+def synthetic_web() -> FakeWeb:
+    """The page of ``synthetic_vault``'s tool note (``source: https://example.invalid/tool``)."""
+    return FakeWeb({"https://example.invalid/tool": TOOL_PAGE})
+
+
+def vault_tools(
+    vault_dir: Path,
+    learning: FakeLearning | None = None,
+    web: FakeWeb | None = None,
+    search: FakeSearch | None = None,
+) -> FakeTools:
     vault = Vault(VaultPolicy(vault_dir=vault_dir))
     learning = learning or FakeLearning()
+    web, search = web or FakeWeb(), search or FakeSearch()
     return FakeTools(
         {
+            "obsidian:move_note": lambda src, dst: vault.move_note(src, dst),
+            "webfetch:fetch_page": web.fetch_page,
+            "websearch:search": search.search,
             "obsidian:list_folder": lambda path: vault.list_folder(path),
             "obsidian:read_note": lambda path: vault.read_note(path),
             "obsidian:write_note": lambda path, body, front_matter=None, overwrite=False: vault.write_note(
@@ -87,19 +105,95 @@ def owner_decides(vault_dir: Path, confirm: list[str] = (), override: dict[str, 
     path.write_text("\n".join(out) + "\n", encoding="utf-8")
 
 
+_DATA = re.compile(
+    r"### (?P<ref>[\w.]+)\n<<<DATA (?P<tok>[0-9a-f]+)>>>\n(?P<text>.*?)\n<<<END DATA (?P=tok)>>>", re.S
+)
+
+
+def prompt_inputs(user: str) -> dict[str, str]:
+    """The datamarked inputs of a session prompt by reference (``sanitize.title``, ``item.extract``, ...)."""
+    return {m["ref"]: m["text"] for m in _DATA.finditer(user)}
+
+
 def fake_model_reply(categories_by_word: dict[str, str], notes: dict[str, str] | None = None):
-    """FakeModel callable: triage sessions get a category by keyword, summarize sessions a note."""
+    """FakeModel callable for the whole public pack: triage by keyword, the secure-fetch Reader (title of the
+    page), the tool loop (one web search, then the final answer) and every category session by its output
+    schema; ``notes`` maps a word of the prompt to the text of a ``note`` field (a scripted injection)."""
     notes = notes or {}
 
-    def reply(system: str, user: str) -> dict[str, Any]:
+    def reply(system: str, user: str, schema: dict[str, Any] | None = None) -> dict[str, Any]:
         if system.startswith("You sort captured resources"):
             for word, cat in categories_by_word.items():
                 if word in user:
                     return {"category": cat, "confidence": 0.9, "reason": f"mentions {word}"}
             return {"category": "misc", "confidence": 0.3, "reason": "unclear"}
+        props = set((schema or {}).get("properties", {}))
+        data = prompt_inputs(user)
+        if props == {"action", "tool", "arguments", "answer"}:  # the tool loop (llm_tools)
+            if "## Tool results" in user:
+                return {"action": "final", "answer": "done"}
+            return {"action": "call", "tool": "websearch:search", "arguments": {"query": "example tool"}}
+        title = (data.get("sanitize.title") or "").strip() or "Resource"
+        if "injection_suspected" in props:  # the secure-fetch Reader
+            return {
+                "title": title,
+                "summary": f"A synthetic page about {title}.",
+                "facts": [f"{title} is a synthetic fact"],
+                "links": [],
+                "injection_suspected": False,
+                "evidence": None,
+            }
+        name = (json.loads(data["item.extract"]).get("title") if "item.extract" in data else None) or title
+        if "extract" in data:  # marketing.synthesize: the idea of the extract session
+            name = json.loads(data["extract"]).get("idea", name).split(":")[0]
+        if "maintainer" in props:  # tool.research
+            return {
+                "name": name,
+                "summary": f"{name} does something useful.",
+                "maintainer": "unknown",
+                "license": "MIT",
+                "pricing": "free",
+                "maturity": "young",
+                "ecosystem": "python",
+                "sources": ["https://example.org/result"],
+            }
+        if "alternatives" in props and "recommendation" not in props:  # tool.compare
+            return {
+                "alternatives": [
+                    {
+                        "name": "altool",
+                        "license": "MIT",
+                        "cost": "free",
+                        "runs_locally": "yes",
+                        "api": "yes",
+                        "maturity": "mature",
+                    }
+                ]
+            }
+        if "adoption_cost" in props:  # tool.fit_*
+            return {"fit": "fits the example project", "replaces": "nothing", "adoption_cost": "low"}
+        if "recommendation" in props:  # tool.synthesize
+            out = {
+                "title": f"{name} evaluation",
+                "summary": f"{name} in short.",
+                "alternatives": ["altool"],
+                "recommendation": "trial",
+                "justification": "Looks useful.",
+            }
+            if "fit_personal" in data.get("*", "") or "### fit_personal" in user:
+                out["fit_personal"] = "fits the example project"
+            if "### fit_enterprise" in user:
+                out["fit_enterprise"] = "fits the example programme"
+            return out
+        if "hook" in props:  # marketing.extract
+            return {"idea": f"{name}: an idea", "hook": "a catchy hook", "why_it_works": ["simple"]}
+        out = {"title": f"About {name}", "note": "A short synthetic note."}
+        if "suggestion" in props:  # misc.evaluate
+            out["suggestion"] = None
         for word, note in notes.items():
             if word in user:
-                return {"title": f"About {word}", "note": note}
-        return {"title": "Resource", "note": "A short synthetic note."}
+                out["note"] = note
+        return out
 
+    reply.wants_schema = True  # type: ignore[attr-defined]
     return reply

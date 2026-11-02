@@ -22,6 +22,7 @@ from tests.support.pack_runtime import (
     FakeLearning,
     fake_model_reply,
     owner_decides,
+    synthetic_web,
     vault_tools,
 )
 
@@ -50,8 +51,14 @@ def _runtime(vault: Path, pack_dir: Path, learning: FakeLearning | None = None):
     )
     notify, tracer, clock = FakeNotify(routes=PACK_ROUTES), RecordingTracer(), FakeClock()
     learning = learning or FakeLearning(polls_until_ready=2)
+    web = synthetic_web()
     ports = make_ports(
-        tools=vault_tools(vault, learning), model=model, notify=notify, tracer=tracer, clock=clock
+        tools=vault_tools(vault, learning, web),
+        model=model,
+        notify=notify,
+        tracer=tracer,
+        clock=clock,
+        resolver=web.resolve,
     )
     return make_service(snap, ports), model, notify, tracer, clock, learning
 
@@ -96,16 +103,19 @@ def test_triage_then_process_released_end_to_end(vault, pack_dir):
         EVIL: "quarantined",  # output guard flagged the injected instruction
         LATER: "pending",  # constitution VI: nothing is processed without the owner
     }
-    note = (vault / "3-Resources/Tools" / f"{TOOL}.md").read_text(encoding="utf-8")
-    assert "source: 0-INBOX/example-tool.md" in note and "pkpipe_item: " + TOOL in note
-    assert not (vault / "3-Resources/Misc" / f"{EVIL}.md").exists()
+    [note_file] = (vault / "3-Resources/Tools").glob(f"*-{TOOL}.md")
+    note = note_file.read_text(encoding="utf-8")
+    assert "source: https://example.invalid/tool" in note and "pkpipe_item: " + TOOL in note
+    assert not list((vault / "3-Resources/Misc").glob("*.md"))
+    assert (vault / "4-Archive/Inbox" / f"{TOOL}-example-tool.md").is_file()  # the INBOX note was archived
+    assert not (vault / "0-INBOX/example-tool.md").exists()
     assert learning.created == [VIDEO] and learning.polls[f"nb-{VIDEO}"] == 3
     assert clock.sleeps == [60, 60, 60]  # BPMN: wait 60 s before each status poll
 
     plist = {r.item_id: r for r in lists.read_processing_list(vault / PROCESSING_LIST)}
     assert set(plist) == {TOOL, VIDEO}
     assert plist[VIDEO].status.value == "ready" and plist[VIDEO].link.endswith(f"nb-{VIDEO}")
-    assert plist[TOOL].obsidian_link == f"3-Resources/Tools/{TOOL}.md"
+    assert plist[TOOL].obsidian_link == f"3-Resources/Tools/{note_file.name}"
 
     summary = [m for m in notify.sent if m.event == "daily_summary"][-1]
     assert summary.message == "Processed 2, quarantined 1, failed 0; 1 item(s) still pending."
@@ -122,7 +132,7 @@ def test_triage_then_process_released_end_to_end(vault, pack_dir):
     # traces: every step span carries flow, item and config version
     steps = [s for s in tracer.of("step") if s.attributes["flow.id"] == "process_released"]
     assert {s.attributes["config.version"] for s in steps} == {run.run.config_version}
-    item_steps = [s for s in steps if s.name == "summarize"]
+    item_steps = [s for s in steps if s.name == "run_sessions"]
     assert {s.attributes["item.id"] for s in item_steps} == {TOOL, EVIL}
     assert all(s.attributes["bpmn.element"] == "Run category sessions" for s in item_steps)
 

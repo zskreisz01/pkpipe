@@ -77,6 +77,7 @@ An overlay can change one node of a pack flow by id (`{"nodes": [{"id": "notify"
 | `wait` | Polls a status tool until a condition holds; each poll is a checkpoint, the deadline is absolute | `tool`, `arguments`, `until`, `poll_s`, `deadline_s` |
 | `guard` | Flags from regular expressions and classifier scores (code decides); sets `item.flagged` | `input`, `patterns`, `checks` |
 | `output_guard` | Output guard (spec 009): the run's canary, active markup, heuristics and the classifier of `security.classifier` on the listed outputs; flags `canary_leak`, `injection_or_jailbreak`, `malicious_content`; sets `item.flagged`, `item.security_flags`; output holds codes and scores only. Validation: its first conditional edge must be `<id>.flagged` truthy (to `handle_security_flag`), no plain or error edges | `input` (list of refs), `canary` |
+| `session_plan` | The item's category session plan (spec 010): runs the sessions of `categories.json` in order, each as an isolated `llm` (or, with `tools`, `llm_tools`) session with its own span, the run's canary and only its declared inputs. A session whose context pack is not in the config is skipped (`{"skipped": "context_missing"}`). Output `{category, sessions, skipped, note_session}` derives from external content: like a `canary: true` session it must be followed by an `output_guard` that checks it, and it is refused as input of a session with tools | `category` (template, default `${item.category}`), `note_text` (template: the INBOX note text, only for sessions that declare `item.text`) |
 | `fetch` | Secure fetch (spec 008): URL filter again, then one `webfetch:fetch_page` call; `status` `ok`, `blocked` (flag) or `failed`. Raw output | `url`, `tool`, `max_bytes` |
 | `sanitize` | Visible text of a fetched page; metadata only for PDF, video, image. Raw output | `input`, `max_chars` |
 | `reader` | The Reader: an `llm` session without tools and context pack, with a per-run canary; output plus `canary_leaked` | as `llm` (`output_schema` required) |
@@ -87,7 +88,21 @@ Flagged items go to the `handle_security_flag` subflow (log URL, deny-list, iner
 
 Raw external text never reaches a session with tools: `fetch`, `sanitize` and `reader` outputs (like `tool`, `wait`, `llm_tools` and `subflow` outputs) are refused as `llm_tools` inputs; take the secure-fetch verdict's `extract` (`item.extract`) instead.
 
-Built-in `code` functions: `secure_fetch.url_check`, `secure_fetch.scan`, `secure_fetch.verdict`, `item.set`, `inbox.select_new`, `triage.category_menu`, `triage.check_category`, `triage.suggested_rows`, `triage.backlog`, `triage.release`, `triage.finalize`, and the self-improvement functions `improvement.locate_journal`, `improvement.section`, `improvement.new_rows`, `improvement.select_review`, `improvement.attach_journals`, `improvement.check_evidence`, `improvement.propose`, `improvement.no_evidence`, `improvement.review_rows`, `improvement.proposal_rows`, `improvement.summary` ([Self-Improvement Cycle](process/self-improvement-cycle.md)).
+Built-in `code` functions: `category.plan`, `category.note`, `category.session_failed` ([Category session plans](#category-session-plans-spec-010)), `secure_fetch.url_check`, `secure_fetch.scan`, `secure_fetch.verdict`, `item.set`, `inbox.select_new`, `triage.category_menu`, `triage.check_category`, `triage.suggested_rows`, `triage.backlog`, `triage.release`, `triage.finalize`, and the self-improvement functions `improvement.locate_journal`, `improvement.section`, `improvement.new_rows`, `improvement.select_review`, `improvement.attach_journals`, `improvement.check_evidence`, `improvement.propose`, `improvement.no_evidence`, `improvement.review_rows`, `improvement.proposal_rows`, `improvement.summary` ([Self-Improvement Cycle](process/self-improvement-cycle.md)).
+
+### Category session plans (spec 010)
+
+`other_resource` is the process of every category whose `subflow` is `other_resource` (Tool, Marketing, Misc and any overlay category); its steps follow the BPMN page [Process Other Resource](process/process-other-resource.md):
+
+| Step | What it does |
+| --- | --- |
+| `read`, `plan` | Reads the INBOX note; `category.plan` loads the category's plan and finds the source URL (front matter `source`, `url`, `link`, else the first http(s) URL of the body, kept as `item.source_url`; `item.resource` stays the note path). Statuses: `ok`, `no_plan` (no sessions) and `no_url` (a session reads the page extract but the note names no URL): both fail the item with the reason |
+| `secure_fetch` | Only when a session reads `item.extract` or `*` ([Secure fetch](process/secure-fetch.md)). A flag goes to `handle_security_flag`; a failed fetch (HTTP error, server down) lists the item as failed, it is no security flag |
+| `run_sessions` | The `session_plan` step. A session error after the model's retries (`SchemaError`, model unavailable) ends the plan and lists the item as failed with `session '<id>' failed: <ErrorType>` (no model output in the reason) |
+| `guard` | The `output_guard` over everything the sessions produced; a flag quarantines the item, nothing is written |
+| `note`, `write`, `agent_task`, `record`, `archive` | `category.note` renders the validated output of the plan's note session (`note_session`, default `synthesize`, else the last session) to `<para_path>/<slug of the title>-<item id>.md` with front matter (`type`, `source`, `category`, `pkpipe_item`, `inbox_note`) and a section per field; a session output with a field named like a skipped session loses that field. A new-category `suggestion` of a session becomes a note `2-Areas/Agent-Tasks/new-category-<id>-<item id>.md`. The processing list row says `done`; the INBOX note moves to `4-Archive/Inbox/<item id>-<name>.md` (a failed move is only recorded) |
+
+The processing list has no reason column: a failed item shows its reason in the `link` column.
 
 ### Triage and release (spec 007)
 

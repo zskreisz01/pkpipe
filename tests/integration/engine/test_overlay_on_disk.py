@@ -77,3 +77,81 @@ def test_all_validation_errors_are_collected_not_just_the_first(pack_dir, overla
         load_effective(pack_dir, overlay)
     files = {e.split(":")[0] for e in exc.value.errors}
     assert {"schedules.json", "security.json"} <= files
+
+
+# -- spec 010: session plan validation of overlay categories --------------------------------------------
+def _plan_category(*sessions, **extra):
+    return {**PRIVATE_CATEGORY, "id": "plan", "sessions": list(sessions), **extra}
+
+
+def _session(id, **kw):
+    return {"id": id, "system": "analyst", "instruction": "job/fit.md", "inputs": ["item.extract"], **kw}
+
+
+def test_overlay_category_with_a_plan_of_its_own_validates_and_names_its_note_session(
+    pack_dir, overlay, write_json
+):
+    """SC-002: a new category is configuration only, with sessions, tools, context and note session."""
+    cat = _plan_category(
+        _session("research", tools=["websearch:search"], output_schema="tool_research"),
+        _session("fit", inputs=["research"], context="personal", output_schema="tool_fit"),
+        _session("late", inputs=["fit"]),
+        note_session="fit",
+    )
+    write_json(overlay, "categories.json", [cat])
+    cfg = load_effective(pack_dir, overlay)
+    effective = next(c for c in cfg.data["categories"] if c["id"] == "plan")
+    assert effective["note_session"] == "fit" and [s["id"] for s in effective["sessions"]] == [
+        "research",
+        "fit",
+        "late",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("sessions", "message"),
+    [
+        (
+            [_session("r", inputs=["item.text"], tools=["websearch:search"])],
+            "raw untrusted input 'item.text'",
+        ),
+        ([_session("r", inputs=["*"], tools=["websearch:search"])], "raw untrusted input '\\*'"),
+        (
+            [_session("e", context="enterprise", tools=["websearch:search"])],
+            "enterprise context must not have web search tools",
+        ),
+        (
+            [
+                _session("e", context="enterprise", output_schema="tool_fit"),
+                _session("w", inputs=["e"], tools=["websearch:search"]),
+            ],
+            "enterprise-derived",
+        ),
+        ([_session("a", inputs=["later"]), _session("later")], "input 'later'"),
+    ],
+)
+def test_overlay_plan_rule_violations_fail_validation(pack_dir, overlay, write_json, sessions, message):
+    write_json(overlay, "categories.json", [_plan_category(*sessions)])
+    with pytest.raises(ConfigError, match=message):
+        load_effective(pack_dir, overlay)
+
+
+def test_overlay_instruction_over_the_token_budget_fails_validation(pack_dir, overlay, write_json):
+    """FR-003: about 800 tokens at most."""
+    (overlay / "instructions/job/fit.md").write_text("word " * 700, encoding="utf-8")
+    write_json(overlay, "categories.json", [_plan_category(_session("a"))])
+    with pytest.raises(ConfigError, match="FR-003"):
+        load_effective(pack_dir, overlay)
+
+
+def test_overlay_query_guard_terms_are_validated_config(pack_dir, overlay, write_json):
+    write_json(
+        overlay,
+        "security.json",
+        {"query_guard": {"blocked_terms": ["Project Falcon"], "terms_file": "contexts/t.txt"}},
+    )
+    cfg = load_effective(pack_dir, overlay)
+    assert cfg.data["security"]["query_guard"]["blocked_terms"] == ["Project Falcon"]
+    write_json(overlay, "security.json", {"query_guard": {"blocked": ["x"]}})
+    with pytest.raises(ConfigError, match="query_guard"):
+        load_effective(pack_dir, overlay)

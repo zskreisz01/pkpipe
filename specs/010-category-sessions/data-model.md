@@ -1,9 +1,9 @@
 ---
 spec_id: 010-category-sessions
 title: Category session plans and Process Other Resource
-status: Draft
+status: Completed
 description: Entities and storage for category session plans and process other resource.
-updated: 2026-10-31
+updated: 2026-11-01
 ---
 
 # Data Model: 010-category-sessions
@@ -26,6 +26,18 @@ Notation: **NEW** = introduced by this spec · **EXISTING** = already in the cod
 | `context` | enum|null | no | personal · enterprise · system |
 | `output_schema` | str|null | no | Schema name |
 
+### EXISTING `Category` (extended)
+
+`id`, `label`, `subflow`, `para_path`, `triage_hint`, `sessions: list[SessionSpec]`, `enabled`, and **NEW** `note_session` (str | null): the session whose output becomes the note; default `synthesize`, else the last session. `SessionSpec` is `pkpipe.engine.config_models.Session`; its input rules are `pkpipe.domain.session_plan.plan_errors`.
+
+### NEW `SessionResult`
+
+Output of the `session_plan` step (stored under the node id): `{category, sessions: {session id: validated output | {"skipped": "context_missing", "context": ...}}, skipped: [ids], note_session}`. It derives from external content: the output guard checks it before `category.note` renders `{path, archive_path, title, body, front_matter, has_task, task_*}` from the note session's output.
+
+### NEW `QueryGuard` (`security.json` `query_guard`)
+
+`blocked_terms: list[str]`, `terms_file: str | null` (an asset with one term per line).
+
 ## Diagram
 
 ```mermaid
@@ -38,6 +50,18 @@ erDiagram
         list_str inputs
         enum context
         str output_schema
+    }
+    Category ||--o{ SessionSpec : sessions
+    Category {
+        str id
+        str para_path
+        str note_session
+    }
+    SessionSpec ||--o| SessionResult : produces
+    SessionResult {
+        str session_id
+        json output
+        bool skipped
     }
 ```
 

@@ -30,7 +30,7 @@ SECURITY = [
 SESSION = [
     {
         "id": "s1",
-        "input": {"item.category": "tool", "read.body": "minikv is a key-value store."},
+        "input": {"extract": "minikv is a key-value store."},
         "expected": {"must_include": ["minikv"]},
     }
 ]
@@ -52,7 +52,7 @@ def paths(tmp_path):
             "datasets/security.jsonl": SECURITY,
             "datasets/injection.jsonl": INJECTION,
             "datasets/secure_fetch.jsonl": SECURE_FETCH_CASES,
-            "datasets/sessions/other_resource/summarize.jsonl": SESSION,
+            "datasets/sessions/marketing/synthesize.jsonl": SESSION,
             **flows,
         },
     )
@@ -144,28 +144,26 @@ def test_lowering_a_threshold_is_refused_even_with_an_override(pack_dir, paths, 
 def test_session_instruction_change_is_compared_pairwise(pack_dir, paths, tmp_path):
     """FR-003: old vs new output judged A/B (twice, order swapped); a consistent win for the new one
     passes."""
-    overlay = _overlay(tmp_path / "ov", {"instructions/other/summarize.md": "Write a crisp note."})
+    overlay = _overlay(tmp_path / "ov", {"instructions/marketing/synthesize.md": "Write a crisp note."})
     current, draft = _snap(pack_dir), _snap(pack_dir, overlay)
     model = _model(judge_winner=("B", "A"))  # B=new first, then A=new: consistent win
     d = _gate(paths, model).check(current, draft)
     assert "sessions" in d.affected
     [pw] = d.pairwise
-    assert pw["session"] == "other_resource.summarize" and pw["score"] == 1.0 and pw["passed"]
+    assert pw["session"] == "marketing.synthesize" and pw["score"] == 1.0 and pw["passed"]
     assert d.allowed, d.failures
     worse = _gate(paths, _model(judge_winner=("A", "B"))).check(current, draft)
-    assert not worse.allowed and any(
-        "pairwise other_resource.summarize: score 0.0" in f for f in worse.failures
-    )
+    assert not worse.allowed and any("pairwise marketing.synthesize: score 0.0" in f for f in worse.failures)
 
 
 def test_judge_unavailable_blocks_publishing_an_llm_step(pack_dir, paths, tmp_path):
     """Edge case: no usable judge -> step eval skipped -> publish blocked for LLM steps."""
-    overlay = _overlay(tmp_path / "ov", {"instructions/other/summarize.md": "Write a crisp note."})
+    overlay = _overlay(tmp_path / "ov", {"instructions/marketing/synthesize.md": "Write a crisp note."})
     same = {"default": "http://h|m", "judge": "http://h|m"}
     d = _gate(paths, _model(), identities=same).check(_snap(pack_dir), _snap(pack_dir, overlay))
     assert not d.allowed
     assert any("sessions: skipped" in f for f in d.failures)
-    assert any("pairwise other_resource.summarize: judge unavailable" in f for f in d.failures)
+    assert any("pairwise marketing.synthesize: judge unavailable" in f for f in d.failures)
 
 
 def test_first_publish_runs_every_gated_suite(pack_dir, paths):
@@ -215,13 +213,13 @@ def test_changed_llm_step_without_an_eval_dataset_blocks(pack_dir, tmp_path):
             **flows,
         },
     )
-    overlay = _overlay(tmp_path / "ov", {"instructions/other/summarize.md": "Write a crisp note."})
+    overlay = _overlay(tmp_path / "ov", {"instructions/marketing/synthesize.md": "Write a crisp note."})
     current, draft = _snap(pack_dir), _snap(pack_dir, overlay)
     assert "security" in affected_suites(current, draft, no_sessions)
     d = _gate(no_sessions, _model()).check(current, draft)
     assert not d.allowed and d.status == "blocked"
     assert any(
-        f.startswith("other_resource.summarize: LLM step changed but has no eval dataset") for f in d.failures
+        f.startswith("marketing.synthesize: LLM step changed but has no eval dataset") for f in d.failures
     ), d.failures
     ok = _gate(no_sessions, _model()).check(
         current, draft, override_reason="dataset follows in the next change"

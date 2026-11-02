@@ -11,6 +11,7 @@ from tests.fakes.security_log import FakeSecurityLog
 from tests.fakes.state import InMemoryState
 from tests.fakes.tools import FakeTools
 from tests.fakes.tracer import RecordedSpan, RecordingTracer
+from tests.fakes.web import FakeSearch, FakeWeb
 
 __all__ = [
     "FakeClassifier",
@@ -18,8 +19,10 @@ __all__ = [
     "FakeLearningBackend",
     "FakeModel",
     "FakeNotify",
+    "FakeSearch",
     "FakeSecurityLog",
     "FakeTools",
+    "FakeWeb",
     "InMemoryConfig",
     "InMemoryRunStore",
     "InMemoryState",

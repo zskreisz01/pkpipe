@@ -33,7 +33,10 @@ def served_vault(tmp_path, synthetic_vault, write_json):
 
 @pytest.fixture
 def fakes(monkeypatch):
-    model = FakeModel(fake_model_reply({"CLI tool": "tool", "video": "learning-material"}))
+    # misc: a category without web content, so this CLI test needs no web-fetch server
+    # (tests/e2e/test_category_sessions_e2e.py
+    # runs the Tool plan through secure fetch)
+    model = FakeModel(fake_model_reply({"CLI tool": "misc", "video": "learning-material"}))
     notify = FakeNotify(routes=PACK_ROUTES)
     monkeypatch.setattr(app, "make_model", lambda snapshot: model)
     monkeypatch.setattr(app, "make_notify", lambda snapshot: notify)
@@ -57,7 +60,7 @@ def test_pkpipe_run_triage_then_process_released(served_vault, fakes, capsys):
     assert triage["flow_id"] == "triage" and triage["status"] == "done" and triage["trigger"] == "manual"
     rows = {r["item_id"]: r for r in lists.read_triage(vault / TRIAGE_FILE)["rows"]}
     assert {k: v["ai_suggested_category"] for k, v in rows.items()} == {
-        TOOL: "tool",
+        TOOL: "misc",
         VIDEO: "learning-material",
     }
     assert notify.sent[0].channel == "discord_main" and "2 new item(s)" in notify.sent[0].message
@@ -66,8 +69,9 @@ def test_pkpipe_run_triage_then_process_released(served_vault, fakes, capsys):
     owner_decides(vault, confirm=[TOOL])  # the video stays unreviewed
     code, processed = _run(capsys, "run", "process_released", *common, "--trigger", "ui")
     assert code == 0, processed
-    note = (vault / "3-Resources/Tools" / f"{TOOL}.md").read_text(encoding="utf-8")
-    assert "pkpipe_item: " + TOOL in note
+    [note_file] = (vault / "3-Resources/Misc").glob(f"*-{TOOL}.md")
+    assert "pkpipe_item: " + TOOL in note_file.read_text(encoding="utf-8")
+    assert (vault / "4-Archive/Inbox" / f"{TOOL}-example-tool.md").is_file()  # archived through the vault MCP
     rows = {r["item_id"]: r["state"] for r in lists.read_triage(vault / TRIAGE_FILE)["rows"]}
     assert rows == {TOOL: "processed", VIDEO: "pending"}
     assert notify.sent[-1].message == "Processed 1, quarantined 0, failed 0; 1 item(s) still pending."

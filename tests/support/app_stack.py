@@ -94,7 +94,7 @@ def gate_paths(root: Path):
     session = [
         {
             "id": "s1",
-            "input": {"item.category": "tool", "read.body": "minikv is a key-value store."},
+            "input": {"extract": "minikv is a key-value store."},
             "expected": {"must_include": ["minikv"]},
         }
     ]
@@ -113,7 +113,7 @@ def gate_paths(root: Path):
             "datasets/security.jsonl": security,
             "datasets/injection.jsonl": injection,
             "datasets/secure_fetch.jsonl": SECURE_FETCH_CASES,
-            "datasets/sessions/other_resource/summarize.jsonl": session,
+            "datasets/sessions/marketing/synthesize.jsonl": session,
             **flows,
         },
     )

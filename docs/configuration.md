@@ -87,6 +87,7 @@ Webhook and Apprise URLs contain secrets, so the config accepts only `env:NAME` 
 | `output_guard.block_on` | Qwen3Guard safety labels that make a harm category a `malicious_content` flag (`Unsafe`, `Controversial`) | `["Unsafe"]` |
 | `canary.rotate` | The canary of sessions with `canary: true`: `per_run` (from the run id), `daily`, `never` | `per_run` |
 | `quarantine_dir` | Quarantine folder of the vault (the vault server's `quarantine_dir` policy must match) | `0-INBOX/_quarantine` |
+| `query_guard.blocked_terms`, `query_guard.terms_file` | Names that no web query of a session with tools may contain (spec 010 FR-002, [Sessions instead of skills](#plan-rules)) | none |
 
 An `llm` / `llm_tools` step over external content sets `"canary": true`; validation then requires that every successor is an `output_guard` step whose `input` lists it. The `output_guard` step (`{"input": ["summarize"], "canary": true}`) sets `item.flagged` and the flow routes the item to the `handle_security_flag` subflow. That flow writes `security/malicious_urls.jsonl` and the deny-list in the overlay (`<overlay>/security/`, the deny-list file of `url_filter.deny_list`, started from the pack's list) or, without an overlay, in `$PKPIPE_DATA_DIR/security/`. Owner releases write eval candidates to `<overlay>/evals/candidates/security.jsonl` (else `$PKPIPE_DATA_DIR/candidates/`).
 
@@ -138,15 +139,42 @@ Session references (`system`, `instruction`, `context`, `output_schema`) are rel
   "para_path": "3-Resources/Tools",
   "triage_hint": "Software, library or service that could become part of my ecosystem.",
   "sessions": [
-    {"id": "research", "system": "researcher", "instruction": "tool/research.md", "tools": ["websearch:search"], "inputs": ["item.extract"]},
-    {"id": "compare", "system": "analyst", "instruction": "tool/compare.md", "tools": ["websearch:search"], "inputs": ["research"]},
-    {"id": "fit_personal", "system": "analyst", "instruction": "tool/fit.md", "context": "personal", "inputs": ["research", "compare"]},
-    {"id": "fit_enterprise", "system": "analyst", "instruction": "tool/fit.md", "context": "enterprise", "inputs": ["research", "compare"]},
-    {"id": "synthesize", "system": "synthesizer", "instruction": "tool/synthesize.md", "inputs": ["*"], "output_schema": "tool_evaluation"},
-    {"id": "system_relevance", "system": "analyst", "instruction": "tool/system_relevance.md", "context": "system", "inputs": ["synthesize"]}
+    {"id": "research", "system": "researcher", "instruction": "tool/research.md", "tools": ["websearch:search"], "inputs": ["item.extract"], "output_schema": "tool_research"},
+    {"id": "compare", "system": "analyst", "instruction": "tool/compare.md", "tools": ["websearch:search"], "inputs": ["research"], "output_schema": "tool_comparison"},
+    {"id": "fit_personal", "system": "analyst", "instruction": "tool/fit.md", "context": "personal", "inputs": ["research", "compare"], "output_schema": "tool_fit"},
+    {"id": "fit_enterprise", "system": "analyst", "instruction": "tool/fit.md", "context": "enterprise", "inputs": ["research", "compare"], "output_schema": "tool_fit"},
+    {"id": "synthesize", "system": "synthesizer", "instruction": "tool/synthesize.md", "inputs": ["*"], "output_schema": "tool_evaluation"}
   ]
 }
 ```
+
+### Plan rules
+
+`pkpipe validate` checks every category with `subflow: other_resource` (`pkpipe.domain.session_plan`); a violation is an error that names the category and session:
+
+| Rule | Why |
+| --- | --- |
+| `inputs` are `item.extract` (the validated secure-fetch extract; the plan then runs secure fetch first), `item.text` (the INBOX note text, raw), other `item.<field>`, `*` (the extract and every earlier, not skipped, session output) or the id of an **earlier** session | A session gets exactly what it declares |
+| A session with `tools` never reads raw text (`item.text`, `item`, `*`) and only the output of a session that has an `output_schema` | Constitution IV: only validated JSON reaches a session with tools; raw note text goes to tool-less sessions only (the Misc evaluation) |
+| A session with `context: enterprise` has no tool on an `egress` MCP server (web search), and no such session reads an output derived from an enterprise session | Spec 010 FR-002 |
+| An instruction is about 800 tokens at most (a quarter of its characters) | FR-003 |
+| `note_session` (default `synthesize`, else the last session) is a session of the plan; its output becomes the note, a session with an `output_schema` gives one section per field | Later sessions can run after it without changing the note (the extension point for the system relevance session of spec 016) |
+| A session whose `context` pack is not in the config (a private pack in a public checkout) is skipped at run time and a validation warning says so | A session never answers about projects it does not know |
+
+Every session of a plan runs with the run's canary and its output is checked by the output guard before a write. `security.query_guard` holds the names no web query may contain (`blocked_terms`, and `terms_file`: one term per line, an asset such as `contexts/blocked_terms.txt`); a tool call on an `egress` server whose string arguments contain a term (case, accent and punctuation insensitive, whole words) is refused before it leaves the machine, traced as a `query_guard` security flag, and the model is told only that the call was blocked.
+
+The public plans: **Tool** `research` (web search) → `compare` (web search) → `fit_personal` (context `personal`) → `fit_enterprise` (context `enterprise`, no web search) → `synthesize`; **Marketing** `extract` → `synthesize`; **Misc** `evaluate` (reads the note text; a `suggestion` of a new category becomes an agent task). The system relevance session (context `system`) is added by spec 016 after `synthesize`.
+
+A new category is an overlay entry, nothing else (test: `tests/integration/engine/test_category_sessions.py`):
+
+```json
+{"id": "paper", "label": "Papers", "subflow": "other_resource", "para_path": "3-Resources/Papers",
+ "triage_hint": "A research paper worth keeping.",
+ "sessions": [{"id": "summarize", "system": "synthesizer", "instruction": "other/summarize.md",
+               "inputs": ["item.extract"], "output_schema": "resource_note"}]}
+```
+
+Triage offers it (id, label and hint), the owner's override or confirmation releases items to it, and its plan runs through secure fetch, the sessions, the output guard and the vault writes like the public plans. Its sessions need a dataset in the overlay (`<overlay>/evals/datasets/sessions/paper/summarize.jsonl`) before the config UI publishes a change to them.
 
 ## Context packs
 

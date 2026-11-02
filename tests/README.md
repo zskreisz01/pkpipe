@@ -80,3 +80,16 @@ The real Qwen3Guard-Gen-0.6B and ProtectAI DeBERTa models run in `tests/integrat
 under `@pytest.mark.live("guard")` (model directories `~/tools/qwen3guard/Qwen3Guard-Gen-0.6B` and
 `~/tools/protectai-deberta-pi-v2` plus `uv sync --extra guard`; see docs/installation.md). The security eval replays
 recorded classifier results from `evals/cassettes/classifier.json`.
+
+## Category sessions (spec 010)
+
+`FakeWeb` (`webfetch:fetch_page` over HTML pages by URL, plus the `resolver` port so no DNS is needed) and
+`FakeSearch` (`websearch:search`, records the queries) are in `tests/fakes/web.py`; `tests/support/pack_runtime.py`
+puts them behind `vault_tools(vault, web=..., search=...)` next to the real `Vault`. `fake_model_reply` answers every
+session of the public pack by its output schema (it receives the schema: a callable with `wants_schema = True`).
+`tests/e2e/test_category_sessions_e2e.py` runs the whole process through the CLI with the real vault server, the
+real web-fetch server (Lightpanda, the fixture site) and `tests/support/websearch_mcp.py`, a synthetic web search
+MCP server that logs every query (the query guard is asserted on that log). The fit sessions need context packs: the
+tests write synthetic ones into a temp overlay, never real ones. Fixture pages of one host share a deny-list: a page
+quarantined by secure fetch deny-lists the host of the fixture site, so such a page is processed in a later run than
+the pages that must succeed.

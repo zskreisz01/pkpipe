@@ -139,18 +139,11 @@ def test_triage_confirm_override_release_fans_out_to_category_processes(world, v
     )
 
     # -- the owner reviews in Obsidian (edits the triage file) --
-    # learning-material would need the learning gateway (spec 008): route that item to 'marketing' instead.
-    confirm, override = [IDS["cli-tool.md"], IDS["campaign.md"]], {IDS["recipe.md"]: "misc"}
-    if suggestions["course.md"] == "learning-material":
-        override[IDS["course.md"]] = "marketing"
-    else:
-        confirm.append(IDS["course.md"])
-    if "trap.md" not in flagged:
-        if suggestions["trap.md"] == "learning-material":
-            override[IDS["trap.md"]] = "misc"
-        else:
-            confirm.append(IDS["trap.md"])
-    confirm = [c for c in confirm if c not in override]
+    # This test is about triage, release and fan-out, not about the categories' processes: the owner routes
+    # every item to 'misc' (no web content, so no web-fetch server; tests/e2e/test_category_sessions_e2e.py
+    # runs the Tool and Marketing plans through secure fetch, and the learning gateway has its own e2e).
+    names = [n for n in IDS if n not in flagged and n != "later.md"]
+    confirm, override = [], {IDS[n]: "misc" for n in names}
     decided = set(confirm) | set(override)
     owner_decides(vault, confirm=confirm, override=override)  # 'later.md' stays unreviewed
 
@@ -166,12 +159,12 @@ def test_triage_confirm_override_release_fans_out_to_category_processes(world, v
         if item_id in decided:
             assert rows[item_id]["state"] in ("processed", "quarantined"), (name, rows[item_id])
         category = override.get(item_id) or suggestions[name]
-        note = vault / CATEGORIES[category]["para_path"] / f"{item_id}.md"
+        notes = list((vault / CATEGORIES[category]["para_path"]).glob(f"*-{item_id}.md"))
         if item_id not in decided:
-            assert not list(vault.rglob(f"{item_id}.md")), name
+            assert not list(vault.rglob(f"*{item_id}.md")), name
         elif rows[item_id]["state"] == "processed":
-            text = note.read_text(encoding="utf-8")  # US2-AS2: the override's category folder is used
-            assert f"pkpipe_item: {item_id}" in text and f"source: 0-INBOX/{name}" in text, name
+            text = notes[0].read_text(encoding="utf-8")  # US2-AS2: the override's category folder is used
+            assert f"pkpipe_item: {item_id}" in text and f"0-INBOX/{name}" in text, name
     per_item = {r["item"]["id"]: r for r in release["outputs"]["process_item"]}
     assert set(per_item) == decided  # FR-004: one instance per released item
     assert per_item[IDS["cli-tool.md"]]["status"] == "done"
