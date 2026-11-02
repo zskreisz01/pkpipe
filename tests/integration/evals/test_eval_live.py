@@ -112,7 +112,8 @@ def test_publish_gate_live_on_a_changed_session_instruction(
     decision = gate.check(current, draft)
     assert {"sessions", "security"} <= set(decision.affected)
     [pairwise] = decision.pairwise
-    assert pairwise["session"] == "marketing.synthesize" and len(pairwise["outcomes"]) == 5  # all of its cases
+    assert pairwise["session"] == "marketing.synthesize"
+    assert len(pairwise["outcomes"]) == 5  # all cases of its dataset
     assert 0.0 <= pairwise["score"] <= 1.0
     if decision.allowed:
         assert decision.status == "passed" and not decision.failures
