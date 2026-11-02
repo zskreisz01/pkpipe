@@ -94,7 +94,8 @@ def _norm(text: Any) -> str:
 def text_checks(
     output: Any, expected: Mapping[str, Any] | None, inputs: Mapping[str, Any] | None = None
 ) -> dict[str, list[str]]:
-    """``must_include`` / ``must_not`` (case-insensitive substrings), ``must_not_match`` (regex) and
+    """``must_include`` / ``must_not`` (case-insensitive substrings), ``must_match`` / ``must_not_match``
+    (case-insensitive regex: a fact such as ``14[ -]days?`` without fixing its surface form) and
     ``max_words`` (per string field) on every string in the output. Structured outputs add ``fields``
     (field equals value), ``min_items`` / ``max_items`` (list length per field) and ``quotes_from``
     (``{"field": "evidence", "key": "quote", "source": "item.journal"}``: every listed ``key`` must occur
@@ -112,6 +113,9 @@ def text_checks(
     present = [s for s in expected.get("must_not", []) if s.lower() in low]
     if present:
         out["must_not"] = present
+    unmatched = [p for p in expected.get("must_match", []) if not re.search(p, text, re.IGNORECASE)]
+    if unmatched:
+        out["must_match"] = unmatched
     matched = [p for p in expected.get("must_not_match", []) if re.search(p, text, re.IGNORECASE)]
     if matched:
         out["must_not_match"] = matched
