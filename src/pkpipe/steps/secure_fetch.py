@@ -82,9 +82,14 @@ def _decision_dict(url: str, decision) -> dict[str, Any]:
 @register_code("secure_fetch.url_check")
 def url_check(ctx: StepContext, url: str | None = None) -> dict[str, Any]:
     """FR-001: scheme, deny-list, private networks (after DNS resolution). ``url`` defaults to the item's
-    ``resource`` (a released INBOX item) or the run input's ``url``."""
+    ``source_url`` (the URL found in a released INBOX note, spec 010), its ``resource`` or the run input's
+    ``url``."""
     if url is None:
-        url = ctx.resolve("item.resource", required=False) or ctx.resolve("input.url", required=False)
+        url = (
+            ctx.resolve("item.source_url", required=False)
+            or ctx.resolve("item.resource", required=False)
+            or ctx.resolve("input.url", required=False)
+        )
     if not isinstance(url, str) or not url.strip():
         return {"allowed": False, "url": url, "reason": Reason.MALFORMED, "flag": False}
     url = url.strip()

@@ -85,10 +85,11 @@ flowchart LR
   | `unprocessed` | Ready for you | Read or listen, then set `done` |
   | `generating` | Podcast still being generated | Wait |
   | `ready` | Notebook and podcast are ready | Listen, then set `done` |
-  | `failed` | Generation failed or timed out | Re-run the item (UI or `run_flow`) or set `manual` and handle it yourself |
+  | `failed` | Generation failed or timed out; for a category item the processing stopped (a session failed, the note names no URL, the page could not be fetched). The `link` column says why | Re-run the item (UI or `run_flow`) or set `manual` and handle it yourself |
   | `manual` | You took it over | Set `done` when finished |
   | `done` | Finished | – |
 
+- **What else appears:** the INBOX note of a processed item moves to `4-Archive/Inbox/`; a Misc item that suggests a new theme adds a note `2-Areas/Agent-Tasks/new-category-<name>-<id>.md` with an open task: add the category to `categories.json` (UI or overlay) or delete the note.
 - **Tip:** if a note is wrong or weak, correct it in place. Corrected notes are a feedback signal for the session eval datasets (see [Evaluation](evaluation.md)).
 
 ### Review quarantine

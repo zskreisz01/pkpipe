@@ -95,9 +95,9 @@ def test_publish_gate_live_on_a_changed_session_instruction(
     instruction's outputs and every pairwise judgement are live; requests identical to the sessions +
     security test above (unchanged sessions, security, the published instruction's outputs) reuse its live
     answers (tests/conftest.py)."""
-    (overlay_dir / "instructions/other").mkdir(parents=True)
-    original = (pack_dir / "instructions/other/summarize.md").read_text(encoding="utf-8")
-    (overlay_dir / "instructions/other/summarize.md").write_text(
+    (overlay_dir / "instructions/marketing").mkdir(parents=True)
+    original = (pack_dir / "instructions/marketing/synthesize.md").read_text(encoding="utf-8")
+    (overlay_dir / "instructions/marketing/synthesize.md").write_text(
         original.strip() + " Start the note with what the resource is in one sentence.\n", encoding="utf-8"
     )
     current = load_effective(pack_dir, None).snapshot()
@@ -112,7 +112,8 @@ def test_publish_gate_live_on_a_changed_session_instruction(
     decision = gate.check(current, draft)
     assert {"sessions", "security"} <= set(decision.affected)
     [pairwise] = decision.pairwise
-    assert pairwise["session"] == "other_resource.summarize" and len(pairwise["outcomes"]) == 6
+    assert pairwise["session"] == "marketing.synthesize"
+    assert len(pairwise["outcomes"]) == 5  # all cases of its dataset
     assert 0.0 <= pairwise["score"] <= 1.0
     if decision.allowed:
         assert decision.status == "passed" and not decision.failures

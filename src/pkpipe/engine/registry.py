@@ -265,6 +265,16 @@ def check_references(cfg: EffectiveConfig) -> tuple[list[str], list[str]]:
                     errors.append(f"{where}: tool '{tool}' references unregistered MCP server '{server}'")
                 elif name not in servers[server].get("allow", []):
                     errors.append(f"{where}: tool '{tool}' is not in the allow list of '{server}'")
+    from pkpipe.domain.session_plan import plan_errors
+
+    for cat in cfg.data.get("categories", []):
+        e, w = plan_errors(
+            cat,
+            servers=servers,
+            asset=lambda rel: (lambda f: f.read_text(encoding="utf-8") if f else None)(cfg.find_file(rel)),
+        )
+        errors += e
+        warnings += w
     errors += _check_judge_profile(cfg.data)
     deny = cfg.data.get("security", {}).get("url_filter", {}).get("deny_list")
     if deny and cfg.find_file(deny) is None:

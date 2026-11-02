@@ -1,0 +1,52 @@
+{
+  "type": "object",
+  "required": [
+    "name",
+    "summary",
+    "maintainer",
+    "license",
+    "pricing",
+    "maturity",
+    "ecosystem",
+    "sources"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "maintainer": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "license": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "pricing": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "maturity": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "ecosystem": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "sources": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    }
+  }
+}

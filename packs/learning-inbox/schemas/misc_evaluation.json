@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "required": [
+    "title",
+    "note",
+    "suggestion"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "title": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "note": {
+      "type": "string",
+      "maxLength": 1000
+    },
+    "suggestion": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "triage_hint"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "triage_hint": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    }
+  }
+}

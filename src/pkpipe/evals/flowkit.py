@@ -18,7 +18,7 @@ from typing import Any
 from pkpipe.domain.triage import item_id_for
 from pkpipe.obsidian.policy import VaultPolicy
 from pkpipe.obsidian.vault import Vault
-from pkpipe.ports import Delivery, ModelError
+from pkpipe.ports import Delivery, ModelError, ModelUnavailable, SchemaError
 
 TRIAGE_FILE = "0-INBOX/Inbox-Triage.md"
 PROCESSING_LIST = "0-INBOX/Manual-Resource-Processing-List.md"
@@ -88,12 +88,58 @@ class ScriptedLearning:
         return self.gateway.audio(job_id)
 
 
-class VaultTools:
-    """``ToolPort`` over a real :class:`Vault` (its own path and owner-field rules apply) + learning tools."""
+class ScriptedWeb:
+    """``webfetch:fetch_page`` and ``websearch:search`` of flow cases.
 
-    def __init__(self, vault_dir: Path, learning: ScriptedLearning | None = None):
+    ``pages`` maps a URL to its HTML (the web-fetch MCP result shape, so the real secure-fetch steps run on
+    it), a URL without a page is an HTTP 404 and ``down`` makes the server unreachable. ``resolve`` is the
+    ``resolver`` port: every host of a page resolves to a public address, any other host does not resolve (no
+    real DNS in an eval)."""
+
+    def __init__(self, pages: dict[str, str] | None = None, down: bool = False):
+        self.pages = dict(pages or {})
+        self.down = down
+
+    def resolve(self, host: str) -> list[str]:
+        known = {url.split("/")[2].split(":")[0] for url in self.pages if "//" in url}
+        return ["93.184.216.34"] if host in known else []
+
+    def fetch_page(self, url: str, max_bytes: int | None = None) -> dict[str, Any]:
+        if self.down:
+            raise ConnectionError("web-fetch server is down")
+        html = self.pages.get(url)
+        if html is None:
+            return {"status": "failed", "url": url, "http_status": 404, "reason": "http_404"}
+        return {
+            "status": "ok",
+            "url": url,
+            "final_url": url,
+            "http_status": 200,
+            "content_type": "text/html",
+            "kind": "html",
+            "html": html,
+            "bytes": len(html.encode("utf-8")),
+            "fetcher": "lightpanda",
+        }
+
+    def search(self, query: str, max_results: int = 5) -> dict[str, Any]:
+        return {
+            "results": [{"title": "Example", "url": "https://example.org/result", "snippet": "synthetic"}]
+        }
+
+
+class VaultTools:
+    """``ToolPort`` over a real :class:`Vault` (its path and owner-field rules apply), learning and web."""
+
+    def __init__(
+        self,
+        vault_dir: Path,
+        learning: ScriptedLearning | None = None,
+        web: ScriptedWeb | None = None,
+    ):
         vault = Vault(VaultPolicy(vault_dir=vault_dir))
         learning = learning or ScriptedLearning()
+        web = web or ScriptedWeb()
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self._tools: dict[str, Callable[..., Any]] = {
             "obsidian:list_folder": vault.list_folder,
@@ -101,6 +147,9 @@ class VaultTools:
             "obsidian:write_note": lambda path, body, front_matter=None, overwrite=False: vault.write_note(
                 path, body, front_matter, overwrite
             ),
+            "obsidian:move_note": vault.move_note,
+            "webfetch:fetch_page": web.fetch_page,
+            "websearch:search": web.search,
             "obsidian:read_triage": vault.read_triage,
             "obsidian:update_triage": vault.update_triage,
             "obsidian:upsert_processing_list": vault.upsert_processing_list,
@@ -132,6 +181,9 @@ class ScriptedModel:
     * ``fields`` – the requested output schema requires (at least) these fields, e.g. ``["title", "note"]``,
       so a rule keeps matching when the session's instruction text is edited.
 
+    A rule with ``"error": "SchemaError"`` (or ``"ModelUnavailable"``) raises that model error instead of
+    replying (a model that kept answering invalid JSON after its retries).
+
     ``{canary}`` in a reply string becomes the canary of the system prompt (a scripted prompt leak).
     No match is a ``ModelError`` (a case must script every call)."""
 
@@ -153,6 +205,10 @@ class ScriptedModel:
         self.calls += 1
         for rule in self.rules:
             if self._matches(rule, system, user, json_schema):
+                if "error" in rule:
+                    raise {"SchemaError": SchemaError, "ModelUnavailable": ModelUnavailable}.get(
+                        rule["error"], ModelError
+                    )("scripted model error")
                 reply = json.dumps(rule["reply"])
                 if "{canary}" in reply:
                     found = re.search(r"CNY-[0-9a-f]{16}", system)

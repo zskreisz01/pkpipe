@@ -193,10 +193,13 @@ def validate_flow(
 
 
 #: Step types whose output is external data that no schema has validated (tool results, wait poll results,
-#: tool-using sessions that saw such results), plus the raw stages of secure fetch (spec 008): the fetched
+#: tool-using sessions that saw such results, the output of a category session plan (spec 010: its sessions
+#: read web search results and the page extract)), plus the raw stages of secure fetch (spec 008): the fetched
 #: page, the sanitized text and the Reader output (which quotes page text as evidence). Sessions with tools
 #: take the secure-fetch verdict's ``extract`` (or ``item.extract``) instead.
-UNVALIDATED_OUTPUT_TYPES = frozenset({"tool", "wait", "llm_tools", "fetch", "sanitize", "reader", "subflow"})
+UNVALIDATED_OUTPUT_TYPES = frozenset(
+    {"tool", "wait", "llm_tools", "fetch", "sanitize", "reader", "subflow", "session_plan"}
+)
 
 
 def _unvalidated_source(flow: Flow, ref: str, registry: StepRegistry) -> bool:

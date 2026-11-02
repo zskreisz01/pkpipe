@@ -1,0 +1,90 @@
+{
+  "id": "misc-suggests-new-category",
+  "source": "synthetic",
+  "description": "Misc item without web content: the evaluate session proposes a new category; the note is stored in the Misc folder and the suggestion is added to the agent tasks as a note (spec 010 US3).",
+  "input": {
+    "vault": {
+      "0-INBOX/sourdough.md": "Notes on feeding a sourdough starter twice a day with rye flour.\n"
+    },
+    "model": [
+      {
+        "reply": {
+          "title": "Sourdough starter",
+          "note": "Feed the starter twice a day.",
+          "suggestion": {
+            "name": "Recipes",
+            "triage_hint": "Cooking and baking instructions worth keeping."
+          }
+        },
+        "fields": [
+          "suggestion"
+        ]
+      },
+      {
+        "when": "sourdough",
+        "reply": {
+          "category": "misc",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/sourdough.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/sourdough.md": {
+        "state": "processed"
+      }
+    },
+    "files": {
+      "3-Resources/Misc/sourdough-starter-{id:0-INBOX/sourdough.md}.md": {
+        "contains": [
+          "# Sourdough starter",
+          "## Suggestion",
+          "Recipes"
+        ]
+      },
+      "2-Areas/Agent-Tasks/new-category-recipes-{id:0-INBOX/sourdough.md}.md": {
+        "contains": [
+          "type: agent_task",
+          "kind: new_category",
+          "Decide whether to add the category `recipes`",
+          "Cooking and baking instructions"
+        ]
+      },
+      "4-Archive/Inbox/{id:0-INBOX/sourdough.md}-sourdough.md": {
+        "contains": [
+          "sourdough starter"
+        ]
+      }
+    },
+    "processing": {
+      "0-INBOX/sourdough.md": {
+        "category": "misc",
+        "status": "done"
+      }
+    }
+  }
+}

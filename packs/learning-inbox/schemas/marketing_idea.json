@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "required": [
+    "idea",
+    "hook",
+    "why_it_works"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "idea": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "hook": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "why_it_works": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    }
+  }
+}

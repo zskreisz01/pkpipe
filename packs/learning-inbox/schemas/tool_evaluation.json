@@ -1,23 +1,39 @@
 {
   "type": "object",
   "required": [
+    "title",
     "summary",
     "alternatives",
     "fit_personal",
-    "recommendation"
+    "fit_enterprise",
+    "recommendation",
+    "justification"
   ],
+  "additionalProperties": false,
   "properties": {
+    "title": {
+      "type": "string",
+      "maxLength": 120
+    },
     "summary": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 800
     },
     "alternatives": {
       "type": "array",
+      "maxItems": 3,
       "items": {
-        "type": "string"
+        "type": "string",
+        "maxLength": 300
       }
     },
     "fit_personal": {
-      "type": "string"
+      "type": "string",
+      "maxLength": 600
+    },
+    "fit_enterprise": {
+      "type": "string",
+      "maxLength": 600
     },
     "recommendation": {
       "enum": [
@@ -26,6 +42,10 @@
         "assess",
         "hold"
       ]
+    },
+    "justification": {
+      "type": "string",
+      "maxLength": 400
     }
   }
 }

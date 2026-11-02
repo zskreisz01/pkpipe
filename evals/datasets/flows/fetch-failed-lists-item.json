@@ -1,0 +1,64 @@
+{
+  "id": "fetch-failed-lists-item",
+  "source": "synthetic",
+  "description": "A page that cannot be fetched (HTTP 404) is not a security flag: the item is listed as failed with the reason and stays in the INBOX (spec 010).",
+  "input": {
+    "vault": {
+      "0-INBOX/gone.md": "---\nsource: https://example.invalid/gone\n---\nA fictional tool page that no longer exists.\n"
+    },
+    "web": {},
+    "model": [
+      {
+        "when": "fictional tool",
+        "reply": {
+          "category": "tool",
+          "confidence": 0.9,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "confirm": [
+            "0-INBOX/gone.md"
+          ]
+        }
+      },
+      {
+        "run": "process_released"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/gone.md": {
+        "state": "processed"
+      }
+    },
+    "files": {
+      "0-INBOX/gone.md": {
+        "contains": [
+          "no longer exists"
+        ]
+      }
+    },
+    "processing": {
+      "0-INBOX/gone.md": {
+        "category": "tool",
+        "status": "failed",
+        "link": "the page could not be fetched"
+      }
+    }
+  }
+}

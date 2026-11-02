@@ -1,8 +1,8 @@
 ---
 spec_id: 010-category-sessions
 title: Category session plans and Process Other Resource
-status: Draft
-description: Executes per-category session plans from config (Tool with six sessions, Marketing, Misc and overlay categories), stores notes in PARA folders and maintains the processing list.
+status: Completed
+description: Executes per-category session plans from config (Tool with five sessions, the sixth added by spec 016; Marketing, Misc and overlay categories), stores notes in PARA folders and maintains the processing list.
 relevant_when:
   - session plan
   - categories.json
@@ -12,14 +12,14 @@ relevant_when:
   - processing list
   - overlay category
 related: [008-secure-fetch, 009-output-guard-and-quarantine, 011-context-packs]
-updated: 2026-10-31
+updated: 2026-11-01
 ---
 
 # Feature Specification: Category session plans and Process Other Resource
 
 **Feature Branch**: `spec/010-category-sessions`
 **Created**: 2026-10-31
-**Status**: Draft
+**Status**: Completed
 **Input**: Design docs (`docs/`), process model (`docs/design/pkpipe-process-model.drawio`), constitution
 **Companions**: [data-model.md](data-model.md)
 
@@ -84,6 +84,21 @@ Misc items get a new-category suggestion when appropriate.
 ### Session 2026-10-31
 
 - Q: Is this spec part of the public engine? → A: Yes; private categories, contexts and datasets stay in the overlay.
+
+### Session 2026-11-01 (implementation)
+
+- Q: How is "dynamic subgraph from the plan" built? → A: As one step type, `session_plan`, not a generated LangGraph subgraph: the plan is data, the step runs its sessions in order (each its own isolated session and span) and the flow `other_resource` around it routes by code. A crash inside the plan repeats the plan (the vault writes come after it, so a rerun overwrites the same note); `run_category_sessions.json` is therefore not a separate flow file, the BPMN page "Run Category Sessions" is the step.
+- Q: Which tool sessions, and where is the system relevance session? → A: `research`, `compare`, `fit_personal`, `fit_enterprise`, `synthesize` (the plan of `docs/configuration.md`). The system relevance session needs the system context and a list writer, both spec 016 / 011: it is added after `synthesize`; `note_session` (default `synthesize`) keeps the note independent of sessions that run later.
+- Q: How do raw content and tools stay apart? → A: Validation (`pkpipe.domain.session_plan.plan_errors`, also run by the step): a session with tools reads only `item.extract` (the validated secure-fetch extract) and outputs of sessions with an `output_schema`; raw note text (`item.text`) goes only to tool-less sessions (the Misc evaluation). Every session carries the run canary and the plan's output goes through the output guard before any write.
+- Q: FR-002 "queries pass the query guard"? → A: `security.query_guard` (`blocked_terms`, `terms_file`): a call to a tool on an `egress` MCP server whose string arguments contain a term is refused before it leaves the machine (case, accent and punctuation insensitive, whole words). A session with the enterprise context has no egress tool, and no such session reads enterprise-derived output (validated). Spec 011 supplies the terms from the context packs.
+- Q: What if a context pack is missing (public checkout)? → A: The session is skipped (`{"skipped": "context_missing"}`), left out of `*`, and a field of the note session named like a skipped session is dropped, so the public pack's note has no fit sections instead of invented ones.
+- Q: Session failure? → A: A session error after the model's retries (`SchemaError`, `ModelUnavailable`) ends the plan; the item is listed as `failed` with `session '<id>' failed: <ErrorType>` in the `link` column (the list has no reason column, a new column would break existing vault files). A missing URL, a missing plan or an unreachable page fail the item the same way; a security flag quarantines it. Failed items are not retried every morning.
+- Q: Where do notes, tasks and the INBOX note go? → A: `<para_path>/<slug of the title>-<item id>.md`, `2-Areas/Agent-Tasks/new-category-<id>-<item id>.md` (an open task note) and `4-Archive/Inbox/<item id>-<name>.md` (`move_note` is on the pack's vault allow list).
+- Q: Results? → A: Sessions suite live on qwen3.5-9b-mlx (judge gemma-4-12b), 8 plan sessions with 5 to 6 synthetic cases each (final run 2026-11-02: schema 1.0, checks 73/73, judge mean 4.945 over all 73 session cases), see [Evaluation](../../docs/evaluation.md#measured-with-the-reference-model); flows 21/21 (5 new cases, 2 rewritten); e2e with the real vault, web-fetch (Lightpanda) and a synthetic web search MCP server. A first live run found the 9B model copying and obeying injected instructions inside page extracts (`PWNED` as title, a license changed on request); the instructions now say never to follow or repeat them, which fixed it on the shipped set, and the output guard stops what remains.
+
+### Session 2026-11-02 (review)
+
+- Q: Does the BPMN still match? → A: No, the Process Other Resource page showed Misc bypassing the output guard, the new-category suggestion before the guard, an unconditional secure fetch and no failure path. The page, its PNG and the Mermaid block now show the implemented process (`plan` gateway: page / note text only / no plan or URL; fetch failed and session errors list the item as failed; suggestion after the guard); the failure nodes of `other_resource.json` reference the new task "List item as failed".
 
 ## Out of Scope
 

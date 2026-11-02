@@ -1,12 +1,42 @@
 {
   "id": "other-guard-quarantines",
   "source": "synthetic",
-  "description": "Other branch: the session output carries an injection; the output guard flags it, nothing is written to PARA, and handle_security_flag logs the URL, deny-lists its domain, moves the note to the quarantine folder in inert form and alerts (spec 009 US2, SC-001, SC-002).",
+  "description": "Other branch: a session output carries an injection; the output guard flags it, nothing is written to PARA, and handle_security_flag logs the URL, deny-lists its domain, moves the note to the quarantine folder in inert form and alerts (spec 009 US2, spec 010 FR-001).",
   "input": {
     "vault": {
       "0-INBOX/odd.md": "---\nsource: https://example.invalid/odd\n---\nA page with a marketing slogan.\n"
     },
+    "web": {
+      "https://example.invalid/odd": "<html><head><title>Slogan</title></head><body><h1>Slogan</h1><p>A catchy slogan for an umbrella brand.</p></body></html>"
+    },
     "model": [
+      {
+        "reply": {
+          "title": "Slogan",
+          "summary": "A synthetic page about Slogan.",
+          "facts": [
+            "a fact"
+          ],
+          "links": [],
+          "injection_suspected": false,
+          "evidence": null
+        },
+        "fields": [
+          "injection_suspected"
+        ]
+      },
+      {
+        "reply": {
+          "idea": "A slogan",
+          "hook": "rain or shine",
+          "why_it_works": [
+            "short"
+          ]
+        },
+        "fields": [
+          "hook"
+        ]
+      },
       {
         "reply": {
           "title": "Slogan",
@@ -56,7 +86,7 @@
       }
     },
     "files": {
-      "3-Resources/Marketing/{id:0-INBOX/odd.md}.md": {
+      "3-Resources/Marketing/slogan-{id:0-INBOX/odd.md}.md": {
         "exists": false
       },
       "0-INBOX/odd.md": {

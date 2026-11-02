@@ -179,15 +179,15 @@ def test_pairwise_comparison_runs_cases_concurrently_in_dataset_order(pack_dir, 
     cases = [
         {
             "id": f"s{i}",
-            "input": {"item.category": "tool", "read.body": f"case-{i} is a key-value store."},
+            "input": {"extract": f"case-{i} is a key-value store."},
             "expected": {"must_include": ["case"]},
         }
         for i in range(8)
     ]
-    paths = mini_evals(tmp_path / "evals", {"datasets/sessions/other_resource/summarize.jsonl": cases})
+    paths = mini_evals(tmp_path / "evals", {"datasets/sessions/marketing/synthesize.jsonl": cases})
     overlay = tmp_path / "ov"
-    (overlay / "instructions/other").mkdir(parents=True)
-    (overlay / "instructions/other/summarize.md").write_text("Write a crisp note.", encoding="utf-8")
+    (overlay / "instructions/marketing").mkdir(parents=True)
+    (overlay / "instructions/marketing/synthesize.md").write_text("Write a crisp note.", encoding="utf-8")
     write_json(overlay, "evals.json", {"concurrency": 4})
     current, draft = load_effective(pack_dir, None).snapshot(), load_effective(pack_dir, overlay).snapshot()
     flight = InFlight()

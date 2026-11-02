@@ -195,3 +195,46 @@ def test_backlog_reports_decisions_on_an_unconfigured_category_even_without_new_
     )
     only_old = CODE["triage.backlog"](_ctx(), triage={"rows": rows[2:]}, new_rows=[])
     assert only_old["notify"] is False and only_old["backlog"] == 1
+
+
+def test_finalize_lists_a_failed_item_with_its_reason_in_the_link_column():
+    """Spec 010 edge case: the processing list has no reason column, so a failed item's reason (a session
+    error, no URL) is shown in `link` as one clean line; a real link is never replaced."""
+    results = [
+        {
+            "status": "done",
+            "item": {
+                "id": "a",
+                "category": "tool",
+                "resource": "0-INBOX/a.md",
+                "processing_status": "failed",
+                "failure_reason": "session 'synthesize' failed:\nSchemaError " + "x" * 300,
+            },
+        },
+        {
+            "status": "done",
+            "item": {
+                "id": "b",
+                "category": "learning-material",
+                "resource": "0-INBOX/b.md",
+                "processing_status": "failed",
+                "failure_reason": "timeout",
+                "link": "http://127.0.0.1/nb-b",
+            },
+        },
+        {
+            "status": "done",
+            "item": {
+                "id": "c",
+                "category": "tool",
+                "resource": "0-INBOX/c.md",
+                "note": "3-Resources/Tools/c.md",
+                "failure_reason": "stale",
+            },
+        },
+    ]
+    rows = {r["item_id"]: r for r in CODE["triage.finalize"](_ctx(), results=results)["processing_rows"]}
+    assert rows["a"]["status"] == "failed" and "\n" not in rows["a"]["link"] and len(rows["a"]["link"]) == 200
+    assert rows["a"]["link"].startswith("session 'synthesize' failed: SchemaError")
+    assert rows["b"]["link"] == "http://127.0.0.1/nb-b"  # an existing link stays
+    assert rows["c"]["status"] == "done" and rows["c"]["link"] is None  # a reason only matters when failed

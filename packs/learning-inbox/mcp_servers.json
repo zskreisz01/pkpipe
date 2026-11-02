@@ -5,6 +5,7 @@
     "allow": [
       "read_note",
       "write_note",
+      "move_note",
       "list_folder",
       "read_triage",
       "update_triage",

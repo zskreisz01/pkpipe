@@ -53,6 +53,16 @@ Runs on every session output that originates from external content, before anyth
 
 The step's output holds flag names, detectors, reason codes and scores, never the checked text. Regression: the spec 008 review once saw the triage session leak its canary on the injection set; the guard now stops such a reply before the triage file is written (`canary_leaks_unguarded` = 0 is a gate, and a flow eval case covers it).
 
+## Category sessions
+
+The sessions of a category plan (spec 010, [Run Category Sessions](process/run-category-sessions.md)) follow the same rules as every session, with checks made by code at validation and at run time:
+
+- **Raw content only reaches tool-less sessions.** The Reader reads the page; the plan's sessions read its validated extract. Raw note text (`item.text`) goes only to a session without tools (the Misc evaluation); a session with tools reads only `item.extract` and the output of a session with an output schema (`pkpipe validate`).
+- **Every session carries the run's canary** and the output guard checks everything the plan produced before the note, the agent task or the list row is written; a flag quarantines the item.
+- **The enterprise context never goes to the web.** A session with the enterprise pack has no web search tool, no session that reads enterprise-derived output has one either, and every query of a session with tools passes the query guard (`security.query_guard`: client and project names, refused before the call leaves the machine).
+- **A missing context pack skips its session** instead of letting the model answer without the context it was written for.
+- **Failures never carry content.** A failed session lists `session '<id>' failed: <ErrorType>`, nothing the model or the page said.
+
 ## When something is flagged
 
 The flow calls [Handle Security Flag](process/handle-security-flag.md) for the item:

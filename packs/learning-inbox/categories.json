@@ -35,7 +35,8 @@
         ],
         "inputs": [
           "item.extract"
-        ]
+        ],
+        "output_schema": "tool_research"
       },
       {
         "id": "compare",
@@ -46,7 +47,8 @@
         ],
         "inputs": [
           "research"
-        ]
+        ],
+        "output_schema": "tool_comparison"
       },
       {
         "id": "fit_personal",
@@ -56,7 +58,19 @@
         "inputs": [
           "research",
           "compare"
-        ]
+        ],
+        "output_schema": "tool_fit"
+      },
+      {
+        "id": "fit_enterprise",
+        "system": "analyst",
+        "instruction": "tool/fit.md",
+        "context": "enterprise",
+        "inputs": [
+          "research",
+          "compare"
+        ],
+        "output_schema": "tool_fit"
       },
       {
         "id": "synthesize",
@@ -66,15 +80,6 @@
           "*"
         ],
         "output_schema": "tool_evaluation"
-      },
-      {
-        "id": "system_relevance",
-        "system": "analyst",
-        "instruction": "tool/system_relevance.md",
-        "context": "system",
-        "inputs": [
-          "synthesize"
-        ]
       }
     ]
   },
@@ -91,7 +96,8 @@
         "instruction": "marketing/extract.md",
         "inputs": [
           "item.extract"
-        ]
+        ],
+        "output_schema": "marketing_idea"
       },
       {
         "id": "synthesize",
@@ -99,7 +105,8 @@
         "instruction": "marketing/synthesize.md",
         "inputs": [
           "extract"
-        ]
+        ],
+        "output_schema": "resource_note"
       }
     ]
   },
@@ -115,8 +122,9 @@
         "system": "analyst",
         "instruction": "misc/evaluate.md",
         "inputs": [
-          "item"
-        ]
+          "item.text"
+        ],
+        "output_schema": "misc_evaluation"
       }
     ]
   }

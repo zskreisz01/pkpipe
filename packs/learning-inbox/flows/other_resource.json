@@ -1,13 +1,13 @@
 {
   "id": "other_resource",
-  "description": "Summarize the item in an isolated session without tools (run canary), pass the output guard, write the note into its PARA folder or hand the item to handle_security_flag (quarantine). Spec 010 replaces the single session with the category's session plan.",
+  "description": "Process one released item of a category with a session plan (Tool, Marketing, Misc, overlay categories): load the plan from categories.json, run secure fetch when a session reads the page extract (raw page text only reaches the Reader), run the sessions in plan order (spec 010; each is an isolated session with its declared inputs, the run canary and its own span), check everything they produced with the output guard, then store the note in the category's PARA folder, add a new-category suggestion to the agent tasks, set the processing-list status and archive the INBOX note. A flag hands the item to handle_security_flag; a failed session or fetch lists the item as failed with the reason.",
   "bpmn": "process-other-resource",
   "start": "read",
   "nodes": [
     {
       "id": "read",
       "type": "tool",
-      "bpmn_element": "Read item",
+      "bpmn_element": "Process other resource",
       "config": {
         "tool": "obsidian:read_note",
         "arguments": {
@@ -16,52 +16,133 @@
       }
     },
     {
-      "id": "summarize",
-      "type": "llm",
-      "bpmn_element": "Run category sessions",
-      "inputs": [
-        "item.category",
-        "read.body"
-      ],
+      "id": "plan",
+      "type": "code",
+      "bpmn_element": "Load category session plan (sessions, instructions, context)",
       "config": {
-        "system": "synthesizer",
-        "instruction": "other/summarize.md",
-        "output_schema": "resource_note",
-        "canary": true
+        "function": "category.plan",
+        "args": {
+          "note": "${read}"
+        }
+      }
+    },
+    {
+      "id": "no_plan",
+      "type": "code",
+      "bpmn_element": "List item as failed (reason in the processing list)",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "processing_status": "failed",
+          "failure_reason": "the category has no session plan"
+        }
+      }
+    },
+    {
+      "id": "no_url",
+      "type": "code",
+      "bpmn_element": "List item as failed (reason in the processing list)",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "processing_status": "failed",
+          "failure_reason": "no source URL in the note"
+        }
+      }
+    },
+    {
+      "id": "secure_fetch",
+      "type": "subflow",
+      "bpmn_element": "Secure fetch",
+      "config": {
+        "flow": "secure_fetch"
+      }
+    },
+    {
+      "id": "fetch_failed",
+      "type": "code",
+      "bpmn_element": "List item as failed (reason in the processing list)",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "processing_status": "failed",
+          "failure_reason": "the page could not be fetched"
+        }
+      }
+    },
+    {
+      "id": "run_sessions",
+      "type": "session_plan",
+      "bpmn_element": "Run category sessions",
+      "config": {
+        "category": "${item.category}",
+        "note_text": "${read.body}"
+      }
+    },
+    {
+      "id": "session_failed",
+      "type": "code",
+      "bpmn_element": "List item as failed (reason in the processing list)",
+      "config": {
+        "function": "category.session_failed",
+        "args": {
+          "error": "${error}"
+        }
       }
     },
     {
       "id": "guard",
       "type": "output_guard",
-      "bpmn_element": "Output guard",
+      "bpmn_element": "Output guard (canary, heuristics, Qwen3Guard + DeBERTa)",
       "config": {
         "input": [
-          "summarize"
+          "run_sessions"
         ]
       }
     },
     {
       "id": "security_flag",
       "type": "subflow",
-      "bpmn_element": "Handle security flag",
+      "bpmn_element": "Security flag",
       "config": {
         "flow": "handle_security_flag"
       }
     },
     {
+      "id": "note",
+      "type": "code",
+      "bpmn_element": "Store in Obsidian (PARA location by category)",
+      "config": {
+        "function": "category.note",
+        "args": {
+          "sessions": "${run_sessions}"
+        }
+      }
+    },
+    {
       "id": "write",
       "type": "tool",
-      "bpmn_element": "Write note",
+      "bpmn_element": "Store in Obsidian (PARA location by category)",
       "config": {
         "tool": "obsidian:write_note",
         "arguments": {
-          "path": "${item.para_path}/${item.id}.md",
-          "body": "# ${summarize.title}\n\n${summarize.note}\n",
-          "front_matter": {
-            "source": "${item.resource}",
-            "category": "${item.category}",
-            "pkpipe_item": "${item.id}"
-          },
+          "path": "${note.path}",
+          "body": "${note.body}",
+          "front_matter": "${note.front_matter}",
+          "overwrite": true
+        }
+      }
+    },
+    {
+      "id": "agent_task",
+      "type": "tool",
+      "bpmn_element": "Add new-category suggestion to agent tasks",
+      "config": {
+        "tool": "obsidian:write_note",
+        "arguments": {
+          "path": "${note.task_path}",
+          "body": "${note.task_body}",
+          "front_matter": "${note.task_front_matter}",
           "overwrite": true
         }
       }
@@ -69,12 +150,35 @@
     {
       "id": "record",
       "type": "code",
-      "bpmn_element": "Write note",
+      "bpmn_element": "Add to processing list (status = unprocessed)",
       "config": {
         "function": "item.set",
         "args": {
-          "note": "${item.para_path}/${item.id}.md",
+          "note": "${note.path}",
           "processing_status": "done"
+        }
+      }
+    },
+    {
+      "id": "archive",
+      "type": "tool",
+      "bpmn_element": "Archive item in INBOX",
+      "config": {
+        "tool": "obsidian:move_note",
+        "arguments": {
+          "src": "${item.path}",
+          "dst": "${note.archive_path}"
+        }
+      }
+    },
+    {
+      "id": "archive_failed",
+      "type": "code",
+      "bpmn_element": "Archive item in INBOX",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "archived": false
         }
       }
     }
@@ -82,11 +186,66 @@
   "edges": [
     {
       "from": "read",
-      "to": "summarize"
+      "to": "plan"
     },
     {
-      "from": "summarize",
+      "from": "plan",
+      "to": "no_plan",
+      "when": {
+        "path": "plan.status",
+        "eq": "no_plan"
+      }
+    },
+    {
+      "from": "plan",
+      "to": "no_url",
+      "when": {
+        "path": "plan.status",
+        "eq": "no_url"
+      }
+    },
+    {
+      "from": "plan",
+      "to": "secure_fetch",
+      "when": {
+        "path": "plan.needs_fetch",
+        "truthy": true
+      }
+    },
+    {
+      "from": "plan",
+      "to": "run_sessions",
+      "default": true
+    },
+    {
+      "from": "secure_fetch",
+      "to": "security_flag",
+      "when": {
+        "path": "item.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "secure_fetch",
+      "to": "run_sessions",
+      "when": {
+        "path": "item.fetch_status",
+        "eq": "clean"
+      }
+    },
+    {
+      "from": "secure_fetch",
+      "to": "fetch_failed",
+      "default": true
+    },
+    {
+      "from": "run_sessions",
       "to": "guard"
+    },
+    {
+      "from": "run_sessions",
+      "to": "session_failed",
+      "on": "error"
     },
     {
       "from": "guard",
@@ -98,12 +257,38 @@
     },
     {
       "from": "guard",
-      "to": "write",
+      "to": "note",
       "default": true
     },
     {
+      "from": "note",
+      "to": "write"
+    },
+    {
       "from": "write",
+      "to": "agent_task",
+      "when": {
+        "path": "note.has_task",
+        "truthy": true
+      }
+    },
+    {
+      "from": "write",
+      "to": "record",
+      "default": true
+    },
+    {
+      "from": "agent_task",
       "to": "record"
+    },
+    {
+      "from": "record",
+      "to": "archive"
+    },
+    {
+      "from": "archive",
+      "to": "archive_failed",
+      "on": "error"
     }
   ]
 }

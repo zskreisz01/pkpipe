@@ -14,6 +14,7 @@ from typing import Any
 
 from pydantic import Field
 
+from pkpipe.security import query_guard
 from pkpipe.security.canary import canary_notice, run_canary
 from pkpipe.steps.base import (
     StepConfig,
@@ -175,6 +176,18 @@ class LlmStep(StepExecutor):
         return StepResult(output=complete(ctx, config, with_canary(system, config, ctx), user, schema))
 
 
+def query_blocked(ctx: StepContext, tool: str, arguments: Any) -> bool:
+    """Spec 010 FR-002: a call to a tool on an ``egress`` server (web search) whose arguments contain a
+    blocked term (``security.query_guard``) is refused before it leaves the machine."""
+    servers = ctx.snapshot.data.get("mcp_servers") or {}
+    if not (servers.get(tool.partition(":")[0]) or {}).get("egress"):
+        return False
+    cfg = (ctx.snapshot.section("security", {}) or {}).get("query_guard") or {}
+    terms_file = cfg.get("terms_file")
+    terms = query_guard.blocked_terms(cfg, ctx.snapshot.asset(terms_file) if terms_file else None)
+    return query_guard.check_arguments(arguments, terms) is not None
+
+
 DECISION_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -233,9 +246,14 @@ class LlmToolsStep(StepExecutor):
                 )
                 transcript.append(f"Tool '{tool}' is not allowed. Allowed: {', '.join(config.tools)}.")
                 continue
+            arguments = decision.get("arguments") or {}
+            if query_blocked(ctx, tool, arguments):
+                ctx.ports.tracer.security_flag("query_guard", action="block", reason_code=query_guard.REASON)
+                transcript.append(f"The call to '{tool}' was blocked: the query is not allowed.")
+                continue
             calls += 1
             try:
-                result = call_tool(ctx, tool, decision.get("arguments") or {})
+                result = call_tool(ctx, tool, arguments)
                 text = _text(result)
             except Exception as exc:  # noqa: BLE001 - the model sees that the call failed, nothing more
                 text = f"error: {type(exc).__name__}"

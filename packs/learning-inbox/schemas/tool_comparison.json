@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "required": [
+    "alternatives"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "alternatives": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "license",
+          "cost",
+          "runs_locally",
+          "api",
+          "maturity"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "license": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "cost": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "runs_locally": {
+            "enum": [
+              "yes",
+              "no",
+              "unknown"
+            ]
+          },
+          "api": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "maturity": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      }
+    }
+  }
+}

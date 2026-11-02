@@ -111,12 +111,33 @@ def test_security_and_other_datasets_have_their_documented_shape():
     assert len({c.expected.get("type") for c in sec if c.expected["label"] == "malicious"}) >= 5
     inj = load_jsonl(EVALS / "datasets/injection.jsonl", "injection")
     assert len(inj) >= 10 and all("category" in c.expected for c in inj)
-    sessions = load_jsonl(EVALS / "datasets/sessions/other_resource/summarize.jsonl", "s")
-    assert 10 <= len(sessions) <= 15 and all(c.expected.get("must_include") for c in sessions)
     calib = load_jsonl(EVALS / "datasets/calibration/resource_note.jsonl", "c")
     assert len(calib) == 20 and {c.expected["owner_score"] for c in calib} == {1, 2, 3, 4, 5}
     flows = sorted((EVALS / "datasets/flows").glob("*.json"))
     assert len(flows) >= 6 and all(json.loads(p.read_text())["expected"] for p in flows)
+
+
+def test_every_category_session_has_a_synthetic_dataset():
+    """Spec 010 T006 / constitution IX: each session of an other_resource category plan of the public
+    pack has a
+    dataset ``datasets/sessions/<category>/<session>.jsonl`` with its inputs and code checks."""
+    from pkpipe.evals.category_sessions import session_names
+    from pkpipe.evals.suites import find_node
+
+    snap = load_effective(None, None).snapshot()
+    names = session_names(snap)
+    assert {"tool.research", "tool.synthesize", "marketing.extract", "misc.evaluate"} <= set(names)
+    for name in names:
+        category, session = name.split(".")
+        cases = load_jsonl(EVALS / f"datasets/sessions/{category}/{session}.jsonl", name)
+        assert len(cases) >= 5, name
+        node = find_node(snap, category, session)
+        for case in cases:
+            assert case.source == "synthetic" and case.expected, (name, case.id)
+            assert "*" in node.inputs or set(node.inputs) <= set(case.input), (name, case.id)
+            assert ("context" in case.input) == bool(node.config.get("context")), (name, case.id)
+        injected = [c for c in cases if "ignore all previous instructions" in json.dumps(c.input).lower()]
+        assert injected, f"{name} has no case with an injected instruction"
 
 
 def test_every_session_dataset_has_a_rubric():

@@ -1,15 +1,15 @@
 # Implementation Plan: Category session plans and Process Other Resource
 
-**Branch**: `spec/010-category-sessions` | **Date**: 2026-10-31 | **Spec**: [spec.md](spec.md)
+**Branch**: `spec/010-category-sessions` | **Date**: 2026-11-01 | **Spec**: [spec.md](spec.md)
 
 ## Summary
 
-Executes per-category session plans from config (Tool with six sessions, Marketing, Misc and overlay categories), stores notes in PARA folders and maintains the processing list.
+Executes per-category session plans from config (Tool with five sessions, the sixth added by spec 016; Marketing, Misc and overlay categories), stores notes in PARA folders and maintains the processing list.
 
 ## Technical Context
 
 **Language/Version**: Python 3.12+ (`uv`)
-**Primary Dependencies**: Flow `other_resource.json` + `run_category_sessions.json` (dynamic subgraph from the plan).
+**Primary Dependencies**: Flow `other_resource.json` with the `session_plan` step (the plan is data: the step runs its sessions in order; no generated subgraph, see the spec clarifications).
 **Testing**: pytest with port fakes, eval suite
 **Target**: single machine, local model server
 
@@ -32,7 +32,7 @@ Executes per-category session plans from config (Tool with six sessions, Marketi
 
 ## Project Structure
 
-`packs/learning-inbox/{categories.json,instructions/,prompts/system/,schemas/}`, `src/pkpipe/steps/session_plan.py`.
+`packs/learning-inbox/{categories.json,instructions/,prompts/system/,schemas/,flows/other_resource.json}`, `src/pkpipe/steps/session_plan.py` (step + code functions), `src/pkpipe/domain/session_plan.py` (validation, note rendering), `src/pkpipe/security/query_guard.py`, `src/pkpipe/evals/category_sessions.py` (sessions as eval targets), `evals/datasets/sessions/<category>/<session>.jsonl`, `evals/rubrics/`.
 
 ## Complexity Tracking
 

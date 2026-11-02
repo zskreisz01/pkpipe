@@ -23,6 +23,7 @@ from tests.support.pack_runtime import (
     FakeLearning,
     fake_model_reply,
     owner_decides,
+    synthetic_web,
     vault_tools,
 )
 
@@ -42,8 +43,10 @@ class World:
         self.model = FakeModel(fake_model_reply(replies))
         self.notify = FakeNotify(routes=PACK_ROUTES)
         self.tracer = RecordingTracer()
+        web = synthetic_web()
         ports = make_ports(
-            tools=vault_tools(vault, FakeLearning(polls_until_ready=0)),
+            tools=vault_tools(vault, FakeLearning(polls_until_ready=0), web),
+            resolver=web.resolve,
             model=self.model,
             notify=self.notify,
             tracer=self.tracer,
@@ -113,8 +116,8 @@ def test_override_category_is_used_and_each_item_runs_in_its_own_instance(world)
     run = world.svc.start("process_released")
     assert run.ok, run.error
     assert _states(world.vault) == {TOOL: "processed", VIDEO: "processed"}
-    assert (world.vault / "3-Resources/Misc" / f"{TOOL}.md").exists()  # override, not the suggested 'tool'
-    assert not (world.vault / "3-Resources/Tools" / f"{TOOL}.md").exists()
+    assert list((world.vault / "3-Resources/Misc").glob(f"*-{TOOL}.md"))  # override, not the suggested 'tool'
+    assert not list((world.vault / "3-Resources/Tools").glob(f"*-{TOOL}.md"))
     results = {r["item"]["id"]: r for r in run.outputs["process_item"]}
     assert set(results) == {TOOL, VIDEO} and results[TOOL]["item"]["category"] == "misc"
     assert world.notify.sent[-1].payload["processed"] == 2 and world.notify.sent[-1].payload["pending"] == 0
@@ -179,7 +182,7 @@ def test_category_removed_from_config_flags_an_undecided_item_for_retriage(world
     owner_decides(world.vault, confirm=[TOOL])
     assert world.svc.start("process_released").ok
     assert _states(world.vault)[TOOL] == "processed"
-    assert (world.vault / "3-Resources/Marketing" / f"{TOOL}.md").exists()
+    assert list((world.vault / "3-Resources/Marketing").glob(f"*-{TOOL}.md"))
 
 
 def test_confirmed_item_whose_category_was_removed_goes_back_to_the_owner(world):
@@ -205,7 +208,7 @@ def test_confirmed_item_whose_category_was_removed_goes_back_to_the_owner(world)
     owner_decides(world.vault, override={TOOL: "misc"})
     assert world.svc.start("process_released").ok
     assert _states(world.vault)[TOOL] == "processed"
-    assert (world.vault / "3-Resources/Misc" / f"{TOOL}.md").exists()
+    assert list((world.vault / "3-Resources/Misc").glob(f"*-{TOOL}.md"))
 
 
 def test_unchanged_unreviewed_backlog_alone_sends_no_evening_mail(world):

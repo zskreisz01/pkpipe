@@ -39,6 +39,7 @@ from pkpipe.domain import improvement as imp
 from pkpipe.domain.triage import ItemState, check_transition
 from pkpipe.engine.flow_models import FlowNode
 from pkpipe.engine.snapshot import ConfigSnapshot
+from pkpipe.evals.category_sessions import case_inputs, find_session, llm_config, with_context
 from pkpipe.evals.datasets import DatasetError, EvalPaths, load_json_case, load_jsonl
 from pkpipe.evals.judge import Judge, JudgeUnavailable, calibration_metrics, pairwise_score
 from pkpipe.evals.models import CaseResult, EvalCase, Level, Status, SuiteReport
@@ -53,7 +54,7 @@ from pkpipe.ports import ClassifierUnavailable, ModelError, ModelPort, SchemaErr
 from pkpipe.security.canary import canary_notice, leaked
 from pkpipe.security.guard import check_output
 from pkpipe.steps.flow_control import pattern_flags
-from pkpipe.steps.llm import LlmConfig, build_prompt
+from pkpipe.steps.llm import build_prompt
 from pkpipe.steps.secure_fetch import decide, reader_reply, sanitized_output, scan_page
 from pkpipe.steps.triage_code import category_menu, check_category, release_items, select_new
 from pkpipe.telemetry import attrs
@@ -138,8 +139,14 @@ def _rate(n: int, d: int) -> float:
 
 # -- LLM step helpers ----------------------------------------------------------------------------------------
 def find_node(snapshot: ConfigSnapshot, flow_id: str, node_id: str) -> FlowNode:
-    for node in snapshot.flow(flow_id).nodes:
-        if node.id == node_id:
+    """A node of a flow, or (spec 010) a session of the category ``flow_id``'s session plan."""
+    if flow_id in (snapshot.data.get("flows") or {}):
+        for node in snapshot.flow(flow_id).nodes:
+            if node.id == node_id:
+                return node
+    else:
+        node = find_session(snapshot, flow_id, node_id)
+        if node is not None:
             return node
     raise KeyError(f"flow '{flow_id}' has no node '{node_id}'")
 
@@ -150,7 +157,7 @@ def step_fingerprint(snapshot: ConfigSnapshot, flow_id: str, node_id: str) -> st
         node = find_node(snapshot, flow_id, node_id)
     except KeyError:
         return _hash(flow_id, node_id, None)
-    cfg = LlmConfig.model_validate(node.config)
+    cfg = llm_config(node)
     assets = [f"prompts/system/{cfg.system}.md"]
     if cfg.instruction:
         assets.append(f"instructions/{cfg.instruction}")
@@ -183,7 +190,7 @@ def run_step(
     Traced as a step span with the standard attributes (constitution X: ``flow.id``, ``step.id``,
     ``bpmn.element``, ``config.version``; ``run.trigger`` = ``eval``) so the LLM call below it is attributable
     to the session under test; content capture stays off (no flow run allows it)."""
-    cfg = LlmConfig.model_validate(node.config)
+    cfg = llm_config(node)
     system, user, schema = build_prompt(cfg, SimpleNamespace(snapshot=snapshot, inputs=inputs))
     if cfg.canary:
         if not canary:
@@ -394,9 +401,7 @@ def session_rubric(paths: EvalPaths, snapshot: ConfigSnapshot, target: SessionTa
     rubric = paths.rubric(target.name)
     if rubric is None:
         try:
-            schema = LlmConfig.model_validate(
-                find_node(snapshot, target.flow, target.node).config
-            ).output_schema
+            schema = llm_config(find_node(snapshot, target.flow, target.node)).output_schema
         except KeyError:
             return None
         rubric = paths.rubric(schema) if schema else None
@@ -425,7 +430,8 @@ class SessionsSuite(Suite):
         """The session's reply and schema. A ``reader`` and a ``canary: true`` session get their canary like
         in a run (deterministic per case so cassettes replay); a leaked canary is a ``canary_leak`` case."""
         node = find_node(snapshot, target.flow, target.node)
-        inputs = {k: v for k, v in case.input.items() if k in node.inputs}
+        inputs = case_inputs(node, case.input)
+        snapshot = with_context(snapshot, node, case.input)
         canary = case_canary(case.id)
         if node.type == "reader":
             reply, schema = run_step(
@@ -785,15 +791,17 @@ class FlowsSuite(Suite):
                 Path(tmp) / "security" / "deny_list.txt",
                 seed=snapshot.asset(deny_rel) if deny_rel else None,
             )
+            web = flowkit.ScriptedWeb(inp.get("web") or {}, down=bool(inp.get("web_down")))
             ports = StepPorts(
                 clock=clock,
                 tracer=OtelTracer(),
                 model=flowkit.ScriptedModel(inp.get("model", [])),
-                tools=flowkit.VaultTools(vault, learning),
+                tools=flowkit.VaultTools(vault, learning, web),
                 notify=notify,
                 extra={
                     "classifier": flowkit.ScriptedClassifier(**(inp.get("classifier") or {})),
                     "security_log": security_log,
+                    "resolver": web.resolve,
                 },
             )
             service = RunService(
