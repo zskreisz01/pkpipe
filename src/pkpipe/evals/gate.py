@@ -25,6 +25,7 @@ from opentelemetry import trace
 
 from pkpipe.engine.config_models import EvalsConfig
 from pkpipe.engine.snapshot import ConfigSnapshot
+from pkpipe.evals.category_sessions import session_names
 from pkpipe.evals.datasets import EvalPaths
 from pkpipe.evals.judge import JudgeUnavailable
 from pkpipe.evals.models import EvalRun
@@ -94,12 +95,17 @@ def threshold_regressions(old: EvalsConfig, new: EvalsConfig) -> list[str]:
 
 
 def llm_steps(snapshot: ConfigSnapshot) -> list[str]:
-    """``flow.node`` of every LLM step."""
+    """``flow.node`` of every LLM step and ``category.session`` of every category plan session (spec 010)."""
     return sorted(
-        f"{fid}.{node.id}"
-        for fid, flow in snapshot.flows().items()
-        for node in flow.nodes
-        if node.type in LLM_STEP_TYPES
+        {
+            *(
+                f"{fid}.{node.id}"
+                for fid, flow in snapshot.flows().items()
+                for node in flow.nodes
+                if node.type in LLM_STEP_TYPES
+            ),
+            *session_names(snapshot),
+        }
     )
 
 

@@ -1,5 +1,6 @@
 """Step executors (spec 005): llm, llm_tools, tool, code, notify, subflow, wait, guard; spec 008 adds fetch,
-sanitize and reader; spec 009 adds output_guard and the security-flag code functions.
+sanitize and reader; spec 009 adds output_guard and the security-flag code functions;
+spec 010 adds session_plan.
 
 Importing this package registers the built-in step types in :data:`STEPS` and the built-in ``code``
 functions in :data:`CODE`. Later specs add a step type by defining a :class:`StepExecutor` subclass with
@@ -40,6 +41,7 @@ BUILTIN_MODULES = (
     "pkpipe.steps.learning_code",
     "pkpipe.steps.output_guard",
     "pkpipe.steps.security_code",
+    "pkpipe.steps.session_plan",
 )
 
 for _module in BUILTIN_MODULES:

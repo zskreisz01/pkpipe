@@ -221,6 +221,13 @@ class Category(_Strict):
     para_path: str
     triage_hint: str
     sessions: list[Session] = Field(default_factory=list)
+    note_session: str | None = Field(
+        default=None,
+        description="Session whose validated output becomes the stored note (spec 010); default "
+        "'synthesize', "
+        "else the last session. Later sessions (for example spec 016's system relevance) run after it "
+        "without changing the note",
+    )
     enabled: bool = True
 
     @model_validator(mode="after")
@@ -315,10 +322,22 @@ class UrlFilter(_Strict):
     deny_list: str | None = None
 
 
+class QueryGuard(_Strict):
+    """``security.query_guard`` (spec 010 FR-002): terms (client and project names) that no web query of a
+    session with tools may contain."""
+
+    blocked_terms: list[str] = Field(default_factory=list)
+    terms_file: str | None = Field(
+        default=None,
+        description="Asset with one blocked term per line (for example contexts/blocked_terms.txt)",
+    )
+
+
 class SecurityConfig(_Strict):
     classifier: ClassifierSettings
     heuristics: Heuristics = Field(default_factory=Heuristics)
     output_guard: OutputGuard = Field(default_factory=OutputGuard)
+    query_guard: QueryGuard = Field(default_factory=QueryGuard)
     canary: Canary
     url_filter: UrlFilter
     quarantine_dir: str

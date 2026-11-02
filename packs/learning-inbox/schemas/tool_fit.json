@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "required": [
+    "fit",
+    "replaces",
+    "adoption_cost"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "fit": {
+      "type": "string",
+      "maxLength": 600
+    },
+    "replaces": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "adoption_cost": {
+      "type": "string",
+      "maxLength": 300
+    }
+  }
+}

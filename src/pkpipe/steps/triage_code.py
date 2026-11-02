@@ -253,14 +253,18 @@ def finalize(ctx: StepContext, results: list[dict[str, Any]]) -> dict[str, Any]:
             continue
         triage_rows.append({"item_id": item["id"], "state": ItemState.PROCESSED.value})
         counts["processed"] += 1
+        status = item.get("processing_status", "done")
+        link = item.get("link")
+        if status == "failed" and not link and item.get("failure_reason"):
+            link = " ".join(str(item["failure_reason"]).split())[:200]  # the list has no reason column
         processing_rows.append(
             {
                 "item_id": item["id"],
                 "category": item.get("category", ""),
                 "obsidian_link": item.get("note") or item.get("resource", ""),
                 "nb_id": item.get("nb_id"),
-                "link": item.get("link"),
-                "status": item.get("processing_status", "done"),
+                "link": link,
+                "status": status,
             }
         )
     return {
