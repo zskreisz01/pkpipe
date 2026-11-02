@@ -135,6 +135,12 @@ def _doctor(args: argparse.Namespace) -> int:
     return doctor_command(args)
 
 
+def _candidates(args: argparse.Namespace) -> int:
+    from pkpipe.candidates_cli import candidates_command
+
+    return candidates_command(args)
+
+
 def _serve(args: argparse.Namespace) -> int:
     from pkpipe.serve import serve_command
 
@@ -153,6 +159,7 @@ HANDLERS: dict[str, Handler] = {
     "runs": _runs,
     "eval": _eval,
     "doctor": _doctor,
+    "candidates": _candidates,
     "validate": _validate,
     "schema": _schema,
 }
@@ -191,6 +198,10 @@ def build_parser() -> argparse.ArgumentParser:
     from pkpipe.system.cli import add_arguments as add_doctor_arguments
 
     add_doctor_arguments(doc)
+    cand = sub.add_parser("candidates", help="system tool candidates: list, A/B spike, ADR, status")
+    from pkpipe.candidates_cli import add_arguments as add_candidate_arguments
+
+    add_candidate_arguments(cand)
     val = sub.add_parser("validate", help="validate the layered config (pack + overlay)")
     val.add_argument("--pack", help="pack directory (default: packs/learning-inbox or PKPIPE_PACK_DIR)")
     val.add_argument("--overlay", help="overlay directory (default: PKPIPE_OVERLAY_DIR)")
