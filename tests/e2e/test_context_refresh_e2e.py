@@ -120,6 +120,23 @@ def test_a_manual_edit_survives_the_next_weekly_run_and_the_diff_is_proposed(ser
     assert code == 0 and not [w for w in listing["warnings"] if "personal" in w]
 
 
+def test_a_missing_enterprise_folder_through_the_real_server_gives_the_empty_pack(served, capsys, stubbed):
+    """Edge case "no project notes": the real MCP server reports the missing folder; the scope writes the
+    empty pack with a warning instead of failing (only an unreachable vault fails a scope)."""
+    import shutil
+
+    vault, overlay, db = served
+    shutil.rmtree(vault / "1-Projects/Enterprise")
+    notify = stubbed(ContextModel())
+
+    code, out = _run(capsys, "run", "context_refresh", "--overlay", str(overlay), "--db", str(db), "--json")
+
+    assert code == 0 and out["status"] == "done", out
+    assert "No project notes were found" in (overlay / "contexts/enterprise.md").read_text(encoding="utf-8")
+    assert "Homelab" in (overlay / "contexts/personal.md").read_text(encoding="utf-8")
+    assert "enterprise: no project notes found" in notify.sent[-1].message
+
+
 def test_the_refresh_is_scheduled_for_sunday_19_00_and_runnable_on_demand(capsys):
     code = main(["validate", "--json"])
     assert code == 0

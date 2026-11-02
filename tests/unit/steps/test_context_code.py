@@ -288,6 +288,36 @@ def test_write_appends_new_terms_to_the_query_guard_file_and_keeps_the_packs_hea
     assert store.files[TERMS].count("# added by context_refresh on 2026-11-01") == 1
 
 
+def test_two_enterprise_scopes_written_in_parallel_keep_both_names_in_the_terms_file():
+    """US2: scopes run in parallel (``max_parallel``); the read-merge-write of the shared terms file must not
+    lose the names of one scope, or its web queries would no longer be blocked."""
+    import threading
+    import time
+
+    class SlowStore(FakeContextStore):
+        def read(self, relative):
+            text = super().read(relative)
+            time.sleep(0.05)  # widen the window between read and write
+            return text
+
+    store = SlowStore()
+    packs = [
+        built(name="ent_a", kind="enterprise", terms=[{"term": CLIENT, "kind": "client"}]),
+        built(name="ent_b", kind="enterprise", terms=[{"term": PROJECT, "kind": "project"}]),
+    ]
+    threads = [
+        threading.Thread(target=CODE["context.write"], args=(ctx(store=store),), kwargs={"pack": p})
+        for p in packs
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    terms = query_guard.parse_terms(store.files[TERMS])
+    assert CLIENT in terms and PROJECT in terms
+
+
 def test_terms_are_stored_even_when_the_owner_edited_the_pack():
     store = FakeContextStore({"contexts/personal.md": "# my own pack"})
     CODE["context.write"](ctx(store=store), pack=built(terms=[{"term": CLIENT, "kind": "client"}]))
@@ -352,7 +382,24 @@ def test_summary_reports_failures_and_warnings():
     warned = result(
         "personal", {"name": "personal", "status": "created", "warnings": ["the summary names no project"]}
     )
-    out = CODE["context.summary"](ctx(), results=[warned, failed])
+    out = CODE["context.summary"](ctx(store=FakeContextStore()), results=[warned, failed])
     assert out["failed"] == 1 and out["total"] == 3
-    assert "enterprise: failed (StepError: boom)" in out["message"]
+    assert "enterprise: failed (StepError, details in run r)" in out["message"]
     assert "personal: the summary names no project" in out["message"]
+    assert "PKPIPE_OVERLAY_DIR" not in out["message"]
+
+
+def test_summary_never_quotes_the_error_message_of_a_failed_scope():
+    """US2: the notification leaves the machine; a failed session's message can quote the notes (a schema
+    violation quotes the value), so only the error type is reported."""
+    message = f"schema violation at projects/0/name: '{CLIENT} ledger for {PERSON}' is too long"
+    failed = result("enterprise", status="failed", error={"type": "SchemaError'<x>", "message": message})
+    out = CODE["context.summary"](ctx(store=FakeContextStore()), results=[failed])
+    assert out["failed"] == 1 and "enterprise: failed (SchemaErrorx, details in run r)" in out["message"]
+    assert CLIENT not in out["message"] and PERSON not in out["message"] and "too long" not in out["message"]
+
+
+def test_summary_names_the_overlay_when_the_store_is_missing():
+    failed = result("personal", status="failed", error={"type": "StepFailed", "message": "x"})
+    out = CODE["context.summary"](ctx(), results=[failed])
+    assert "PKPIPE_OVERLAY_DIR" in out["message"]

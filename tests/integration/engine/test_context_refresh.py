@@ -203,6 +203,28 @@ def test_a_failing_scope_does_not_stop_the_other_and_is_reported(vault, pack_dir
     assert "enterprise: failed" in sent.message and "personal: created" in sent.message
 
 
+def test_a_failed_enterprise_session_does_not_quote_the_notes_in_the_notification(vault, pack_dir):
+    """US2: a session whose output breaks the schema fails its scope; the error (which quotes the offending
+    value) stays in the local run, the notification carries only its type."""
+
+    class Broken(ContextModel):
+        def __call__(self, system, user, schema=None):
+            out = super().__call__(system, user, schema)
+            if self.kinds[-1] == "enterprise":
+                out["projects"][0]["name"] = f"{CLIENT} {PROJECT} {PERSON} " * 40  # too long for the schema
+            return out
+
+    svc, _, notify, store = _runtime(vault, pack_dir, Broken())
+
+    run = svc.start("context_refresh")
+
+    assert run.ok, run.error
+    assert "contexts/enterprise.md" not in store.files
+    [sent] = notify.sent
+    assert "enterprise: failed" in sent.message
+    assert not any(n.lower() in sent.message.lower() for n in PRIVATE), sent.message
+
+
 def test_a_summary_that_carries_instructions_is_not_written(vault, pack_dir):
     class Injected(ContextModel):
         def __call__(self, system, user, schema=None):

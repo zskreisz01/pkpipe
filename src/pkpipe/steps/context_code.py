@@ -11,6 +11,7 @@ content capture) and every function checks that again when it runs.
 from __future__ import annotations
 
 import re
+import threading
 from datetime import UTC, datetime
 from typing import Any
 
@@ -27,6 +28,9 @@ PACK_RE = re.compile(r"[a-z][a-z0-9_-]*")
 RESERVED_PACKS = frozenset({"system"})
 DEFAULT_REVIEW_FOLDER = "2-Areas/Context-Review"
 MAX_NOTES = 60  # what read_notes accepts
+#: Scopes run in parallel and share the query guard's terms file: its read-merge-write is serialized, or one
+#: scope's names would be lost (and its web queries no longer blocked).
+_TERMS_LOCK = threading.Lock()
 
 
 def _private(ctx: StepContext) -> None:
@@ -275,12 +279,13 @@ def write(ctx: StepContext, pack: dict[str, Any], review_folder: str = DEFAULT_R
         )
     elif terms and terms_path:
         day = datetime.fromtimestamp(ctx.ports.clock.now(), UTC).date().isoformat()
-        current = store.read(terms_path)
-        text, added = cp.merge_terms_file(
-            current if current is not None else ctx.snapshot.asset(terms_path), terms, day
-        )
-        if added:
-            store.write(terms_path, text)
+        with _TERMS_LOCK:
+            current = store.read(terms_path)
+            text, added = cp.merge_terms_file(
+                current if current is not None else ctx.snapshot.asset(terms_path), terms, day
+            )
+            if added:
+                store.write(terms_path, text)
     result = cp.merge_pack(store.read(path), str(pack["body"]))
     proposed_path = path + cp.PROPOSED_SUFFIX
     if result.status in ("created", "updated"):
@@ -320,12 +325,15 @@ _PHRASE = {
 
 @register_code("context.summary", data_class=DATA_CLASS)
 def summary(ctx: StepContext, results: list[dict[str, Any]]) -> dict[str, Any]:
-    """Counts and where to look; never the pack text, a diff or a name."""
+    """Counts and where to look; never the pack text, a diff or a name. A failed scope is reported by its
+    error type only: the message of a failed session or tool can quote the notes (a schema violation quotes
+    the offending value) and the notification leaves the machine; the full error stays in the local run."""
     _private(ctx)
     parts: list[str] = []
     warnings: list[str] = []
     review: list[str] = []
     changed = failed = 0
+    no_overlay = STORE_PORT not in ctx.ports.extra
     for r in results or []:
         item = r.get("item") or {}
         pack = item.get("built") if isinstance(item.get("built"), dict) else None
@@ -333,7 +341,8 @@ def summary(ctx: StepContext, results: list[dict[str, Any]]) -> dict[str, Any]:
         if r.get("status") != "done" or pack is None:
             failed += 1
             err = r.get("error") or {}
-            parts.append(f"{scope}: failed ({err.get('type', 'error')}: {str(err.get('message', ''))[:160]})")
+            err_type = re.sub(r"[^A-Za-z0-9_.]", "", str(err.get("type") or "error"))[:60] or "error"
+            parts.append(f"{scope}: failed ({err_type}, details in run {ctx.run.run_id})")
             continue
         status = pack["status"]
         changed += status != "unchanged"
@@ -349,4 +358,6 @@ def summary(ctx: StepContext, results: list[dict[str, Any]]) -> dict[str, Any]:
             message += " Warnings: " + "; ".join(warnings) + "."
         if review:
             message += " Review the diff in " + ", ".join(review) + "."
+        if failed and no_overlay:
+            message += " Context packs are written to the private config overlay: set PKPIPE_OVERLAY_DIR."
     return {"total": total, "changed": changed, "failed": failed, "warnings": warnings, "message": message}

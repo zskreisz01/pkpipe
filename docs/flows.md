@@ -115,7 +115,9 @@ The processing list has no reason column: a failed item shows its reason in the 
 | `assemble_personal`, `assemble_enterprise`, `assemble_empty` | `context.assemble`: renders the pack within `max_tokens`, enterprise: scrub and verify the names, refuse a pack that trips the injection heuristics. `assemble_empty` (no folder, no note) renders the empty pack with a warning |
 | `write`, `review` | `context.write` (terms file first, then the pack or the proposal, see [Configuration](configuration.md#weekly-refresh-spec-011)) and the review note `2-Areas/Context-Review/<pack>.md` through `obsidian:write_note` (only when something changed) |
 
-Writing needs the private overlay (`PKPIPE_OVERLAY_DIR` or `--overlay`): the `context_store` port writes `<overlay>/contexts/` and `<overlay>/security/` only, and a run without an overlay fails its scopes with a message naming it.
+Writing needs the private overlay (`PKPIPE_OVERLAY_DIR` or `--overlay`): the `context_store` port writes `<overlay>/contexts/` and `<overlay>/security/` only, and a run without an overlay fails its scopes and the notification names the variable.
+
+The notification (`context.summary`) carries counts, statuses, warnings and the review note paths, never pack text, a diff or a name. A failed scope is reported by its error type and run id only: the message of a failed session can quote the notes (a schema violation quotes the offending value), so it stays in the local run.
 
 ### Triage and release (spec 007)
 

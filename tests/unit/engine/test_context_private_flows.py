@@ -137,3 +137,26 @@ def test_the_shipped_flow_json_declares_the_class():
     for fid in FLOWS:
         text = json.loads(open(f"packs/learning-inbox/flows/{fid}.json").read())
         assert text["data_classes"] == ["context"]
+
+
+def test_a_run_also_checks_the_sessions_of_nested_subflows(base):
+    """At run time the refresh checks the sessions of every static subflow below it, also two levels down:
+    an env-only remote profile used by a session in a subflow of ``context_pack`` stops the refresh."""
+
+    def edit(d):
+        url = "env:PKPIPE_NESTED_URL|http://localhost:9/v1"
+        d["models"]["nested_remote"] = {"base_url": url, "model": "m"}
+        d["flows"]["context_inner"] = {
+            **copy.deepcopy(d["flows"]["context_pack"]),
+            "id": "context_inner",
+        }
+        node(d, "context_inner", "summarize_personal")["config"]["profile"] = "nested_remote"
+        d["flows"]["context_pack"]["nodes"].append(
+            {"id": "inner", "type": "subflow", "config": {"flow": "context_inner"}}
+        )
+
+    snap = changed(base, edit)
+    environ = {"PKPIPE_NESTED_URL": "https://api.example.invalid/v1"}
+    found = private_data_errors(snap.flow("context_refresh"), snap, environ)
+    assert any("context_inner.summarize_personal" in e and "nested_remote" in e for e in found), found
+    assert private_data_errors(snap.flow("context_refresh"), snap, {}) == []
