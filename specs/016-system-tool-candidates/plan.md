@@ -32,7 +32,7 @@ A sixth Tool session checks whether an evaluated tool could improve pkpipe itsel
 
 ## Project Structure
 
-`packs/learning-inbox/instructions/tool/system_relevance.md`, `docs/adr/`.
+`packs/learning-inbox/instructions/tool/system_relevance.md`, `packs/learning-inbox/contexts/system.md`, `src/pkpipe/domain/tool_candidate.py`, `src/pkpipe/obsidian/tool_candidates.py`, `src/pkpipe/evals/ab.py`, `src/pkpipe/candidates_cli.py`, `docs/decisions/` (the ADR directory, `template.md`).
 
 ## Complexity Tracking
 
