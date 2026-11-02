@@ -7,6 +7,8 @@ __pycache__/
 *.sqlite
 overlay/
 contexts/
+# the public pack ships its system context (spec 011 FR-003); private packs stay ignored
+!packs/learning-inbox/contexts/
 
 # Docusaurus
 node_modules/

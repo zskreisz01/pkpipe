@@ -1,0 +1,1 @@
+Components: flow engine (LangGraph), FastAPI UI, scheduler (APScheduler), SQLite state, MCP servers (obsidian-vault, web-search, web-fetch/Lightpanda, learning-gateway), model server (OpenAI-compatible), guards (Qwen3Guard, ProtectAI DeBERTa injection classifier, canary and output guard), notifiers (Discord, Teams, Apprise), telemetry (OTLP -> Langfuse/Phoenix).
