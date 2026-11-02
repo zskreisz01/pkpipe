@@ -122,12 +122,13 @@ C4Component
         Component(steps, "Step executors", "core", "llm, llm_tools, tool, code, notify, wait, subflow")
         Component(triage, "Triage domain", "core", "Item states, release rule")
         Component(reg, "Config registry", "core", "Layers, validation, hot reload")
-        Component(ports, "Ports", "Protocols", "ModelPort, ToolPort, NotifyPort, StatePort, ConfigPort")
+        Component(ports, "Ports", "Protocols", "ModelPort, ToolPort, NotifyPort, StatePort, ConfigPort, SystemProbePort")
         Component(aopenai, "OpenAI client", "adapter", "ModelPort")
         Component(amcp, "MCP client", "adapter", "ToolPort")
         Component(anotify, "Notifiers", "adapter", "NotifyPort: Discord, Teams, Apprise")
         Component(asqlite, "SQLite repo", "adapter", "StatePort + checkpointer")
         Component(agit, "Git store", "adapter", "ConfigPort")
+        Component(aprobe, "System probe", "adapter", "SystemProbePort: sysctl, vm_stat, pmset, ps, LM Studio")
     }
     Rel(rest, run, "calls")
     Rel(appmcp, run, "calls")
@@ -144,6 +145,7 @@ C4Component
     Rel(anotify, ports, "implements")
     Rel(asqlite, ports, "implements")
     Rel(agit, ports, "implements")
+    Rel(aprobe, ports, "implements")
 ```
 
 Dependencies point inwards: inbound adapters call the core, the core knows only the ports, outbound adapters implement the ports.
@@ -163,6 +165,9 @@ Dependencies point inwards: inbound adapters call the core, the core knows only 
 | Notifiers | `pkpipe.adapters.notify_*` | `httpx`, `apprise` | New channel = new adapter |
 | SQLite repo | `pkpipe.adapters.state_sqlite` | `langgraph-checkpoint-sqlite` | Can move to Postgres |
 | Tracer | `pkpipe.adapters.tracer_otel` | `pkpipe.telemetry` (OpenTelemetry) | TracerPort; the core never imports OpenTelemetry |
+| System preflight policy | `pkpipe.domain.system` | Nothing (pure Python, `evals.preflight` thresholds) | – |
+| System probe | `pkpipe.adapters.system_probe` | `sysctl`, `vm_stat`, `pmset`, `ps`, `/proc`, LM Studio REST / `lms` | SystemProbePort; another OS = another probe |
+| System preflight service | `pkpipe.system` | SystemProbePort, `pkpipe.telemetry` | `pkpipe doctor`, `pkpipe eval`, live-test sampler |
 | Composition root | `pkpipe.app` | All adapters | Chooses the adapter per port |
 | Git store | `pkpipe.adapters.config_git` | `git` | Can move to plain files |
 
