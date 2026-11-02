@@ -18,13 +18,25 @@ from functools import cache
 from pathlib import Path
 
 REPO_DEPLOY = Path(__file__).resolve().parents[2] / "deploy" / "open-notebook"
+PACK_DIR = Path(__file__).resolve().parents[2] / "packs" / "learning-inbox"
 DEFAULT_BASE_URL = "http://127.0.0.1:1234/v1"
 DEFAULT_MODEL = "qwen3.5-9b-mlx"
 DEFAULT_JUDGE_MODEL = "google/gemma-4-12b"
-#: Eval requests in flight in live tests (``EvalRunner(concurrency=...)``): LM Studio serves them with
-#: parallel predictions (``scripts/lmstudio-test-setup.sh`` loads both models with ``--parallel 4``).
-#: Production runs default to ``evals.concurrency`` = 1.
+#: The most eval requests in flight in live tests: LM Studio serves them with parallel predictions
+#: (``scripts/lmstudio-test-setup.sh`` loads both models with ``--parallel 4``). The session's system
+#: preflight may lower it (:func:`eval_concurrency`). Production runs default to ``evals.concurrency`` = 1.
 LIVE_EVAL_CONCURRENCY = 4
+
+
+def eval_concurrency() -> int:
+    """Eval requests in flight for the next live eval (``EvalRunner(concurrency=...)``): the current system
+    preflight decision (tests/support/preflight.py), else :data:`LIVE_EVAL_CONCURRENCY`."""
+    from tests.support import preflight
+
+    decision = preflight.session.decision
+    if decision is None or decision.concurrency < 1:
+        return LIVE_EVAL_CONCURRENCY
+    return min(LIVE_EVAL_CONCURRENCY, decision.concurrency)
 
 
 def model_base_url() -> str:

@@ -27,7 +27,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir ([Secure fetch](#secure-fetch)) |
 | `security/deny_list.txt` | Deny-list of the URL filter: one domain per line (subdomains included), `#` comments |
 | `security/query_guard_terms.txt` | Terms no web query may contain (`security.query_guard.terms_file`): one per line, `#` comments; the overlay's copy is maintained by `context_refresh` (names of the enterprise notes are appended, nothing is ever removed) |
-| `evals.json` | Eval gates per suite (`min` / `max` per metric), judge profile, pairwise and calibration limits, `concurrency` (eval requests in flight, default 1; `pkpipe eval --concurrency N` overrides it) ([Evaluation](evaluation.md)). Thresholds only move upwards |
+| `evals.json` | Eval gates per suite (`min` / `max` per metric), judge profile, pairwise and calibration limits, `concurrency` (eval requests in flight, default 1; `pkpipe eval --concurrency N` overrides it), `preflight` (system preflight thresholds, [below](#system-preflight)) ([Evaluation](evaluation.md)). Thresholds only move upwards |
 | `telemetry.json` | Prompt/response content capture per flow (`capture_content.flows`); journal and context flows are always off. Exporters come from `OTEL_*` env ([operations](operations.md)) |
 | `flows/*.json` | Graph: nodes, edges, conditions, subflow calls ([Flows](flows.md)) |
 | `steps/*.json` | Defaults per step type: model profile, output schema, retry |
@@ -105,7 +105,7 @@ Steps name a profile (`default`, `judge`), never an endpoint. The `judge` profil
 | `temperature` | Sampling temperature (0 to 2) | 0.2 |
 | `max_tokens` | Output cap | server default |
 | `context` | Context window in tokens. A prompt that certainly cannot fit (more than 6 characters per token) is refused with `ContextOverflow` before sending; a server-reported overflow raises the same error. Never truncated silently | none |
-| `timeout_s` | Request timeout | 120 |
+| `timeout_s` | Request timeout; scaled by the [system preflight](#system-preflight)'s timeout multiplier (`PKPIPE_MODEL_TIMEOUT_MULTIPLIER`, 1-10) on a degraded machine | 120 |
 | `schema_retries` | Extra attempts after invalid JSON, then `SchemaError` | 1 |
 | `retries` | Extra tries after a transient endpoint failure (connection error, timeout, 5xx, 408/429, LM Studio's HTTP 400 "Model unloaded" while it swaps or loads a model), each recorded as a `model.retry` span event; after the last one the `fallback` profile takes over, else `ModelUnavailable`. Client errors, context overflow and invalid output are never retried this way. The public pack uses 2 | 0 |
 | `retry_backoff_s` | Wait before the first retry, doubled for each next one | 2 |
@@ -115,6 +115,27 @@ Steps name a profile (`default`, `judge`), never an endpoint. The `judge` profil
 `env:NAME` reads an environment variable and fails with a clear error when unset; `env:NAME|other` falls back to `other` (another `env:` reference or a literal). The public pack uses `env:PKPIPE_MODEL_BASE_URL|http://127.0.0.1:1234/v1` and `env:PKPIPE_MODEL_NAME|qwen3.5-9b-mlx`, so LM Studio works out of the box and Ollama is a `models.json` or environment change only.
 
 With a JSON schema the adapter sends `response_format: json_schema`, strips `<think>` blocks (and anything before a lone `</think>`), extracts the first JSON object and validates it locally. When `content` is empty (Qwen on LM Studio puts schema-constrained answers into `reasoning_content`), the reasoning is used only if it is exactly one JSON object; reasoning prose is never mined for drafts. Output cut by `max_tokens` is an error in both JSON and text mode. Every call emits a span (`llm.model_name`, token counts, latency).
+
+## System preflight
+
+`evals.json` → `preflight` holds the thresholds with which code maps a system snapshot (memory, swap, thermal state, load, LLM server) to `ok` / `degraded` / `blocked`, an eval concurrency and a model timeout multiplier (`pkpipe doctor`, [operations](operations.md#system-preflight)). All fields are optional; the defaults suit a 32 GB Apple-silicon machine running two local models.
+
+| Field | Meaning | Default |
+| --- | --- | --- |
+| `enabled` | Run the preflight before model suites of `pkpipe eval` | true |
+| `max_concurrency` | Concurrency when everything is ok (live tests, `pkpipe doctor`); `pkpipe eval` uses `concurrency` instead | 4 |
+| `reduced_concurrency`, `reduced_timeout_multiplier` | Effect of a *reduce* rule | 2, 1.5 |
+| `minimal_timeout_multiplier` | Effect of a *minimal* rule (concurrency 1) and of a block | 2.0 |
+| `memory_pressure_reduce`, `memory_pressure_block` | Kernel pressure level (`warn`, `critical`) that reduces / blocks; `null` never blocks | `warn`, `critical` |
+| `available_memory_reduce_pct`, `available_memory_block_pct` | Available memory below this percent of total reduces / blocks | 10, 3 |
+| `swap_reduce_pct`, `swap_minimal_pct` | Swap used at or above this percent reduces / sets concurrency 1 (reduce becomes minimal under memory pressure) | 80, 95 |
+| `load_per_cpu_reduce`, `load_per_cpu_minimal` | 1-minute load average per CPU | 1.5, 3.0 |
+| `thermal_reduce`, `thermal_minimal`, `thermal_block` | Thermal state (`nominal`, `fair`, `serious`, `critical`) that reduces / sets 1 / blocks; a CPU speed limit below 100% is always minimal | `fair`, `serious`, `critical` |
+| `llm_busy_queued` | Requests queued by *other* clients on a required model that reduce | 1 |
+| `require_loaded_models` | Block when the server reports a required model as not loaded (false: let a JIT load happen) | true |
+| `sample_interval_s` | Period of the live-test sampler (`PKPIPE_LIVE_SAMPLE_S` overrides it) | 30 |
+
+Inverted pairs (a block threshold milder than its reduce threshold) are rejected by `pkpipe validate`. These are operational limits, not eval gates: they may move both ways.
 
 ## Learning gateway
 

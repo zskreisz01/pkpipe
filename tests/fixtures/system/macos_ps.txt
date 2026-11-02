@@ -1,0 +1,12 @@
+1082432 node
+759952 node
+589584 com.apple.Virtualization.VirtualMachine
+529184 agent-cli
+264320 Editor Helper (Renderer)
+216864 LM Studio
+212208 agent-cli
+204128 mediaanalysisd
+197200 Browser Helper (Renderer)
+185392 Browser
+168048 agent-cli
+153760 Notes Helper (Renderer)

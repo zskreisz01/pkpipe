@@ -4,6 +4,7 @@
 tests/
   conftest.py        live-marker handling, shared fixtures (pack_dir, overlay_dir, write_json, synthetic_vault, lmstudio)
   support/live.py    probes for live services (LM Studio, Docker, Lightpanda)
+  support/preflight.py  system preflight + background sampler of a live session (how live tests adapt)
   fakes/             in-memory fake for every port in src/pkpipe/ports (ModelPort -> FakeModel, ...)
   unit/<area>/       pure logic, fakes only, fast
   integration/<area>/ real adapters against real local processes the test starts (subprocess MCP servers,
@@ -42,6 +43,32 @@ scripts/lmstudio-test-setup.sh                         # once before live tests:
   leaves eval cases unjudged (`docs/evaluation.md`, Concurrency); rerun that test alone before calling it a
   failure.
 - Plain `uv run pytest` still runs everything serially.
+
+## How live tests adapt
+
+The Mac mini that runs the live tests also runs other programs and agents, and it may overheat or swap. Before
+the first live test that drives a model (`lmstudio`, `judge`, `open_notebook`, `guard`) and whose services are
+reachable, `tests/support/preflight.py` runs the system preflight (`pkpipe doctor`, docs/operations.md
+"System preflight") with the pack's `evals.preflight` thresholds and a ceiling of `LIVE_EVAL_CONCURRENCY` (4):
+
+- **Concurrency.** Eval tests pass `live.eval_concurrency()` to `EvalRunner` / `PublishGate`: 4 when the machine
+  is ok, 2 under memory pressure, high swap, a `fair` thermal state, high load or another client queued on the
+  model, 1 when throttled, `serious`, or swap nearly full under pressure. Results do not depend on it.
+- **Timeouts.** `PKPIPE_MODEL_TIMEOUT_MULTIPLIER` (x1, x1.5, x2) scales every model profile's `timeout_s`, also in
+  CLI subprocesses of e2e tests; it is restored when the session ends.
+- **Blocked.** A *system* block (memory pressure `critical`, under 3% memory available, thermal state `critical`)
+  skips the remaining live tests with the reason, or fails them with `PKPIPE_REQUIRE_LIVE=1`. An unreachable
+  server or a missing model is left to the service probes above.
+- **During the run.** A background sampler re-samples every `evals.preflight.sample_interval_s` (30 s;
+  `PKPIPE_LIVE_SAMPLE_S` overrides it). A mid-run degradation lowers the concurrency and lengthens the timeouts of
+  later tests; recovery raises them again. Requests of the test's own concurrency are not counted as another
+  client's.
+- **Record.** The first snapshot and decision are written to `$PKPIPE_TEST_DATA_DIR/system-preflight.json`, every
+  decision change is a `system.preflight` span and every sample sets the `pkpipe.system.*` gauges (exported only
+  when `OTEL_EXPORTER_OTLP_ENDPOINT` is set). The terminal summary ends with a `system preflight` section: the
+  first and last decision, min/max swap, worst memory pressure, max load, thermal events and concurrency changes.
+- `PKPIPE_LIVE_PREFLIGHT=0` turns all of this off (fixed concurrency 4, timeouts x1). Live tests never load or
+  unload models; `scripts/lmstudio-test-setup.sh` does that.
 
 ## Rules
 

@@ -522,3 +522,27 @@ def test_retry_is_recorded_as_span_event_and_default_is_no_retry():
     with pytest.raises(ModelUnavailable):
         make_retrying(handler, plain)[0].complete("s", "u")
     assert calls == [1]
+
+
+def test_system_preflight_timeout_multiplier_scales_the_request_timeout():
+    """System preflight (docs/operations.md): a degraded machine lengthens every profile's timeout_s, from
+    PKPIPE_MODEL_TIMEOUT_MULTIPLIER at call time (clamped to 1-10) or an explicit multiplier."""
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.extensions["timeout"]["read"])
+        return httpx.Response(200, json=reply('{"category": "tool"}'))
+
+    env: dict[str, str] = {}
+    model = make(handler)
+    model.environ = env  # read at call time
+    model.complete("s", "u", SCHEMA)
+    env["PKPIPE_MODEL_TIMEOUT_MULTIPLIER"] = "1.5"
+    model.complete("s", "u", SCHEMA)
+    env["PKPIPE_MODEL_TIMEOUT_MULTIPLIER"] = "50"
+    model.complete("s", "u", SCHEMA)
+    env["PKPIPE_MODEL_TIMEOUT_MULTIPLIER"] = "nonsense"
+    model.complete("s", "u", SCHEMA)
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    OpenAIModel(MODELS, environ=env, client=client, timeout_multiplier=2.0).complete("s", "u", SCHEMA)
+    assert seen == [120, 180, 1200, 120, 240]

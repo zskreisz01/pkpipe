@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from pkpipe.domain.system import SystemSnapshot
 
 
 class ModelError(Exception):
@@ -195,3 +198,13 @@ class RunStorePort(Protocol):
     def save_snapshot(self, version: str, data: dict[str, Any], assets: dict[str, str]) -> None: ...
 
     def load_snapshot(self, version: str) -> tuple[dict[str, Any], dict[str, str]] | None: ...
+
+
+@runtime_checkable
+class SystemProbePort(Protocol):
+    """Reads the host and LLM server state cheaply and without privileges (docs/operations.md "System
+    preflight"). Returns a :class:`pkpipe.domain.system.SystemSnapshot`; a reading that is not available is
+    left empty and named in ``probe_errors``, never raised. ``include_llm=False`` skips the LLM server part.
+    Process entries carry names only (no arguments, no paths)."""
+
+    def snapshot(self, *, include_llm: bool = True) -> SystemSnapshot: ...

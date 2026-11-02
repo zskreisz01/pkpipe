@@ -42,6 +42,58 @@ The default backend is Open Notebook with Speaches (Kokoro voice): `cd deploy/op
 
 `pkpipe eval --suite <suite|all>` runs the eval suites and exits 1 when a gate is red ([Evaluation](evaluation.md)). Reports (JSON + Markdown) go to `$PKPIPE_DATA_DIR/evals`; every eval span carries `eval.run_id`. CI replays recorded model responses (`--cassette replay`); after a prompt, instruction or model change, re-record them against the real model with `--cassette record --concurrency 4` and commit the changed `evals/cassettes/*.json`. The weekly health check is `pkpipe eval --suite production --db <app DB> --vault <vault>`: it alerts on failed runs, override, quarantine and learning-failure rates above the gates in `evals.json`.
 
+## System preflight
+
+An eval or a live test run drives the local model server hard for up to an hour. On the reference Mac mini (M4, 32 GB unified memory, LM Studio with two models x 4 parallel predictions) the failures were never in pkpipe: swap at 17.55 of 18.43 GB stalled LM Studio for 25 minutes and left eval cases unjudged, and a second client on the same server turned a 40-minute live run into 113 minutes. The system preflight reads the machine before a run and lets code decide how hard to drive the server.
+
+```bash
+uv run pkpipe doctor              # snapshot + decision; exit 1 when blocked
+uv run pkpipe doctor --json       # the same as JSON
+uv run pkpipe doctor --no-llm     # host only, the LLM server is not contacted
+```
+
+| Option | Meaning |
+| --- | --- |
+| `--base-url` | LLM server (default: the `default` model profile) |
+| `--model ID` | Required model (repeatable; default: the model under test and, on the same server, the eval judge from `models.json` / `evals.judge_profile`) |
+| `--max-concurrency N` | Concurrency when everything is ok (default `evals.preflight.max_concurrency`, 4) |
+| `--pack`, `--overlay` | Config layers (thresholds, model profiles) |
+
+Sample output on the reference machine during a busy afternoon (another agent using LM Studio):
+
+```text
+system      darwin-arm64, 10 CPUs
+memory      32.0 GiB total, 9.3 GiB available (29%), pressure normal, compressed 4.4 GiB
+swap        18.8 GiB of 20.0 GiB used (94.2%)
+thermal     nominal
+load        1.90 4.00 6.29 (0.19 per CPU)
+top memory  node 914 MiB, ...
+llm server  http://127.0.0.1:1234/v1 reachable [openai, lmstudio-rest, lms]
+  - qwen3.5-9b-mlx (required): loaded, parallel 4, context 32768, status generating, queued 2
+  - google/gemma-4-12b (required): loaded, parallel 4, context 32768, status processingPrompt, queued 0
+
+decision    DEGRADED: eval concurrency 2, timeouts x1.5
+  - [reduce] swap_high: swap 18.8 of 20.0 GiB used (94.2%)
+  - [reduce] llm_busy: 'qwen3.5-9b-mlx' has 2 request(s) queued by other clients
+```
+
+**What is read** (`pkpipe.adapters.system_probe`, behind `SystemProbePort`; no sudo, well under a second, no extra dependency): one `sysctl` call (`hw.memsize`, `hw.ncpu`, `vm.loadavg`, `vm.swapusage`, `kern.memorystatus_vm_pressure_level` = the kernel's normal / warn / critical, `kern.memorystatus_level` = the free percentage `memory_pressure -Q` prints), `vm_stat` (free and compressed pages), `pmset -g therm` (CPU speed limit, a recorded thermal warning), `NSProcessInfo.thermalState` (nominal / fair / serious / critical, read through the Objective-C runtime with ctypes), `ps -axco rss=,comm=` (the five largest memory users by executable *name*: never paths, arguments or user data), and the LLM server: `/v1/models` (served models; any OpenAI-compatible server), LM Studio's `/api/v0/models` (loaded state, context) and, for a local server, `lms ps --json` (parallel predictions, status, queued requests). This works the same for the LM Studio app and the headless `llmster` daemon (`lms daemon up` + `lms server start`); a server that is briefly away (switching between the two, a restart) is retried twice, 2 s apart. On Linux the probe reads `/proc/meminfo`, `/proc/loadavg` and `ps` only (no pressure level, no thermal state). A reading that fails is listed under `not read` and never fails the command.
+
+**How it decides** (`pkpipe.domain.system.decide`, pure code, thresholds in `evals.json` → `preflight`, [configuration](configuration.md#system-preflight)). Each rule that fires adds a reason with a severity; the worst severity wins:
+
+| Severity | Effect | Fired by (defaults) |
+| --- | --- | --- |
+| `block` | `blocked`, concurrency 0, exit 1 | memory pressure `critical`; under 3% memory available; thermal state `critical`; LLM server unreachable; a required model not served or not loaded |
+| `minimal` | `degraded`, concurrency 1, timeouts x2 | swap ≥ 95%; swap ≥ 80% *and* memory pressure ≥ warn; thermal state `serious`; CPU speed limited (< 100%); load ≥ 3.0 per CPU |
+| `reduce` | `degraded`, concurrency 2, timeouts x1.5 | memory pressure `warn`; under 10% available; swap ≥ 80%; thermal state `fair` or a recorded thermal warning; load ≥ 1.5 per CPU; another client has a request queued on a required model |
+| `info` | concurrency capped, status unchanged | the server runs fewer parallel predictions than the ceiling |
+
+`ok` keeps the ceiling (4 for live tests; `evals.concurrency` for `pkpipe eval`) and timeouts x1. Reasons carry a scope: `system` (memory, swap, thermal, load) or `llm` (server, models). The timeout multiplier scales every model profile's `timeout_s` (`PKPIPE_MODEL_TIMEOUT_MULTIPLIER`, clamped to 1-10, read by the model adapter at call time; the model span records the effective `pkpipe.model.timeout_s`). macOS grows swap in steps, so a high swap percentage with pressure `normal` is a warning sign, not a stall; the stall came with pressure and a nearly full swap together, which is why that combination is `minimal`.
+
+**Where it is used.** `pkpipe eval` without `--concurrency` runs the preflight before suites that call a model (not in `--cassette replay`, not for code-only suites; `--no-preflight` skips it): the decision can only lower `evals.concurrency` (production default 1 stays 1) and lengthens timeouts; a `system` block refuses the run (exit 1), an `llm` block is printed and left to the suites, which report the unreachable model per case. Live tests run it once per session and keep re-sampling ([tests/README.md](https://github.com/zskreisz01/pkpipe/blob/master/tests/README.md), "How live tests adapt").
+
+**Telemetry.** Every preflight is a `system.preflight` span (`pkpipe.span.kind` = `system`, `system.source` = `preflight` or `sampler`) with the snapshot as attributes: `system.memory.{total_bytes,available_bytes,available_pct,free_bytes,compressed_bytes,pressure}`, `system.swap.{total_bytes,used_bytes,used_pct}`, `system.thermal.{state,cpu_speed_limit,throttled,warning}`, `system.load.{1m,per_cpu}`, `system.cpu.count`, `system.top_processes` (`name=MiB`), `llm.server.{url,reachable,sources,models_loaded,models}`, and the decision: `system.decision`, `system.eval_concurrency`, `system.timeout_multiplier`, `system.reasons` (`severity:code`). Gauges of the latest sample (attribute `source`): `pkpipe.system.memory_pressure` (0 normal, 1 warn, 2 critical, -1 unknown), `pkpipe.system.memory_available_ratio`, `pkpipe.system.swap_used_bytes`, `pkpipe.system.thermal_level` (0-3, -1 unknown), `pkpipe.system.load_per_cpu`, `pkpipe.system.decision` (0 ok, 1 degraded, 2 blocked), `pkpipe.system.eval_concurrency`. The sampler records the gauges every sample and a span only when the decision changes. Nothing in them is content; process entries are names only.
+
 ## Release ladder
 
 ```mermaid
@@ -54,7 +106,7 @@ Rollback when the override or quarantine rate exceeds twice the weekly average, 
 
 ## Observability
 
-Only OTLP is exported, so the backend is replaceable (Langfuse or Phoenix). Spans carry `flow.id`, `step.id`, `bpmn.element`, `item.id`, `item.category`, `config.version`, `run.trigger`. Metrics: items per category, backlog size, learning generation time and timeout rate, step error rate, tokens per second, flags per detector. Prompt and response capture is configurable and off for private data.
+Only OTLP is exported, so the backend is replaceable (Langfuse or Phoenix). Spans carry `flow.id`, `step.id`, `bpmn.element`, `item.id`, `item.category`, `config.version`, `run.trigger`. Metrics: items per category, backlog size, learning generation time and timeout rate, step error rate, tokens per second, flags per detector, and the system gauges of the [preflight](#system-preflight). Prompt and response capture is configurable and off for private data.
 
 ### Configuring telemetry
 

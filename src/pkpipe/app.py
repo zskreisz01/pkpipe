@@ -36,10 +36,16 @@ def default_db_path() -> Path:
     return Path(base).expanduser() / "pkpipe.db"
 
 
-def make_model(snapshot: ConfigSnapshot) -> ModelPort:
+def make_model(snapshot: ConfigSnapshot, *, timeout_multiplier: float | None = None) -> ModelPort:
+    """The OpenAI-compatible model adapter. ``timeout_multiplier`` scales every profile's ``timeout_s``
+    (system preflight); ``None`` reads ``PKPIPE_MODEL_TIMEOUT_MULTIPLIER`` at call time (default 1)."""
     from pkpipe.adapters.model_openai import OpenAIModel
 
-    return OpenAIModel(snapshot.data.get("models", {}), tracer=telemetry.get_telemetry().tracer)
+    return OpenAIModel(
+        snapshot.data.get("models", {}),
+        tracer=telemetry.get_telemetry().tracer,
+        timeout_multiplier=timeout_multiplier,
+    )
 
 
 def make_tools(snapshot: ConfigSnapshot) -> ToolPort:

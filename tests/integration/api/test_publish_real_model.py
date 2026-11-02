@@ -15,8 +15,8 @@ import pytest
 from pkpipe import app
 from pkpipe.evals import EvalPaths, PublishGate
 from tests.conftest import REPO
+from tests.support import live
 from tests.support.app_stack import api_client, git, make_stack
-from tests.support.live import LIVE_EVAL_CONCURRENCY
 
 CASSETTES = REPO / "evals" / "cassettes" / "ui_publish"
 INSTRUCTION = "instructions/triage/categorize.md"
@@ -30,7 +30,7 @@ def _stack(tmp_path, synthetic_vault, pack_dir, mode, cassette_dir):
             model=model,
             paths=EvalPaths.create(REPO / "evals", None, cassette_dir),
             mode=mode,
-            concurrency=LIVE_EVAL_CONCURRENCY,
+            concurrency=live.eval_concurrency(),
         )
 
     return make_stack(tmp_path, synthetic_vault, pack_dir, gate_factory=gate)
@@ -76,8 +76,6 @@ def test_publish_gate_with_the_live_model_and_cassette_recording(
     """US1 live (qwen3.5-9b-mlx): triage accuracy/F1 and the security suite gate a real publish. The changed
     triage instruction makes every triage and injection request new (live); the secure-fetch Reader pages and
     classifier texts it shares with the other live eval tests are sent once per session."""
-    from tests.support import live
-
     monkeypatch.setenv("PKPIPE_MODEL_BASE_URL", lmstudio["base_url"])
     monkeypatch.setenv("PKPIPE_MODEL_NAME", lmstudio["model"])
     monkeypatch.setenv("PKPIPE_JUDGE_MODEL", live.judge_model_name())

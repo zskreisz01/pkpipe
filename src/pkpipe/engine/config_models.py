@@ -389,6 +389,58 @@ class CalibrationSettings(_Strict):
     max_disagreement_rate: float = Field(default=0.25, ge=0.0, le=1.0)
 
 
+ThermalLevelName = Literal["nominal", "fair", "serious", "critical"]
+
+
+class SystemPreflight(_Strict):
+    """System preflight thresholds (docs/operations.md "System preflight"): code maps a system snapshot
+    (memory, swap, thermal state, load, LLM server) to ok / degraded / blocked, an eval concurrency and a
+    timeout multiplier. A *reduce* rule caps concurrency at ``reduced_concurrency``, a *minimal* rule at 1,
+    a *block* rule stops the run."""
+
+    enabled: bool = Field(default=True, description="Run the preflight before live evals (`pkpipe eval`)")
+    max_concurrency: int = Field(
+        default=4, ge=1, le=16, description="Concurrency recommended when everything is ok (live tests)"
+    )
+    reduced_concurrency: int = Field(default=2, ge=1, le=16)
+    reduced_timeout_multiplier: float = Field(default=1.5, ge=1.0, le=10.0)
+    minimal_timeout_multiplier: float = Field(default=2.0, ge=1.0, le=10.0)
+    memory_pressure_reduce: Literal["warn", "critical"] = Field(
+        default="warn", description="Kernel memory pressure level that reduces concurrency"
+    )
+    memory_pressure_block: Literal["warn", "critical"] | None = Field(
+        default="critical", description="Kernel memory pressure level that blocks (null: never)"
+    )
+    available_memory_reduce_pct: float = Field(default=10.0, ge=0.0, le=100.0)
+    available_memory_block_pct: float = Field(default=3.0, ge=0.0, le=100.0)
+    swap_reduce_pct: float = Field(default=80.0, ge=0.0, le=100.0, description="Swap used / total, percent")
+    swap_minimal_pct: float = Field(default=95.0, ge=0.0, le=100.0)
+    load_per_cpu_reduce: float = Field(default=1.5, gt=0.0, description="1-minute load average per CPU")
+    load_per_cpu_minimal: float = Field(default=3.0, gt=0.0)
+    thermal_reduce: ThermalLevelName = "fair"
+    thermal_minimal: ThermalLevelName = "serious"
+    thermal_block: ThermalLevelName | None = "critical"
+    llm_busy_queued: int = Field(
+        default=1, ge=1, description="Requests queued by other clients on a required model that reduce"
+    )
+    require_loaded_models: bool = Field(
+        default=True, description="Block when the server reports a required model as not loaded"
+    )
+    sample_interval_s: float = Field(default=30.0, ge=1.0, le=3600.0, description="Live-test sampler period")
+
+    @model_validator(mode="after")
+    def _ordered(self) -> SystemPreflight:
+        if self.available_memory_block_pct > self.available_memory_reduce_pct:
+            raise ValueError("available_memory_block_pct must be <= available_memory_reduce_pct")
+        if self.swap_minimal_pct < self.swap_reduce_pct:
+            raise ValueError("swap_minimal_pct must be >= swap_reduce_pct")
+        if self.load_per_cpu_minimal < self.load_per_cpu_reduce:
+            raise ValueError("load_per_cpu_minimal must be >= load_per_cpu_reduce")
+        if self.reduced_concurrency > self.max_concurrency:
+            raise ValueError("reduced_concurrency must be <= max_concurrency")
+        return self
+
+
 class EvalsConfig(_Strict):
     """Eval gates (spec 013 SC-001). Thresholds only move upwards (constitution IX): a publish that lowers a
     ``min``, raises a ``max`` or drops a gate is refused."""
@@ -403,6 +455,11 @@ class EvalsConfig(_Strict):
         le=16,
         description="Eval cases (model and judge requests) in flight at once; > 1 needs a model server with "
         "parallel predictions (LM Studio: docs/evaluation.md). `pkpipe eval --concurrency N` overrides it",
+    )
+    preflight: SystemPreflight = Field(
+        default_factory=SystemPreflight,
+        description="System preflight thresholds (memory, swap, thermal, load, LLM server); "
+        "`pkpipe doctor` shows the decision",
     )
 
 

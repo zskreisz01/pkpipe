@@ -38,6 +38,17 @@ _CONTEXT_HINTS = (
 # HTTP 4xx bodies that mean "the model is not ready right now" (LM Studio swaps, JIT-loads or TTL-unloads
 # models; a request that arrives meanwhile gets HTTP 400 "Model unloaded"): transient, like a 503.
 _TRANSIENT_HINTS = ("model unloaded", "model is unloaded", "model is loading", "model not loaded")
+#: Scales every profile's ``timeout_s`` (system preflight, docs/operations.md): set by ``pkpipe eval`` and the
+#: live-test sampler when the machine is degraded. Read at call time, clamped to [1, 10].
+TIMEOUT_MULTIPLIER_ENV = "PKPIPE_MODEL_TIMEOUT_MULTIPLIER"
+
+
+def timeout_multiplier(environ: Mapping[str, str]) -> float:
+    try:
+        value = float(environ.get(TIMEOUT_MULTIPLIER_ENV) or 1.0)
+    except ValueError:
+        return 1.0
+    return min(10.0, max(1.0, value))
 
 
 class ProfileError(ModelError, ValueError):
@@ -144,7 +155,10 @@ class OpenAIModel:
         client: httpx.Client | None = None,
         tracer: trace.Tracer | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        timeout_multiplier: float | None = None,
     ):
+        #: ``None``: ``PKPIPE_MODEL_TIMEOUT_MULTIPLIER`` of ``environ`` at call time (default 1)
+        self.timeout_multiplier = timeout_multiplier
         self.models = (
             models if isinstance(models, ModelsConfig) else ModelsConfig.model_validate(dict(models))
         )
@@ -196,6 +210,12 @@ class OpenAIModel:
         raise ModelUnavailable(f"no model endpoint reachable (tried: {', '.join(seen)}): {last_error}")
 
     # -- internals ---------------------------------------------------------------------------------
+    def _timeout(self, p: ResolvedProfile) -> float:
+        scale = self.timeout_multiplier
+        if scale is None:
+            scale = timeout_multiplier(self.environ)
+        return p.timeout_s * min(10.0, max(1.0, scale))
+
     def _event_on_current(self, name: str, attrs: dict[str, Any]) -> None:
         span = trace.get_current_span()
         if span.is_recording():
@@ -218,6 +238,7 @@ class OpenAIModel:
             span.set_attribute("llm.model_name", p.model)
             span.set_attribute("llm.provider", "openai-compatible")
             span.set_attribute("pkpipe.model.profile", p.name)
+            span.set_attribute("pkpipe.model.timeout_s", self._timeout(p))
             span.set_attribute("pkpipe.model.used_fallback", used_fallback)
             started = time.monotonic()
             try:
@@ -357,7 +378,7 @@ class OpenAIModel:
         headers = {"Authorization": f"Bearer {p.api_key or 'not-needed'}"}
         try:
             resp = self._client.post(
-                f"{p.base_url}/chat/completions", json=body, headers=headers, timeout=p.timeout_s
+                f"{p.base_url}/chat/completions", json=body, headers=headers, timeout=self._timeout(p)
             )
         except httpx.HTTPError as exc:
             raise ModelUnavailable(f"{p.base_url}: {type(exc).__name__}: {exc}") from exc
