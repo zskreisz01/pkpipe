@@ -61,6 +61,13 @@ def test_text_checks_must_include_must_not_and_max_words():
     assert text_checks(out, None) == {}
 
 
+def test_text_checks_must_match_accepts_any_spelling_of_a_fact():
+    expected = {"must_match": [r"14[ -]days?"]}
+    assert text_checks({"pricing": "free tier, 14-day retention"}, expected) == {}
+    assert text_checks({"pricing": "free tier, 14 days retention"}, expected) == {}
+    assert text_checks({"pricing": "free tier"}, expected) == {"must_match": [r"14[ -]days?"]}
+
+
 def test_schema_errors_are_reported_by_code():
     schema = {"type": "object", "required": ["category"], "properties": {"category": {"type": "string"}}}
     assert schema_errors({"category": "tool"}, schema) == []

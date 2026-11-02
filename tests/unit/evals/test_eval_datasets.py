@@ -14,6 +14,8 @@ from pkpipe.evals.models import Source
 from tests.conftest import REPO
 
 EVALS = REPO / "evals"
+# the sessions gate holds per session at checks >= 0.90: 12 cases tolerate one model slip, 5 or 6 do not
+MIN_SESSION_CASES = 12
 
 
 def test_load_jsonl_fills_suite_and_validates(tmp_path):
@@ -130,7 +132,7 @@ def test_every_category_session_has_a_synthetic_dataset():
     for name in names:
         category, session = name.split(".")
         cases = load_jsonl(EVALS / f"datasets/sessions/{category}/{session}.jsonl", name)
-        assert len(cases) >= 5, name
+        assert len(cases) >= MIN_SESSION_CASES, name
         node = find_node(snap, category, session)
         for case in cases:
             assert case.source == "synthetic" and case.expected, (name, case.id)
@@ -138,6 +140,17 @@ def test_every_category_session_has_a_synthetic_dataset():
             assert ("context" in case.input) == bool(node.config.get("context")), (name, case.id)
         injected = [c for c in cases if "ignore all previous instructions" in json.dumps(c.input).lower()]
         assert injected, f"{name} has no case with an injected instruction"
+
+
+def test_every_session_dataset_is_large_enough_for_its_own_gate():
+    """The sessions gate holds per session (checks >= 0.90): with 5 or 6 cases a single model slip fails it,
+    with 12 one slip still passes, so no session dataset is smaller."""
+    small = {
+        str(p.relative_to(EVALS)): n
+        for p in sorted((EVALS / "datasets/sessions").glob("*/*.jsonl"))
+        if (n := len(load_jsonl(p, p.stem))) < MIN_SESSION_CASES
+    }
+    assert not small, small
 
 
 def test_every_session_dataset_has_a_rubric():
