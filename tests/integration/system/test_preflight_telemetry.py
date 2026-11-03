@@ -61,7 +61,9 @@ def test_sampler_lowers_concurrency_mid_run_and_summarizes():
     clock = iter(1_800_000_000.0 + 60 * i for i in range(100))
     snaps = [
         healthy_snapshot(taken_at=1_800_000_000.0),
-        healthy_snapshot(taken_at=1_800_000_060.0, swap={"used_bytes": 7 * GiB}),  # 87.5% -> reduce
+        healthy_snapshot(
+            taken_at=1_800_000_060.0, swap={"total_bytes": 16 * GiB, "used_bytes": 14 * GiB}
+        ),  # 87.5%
         healthy_snapshot(taken_at=1_800_000_120.0, thermal={"level": "serious", "cpu_speed_limit": 80}),
         healthy_snapshot(taken_at=1_800_000_180.0),
     ]
@@ -80,7 +82,7 @@ def test_sampler_lowers_concurrency_mid_run_and_summarizes():
     assert [sampler.sample_once().concurrency for _ in range(3)] == [2, 1, 4]
     assert [d.concurrency for d in changes] == [2, 1, 4]
     summary = sampler.stop()
-    assert summary.samples == 4 and summary.swap_min == GiB and summary.swap_max == 7 * GiB
+    assert summary.samples == 4 and summary.swap_min == GiB and summary.swap_max == 14 * GiB
     assert summary.thermal_events == ["+2.0 min serious, CPU speed 80%", "+3.0 min nominal"]
     assert [c.split(" (")[0] for c in summary.concurrency_changes] == [
         "+1.0 min 4 -> 2",
@@ -88,7 +90,7 @@ def test_sampler_lowers_concurrency_mid_run_and_summarizes():
         "+3.0 min 1 -> 4",
     ]
     text = "\n".join(summary.lines())
-    assert "swap used min 1.00 / max 7.00 GiB" in text and "thermal events: +2.0 min serious" in text
+    assert "swap used min 1.00 / max 14.00 GiB" in text and "thermal events: +2.0 min serious" in text
     sources = [s.attributes["system.source"] for s in o.spans("system.preflight")]
     assert sources == ["preflight", "sampler", "sampler", "sampler"]
     o.telemetry.shutdown()

@@ -199,14 +199,16 @@ def decide(
         elif avail < s.available_memory_reduce_pct:
             add("memory_available", "reduce", f"only {avail:g}% memory available")
     swap = snapshot.swap.used_pct
-    if swap is not None:
+    under_pressure = pressure >= _rank(s.memory_pressure_reduce, PRESSURE_LEVELS)
+    # macOS grows and shrinks its swap file, so the percentage alone misleads: 6.9 of 8.0 GiB with pressure
+    # normal is a small swap file, no stall; the percentage counts from swap_min_gib used or under pressure.
+    if swap is not None and (under_pressure or snapshot.swap.used_bytes >= s.swap_min_gib * _GiB):
         used = (
             f"swap {snapshot.swap.used_bytes / _GiB:.1f} of {snapshot.swap.total_bytes / _GiB:.1f} GiB used"
         )
         if swap >= s.swap_minimal_pct:
             add("swap_full", "minimal", f"{used} ({swap:g}%)")
         elif swap >= s.swap_reduce_pct:
-            under_pressure = pressure >= _rank(s.memory_pressure_reduce, PRESSURE_LEVELS)
             # a nearly full swap *and* memory pressure: the next model allocation pages out the other model
             add("swap_high", "minimal" if under_pressure else "reduce", f"{used} ({swap:g}%)")
 

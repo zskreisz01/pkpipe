@@ -74,6 +74,22 @@ CASES = [
         2.0,
         {"minimal:swap_full"},
     ),
+    (
+        "swap-small-file-nearly-full-no-pressure",  # macOS shrank the swap file: 6.9 of 8 GiB is not a stall
+        {"swap": {"total_bytes": 8 * GiB, "used_bytes": int(6.9 * GiB)}},
+        Status.OK,
+        4,
+        1.0,
+        set(),
+    ),
+    (
+        "swap-small-file-nearly-full-under-pressure",
+        {"swap": {"total_bytes": 8 * GiB, "used_bytes": int(6.9 * GiB)}, "memory": {"pressure": "warn"}},
+        Status.DEGRADED,
+        1,
+        2.0,
+        {"reduce:memory_pressure", "minimal:swap_high"},
+    ),
     ("thermal-fair", {"thermal": {"level": "fair"}}, Status.DEGRADED, 2, 1.5, {"reduce:thermal"}),
     ("thermal-serious", {"thermal": {"level": "serious"}}, Status.DEGRADED, 1, 2.0, {"minimal:thermal"}),
     ("thermal-critical", {"thermal": {"level": "critical"}}, Status.BLOCKED, 0, 2.0, {"block:thermal"}),
@@ -172,7 +188,7 @@ def test_without_required_models_the_llm_server_is_not_judged():
 
 def test_thresholds_come_from_config():
     strict = SystemPreflight(
-        swap_reduce_pct=5, swap_minimal_pct=6, thermal_block="fair", reduced_concurrency=3
+        swap_reduce_pct=5, swap_minimal_pct=6, swap_min_gib=0, thermal_block="fair", reduced_concurrency=3
     )
     assert decide(healthy_snapshot(), strict).status is Status.DEGRADED  # 12.5% swap >= 6%
     assert decide(healthy_snapshot(thermal={"level": "fair"}), strict).status is Status.BLOCKED

@@ -129,6 +129,7 @@ With a JSON schema the adapter sends `response_format: json_schema`, strips `<th
 | `memory_pressure_reduce`, `memory_pressure_block` | Kernel pressure level (`warn`, `critical`) that reduces / blocks; `null` never blocks | `warn`, `critical` |
 | `available_memory_reduce_pct`, `available_memory_block_pct` | Available memory below this percent of total reduces / blocks | 10, 3 |
 | `swap_reduce_pct`, `swap_minimal_pct` | Swap used at or above this percent reduces / sets concurrency 1 (reduce becomes minimal under memory pressure) | 80, 95 |
+| `swap_min_gib` | The swap percentages count only from this much swap used, or under memory pressure (macOS resizes its swap file, so a small nearly full one alone is no stall) | 12 |
 | `load_per_cpu_reduce`, `load_per_cpu_minimal` | 1-minute load average per CPU | 1.5, 3.0 |
 | `thermal_reduce`, `thermal_minimal`, `thermal_block` | Thermal state (`nominal`, `fair`, `serious`, `critical`) that reduces / sets 1 / blocks; a CPU speed limit below 100% is always minimal | `fair`, `serious`, `critical` |
 | `llm_busy_queued` | Requests queued by *other* clients on a required model that reduce | 1 |

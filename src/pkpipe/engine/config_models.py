@@ -415,6 +415,12 @@ class SystemPreflight(_Strict):
     available_memory_block_pct: float = Field(default=3.0, ge=0.0, le=100.0)
     swap_reduce_pct: float = Field(default=80.0, ge=0.0, le=100.0, description="Swap used / total, percent")
     swap_minimal_pct: float = Field(default=95.0, ge=0.0, le=100.0)
+    swap_min_gib: float = Field(
+        default=12.0,
+        ge=0.0,
+        description="The swap percentage rules apply only from this much swap used (GiB) or under memory "
+        "pressure: macOS resizes its swap file, so a small, nearly full swap file alone is no stall",
+    )
     load_per_cpu_reduce: float = Field(default=1.5, gt=0.0, description="1-minute load average per CPU")
     load_per_cpu_minimal: float = Field(default=3.0, gt=0.0)
     thermal_reduce: ThermalLevelName = "fair"
