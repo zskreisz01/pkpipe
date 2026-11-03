@@ -1,7 +1,7 @@
 {
   "id": "tool-plan-writes-note",
   "source": "synthetic",
-  "description": "Tool category (owner override misc -> tool): secure fetch, the plan's sessions run in order (research and compare use the web search tool, the personal and enterprise fit sessions are skipped because their private context packs are not in the public pack), the evaluation note is written into the PARA folder, the INBOX note is archived and the processing list says done (spec 010 US1).",
+  "description": "Tool category (owner override misc -> tool): secure fetch, the plan's sessions run in order (research and compare use the web search tool, the personal and enterprise fit sessions are skipped because their private context packs are not in the public pack), the evaluation note is written into the PARA folder, the INBOX note is archived and the processing list says done (spec 010 US1). The sixth session (system relevance, public system context) finds the tool relevant for a component: the note gets a System relevance section and the tool lands in the System-Tool-Candidates list with status candidate (spec 016 US1).",
   "input": {
     "vault": {
       "0-INBOX/thing.md": "---\nsource: https://example.invalid/thing\n---\nSome page about a fictional key-value store.\n"
@@ -83,6 +83,17 @@
         ]
       },
       {
+        "reply": {
+          "relevance": "candidate",
+          "component": "App DB",
+          "benefit": "An embeddable key-value store could hold the small run state without SQLite tables.",
+          "effort": "M"
+        },
+        "fields": [
+          "relevance"
+        ]
+      },
+      {
         "when": "key-value store",
         "reply": {
           "category": "misc",
@@ -132,7 +143,9 @@
           "## Alternatives",
           "badgerkv",
           "pkpipe_item: {id:0-INBOX/thing.md}",
-          "category: tool"
+          "category: tool",
+          "## System relevance",
+          "Candidate for App DB (effort M)"
         ],
         "not_contains": [
           "Fit personal",
@@ -146,6 +159,13 @@
       },
       "0-INBOX/thing.md": {
         "exists": false
+      },
+      "2-Areas/System/System-Tool-Candidates.md": {
+        "contains": [
+          "| candidate | minikv | minikv |",
+          "App DB",
+          "| M |"
+        ]
       }
     },
     "processing": {

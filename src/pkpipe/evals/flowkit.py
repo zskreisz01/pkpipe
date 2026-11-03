@@ -156,6 +156,8 @@ class VaultTools:
             "obsidian:read_notes": vault.read_notes,
             "obsidian:read_improvements": vault.read_improvements,
             "obsidian:update_improvements": vault.update_improvements,
+            "obsidian:read_tool_candidates": vault.read_tool_candidates,
+            "obsidian:update_tool_candidates": vault.update_tool_candidates,
             "obsidian:quarantine_note": vault.quarantine_note,
             "learning:create": learning.create,
             "learning:status": learning.status,

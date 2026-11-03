@@ -21,6 +21,8 @@ TOOLS = {
     "read_notes",
     "read_improvements",
     "update_improvements",
+    "read_tool_candidates",
+    "update_tool_candidates",
     "quarantine_note",
 }
 

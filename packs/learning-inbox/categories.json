@@ -80,8 +80,20 @@
           "*"
         ],
         "output_schema": "tool_evaluation"
+      },
+      {
+        "id": "system_relevance",
+        "system": "analyst",
+        "instruction": "tool/system_relevance.md",
+        "context": "system",
+        "inputs": [
+          "research",
+          "compare"
+        ],
+        "output_schema": "tool_system_relevance"
       }
-    ]
+    ],
+    "note_session": "synthesize"
   },
   {
     "id": "marketing",

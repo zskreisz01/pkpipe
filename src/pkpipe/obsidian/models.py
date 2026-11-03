@@ -7,6 +7,7 @@ from enum import StrEnum
 from pydantic import BaseModel, field_validator
 
 from pkpipe.domain.improvement import ImprovementItem
+from pkpipe.domain.tool_candidate import ToolCandidate
 from pkpipe.domain.triage import ItemState, item_id_for
 
 __all__ = ["ItemState", "ProcessingListRow", "ProcessingStatus", "TriageRow", "item_id_for"]
@@ -114,4 +115,5 @@ def vault_json_schemas() -> dict[str, dict]:
         "triage-row": TriageRow.model_json_schema(),
         "processing-list-row": ProcessingListRow.model_json_schema(),
         "improvement-item": ImprovementItem.model_json_schema(),
+        "tool-candidate": ToolCandidate.model_json_schema(),
     }

@@ -79,6 +79,8 @@ def vault_tools(
             "obsidian:read_notes": lambda paths: vault.read_notes(paths),
             "obsidian:read_improvements": lambda: vault.read_improvements(),
             "obsidian:update_improvements": lambda rows: vault.update_improvements(rows),
+            "obsidian:read_tool_candidates": lambda: vault.read_tool_candidates(),
+            "obsidian:update_tool_candidates": lambda rows: vault.update_tool_candidates(rows),
             "obsidian:quarantine_note": vault.quarantine_note,
             "learning:create": learning.create,
             "learning:status": learning.status,
@@ -115,11 +117,17 @@ def prompt_inputs(user: str) -> dict[str, str]:
     return {m["ref"]: m["text"] for m in _DATA.finditer(user)}
 
 
-def fake_model_reply(categories_by_word: dict[str, str], notes: dict[str, str] | None = None):
+def fake_model_reply(
+    categories_by_word: dict[str, str],
+    notes: dict[str, str] | None = None,
+    relevance: dict[str, dict[str, Any]] | None = None,
+):
     """FakeModel callable for the whole public pack: triage by keyword, the secure-fetch Reader (title of the
     page), the tool loop (one web search, then the final answer) and every category session by its output
-    schema; ``notes`` maps a word of the prompt to the text of a ``note`` field (a scripted injection)."""
+    schema; ``notes`` maps a word of the prompt to the text of a ``note`` field (a scripted injection),
+    ``relevance`` a word of the prompt to the answer of the system relevance session (default: none)."""
     notes = notes or {}
+    relevance = relevance or {}
 
     def reply(system: str, user: str, schema: dict[str, Any] | None = None) -> dict[str, Any]:
         if system.startswith("You sort captured resources"):
@@ -143,6 +151,11 @@ def fake_model_reply(categories_by_word: dict[str, str], notes: dict[str, str] |
                 "injection_suspected": False,
                 "evidence": None,
             }
+        if "relevance" in props:  # tool.system_relevance (spec 016)
+            for word, answer in relevance.items():
+                if word in user:
+                    return answer
+            return {"relevance": "none", "component": "", "benefit": "", "effort": "S"}
         name = (json.loads(data["item.extract"]).get("title") if "item.extract" in data else None) or title
         if "extract" in data:  # marketing.synthesize: the idea of the extract session
             name = json.loads(data["extract"]).get("idea", name).split(":")[0]

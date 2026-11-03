@@ -32,6 +32,7 @@ def test_the_public_plans_are_listed_as_llm_steps_next_to_the_flow_nodes(snap):
         "tool.fit_personal",
         "tool.fit_enterprise",
         "tool.synthesize",
+        "tool.system_relevance",
         "marketing.extract",
         "marketing.synthesize",
         "misc.evaluate",

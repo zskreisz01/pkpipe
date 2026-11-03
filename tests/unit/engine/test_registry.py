@@ -41,7 +41,7 @@ def test_overlay_category_with_existing_id_merges_key_by_key(pack_dir, overlay_d
     write_json(overlay_dir, "categories.json", [{"id": "tool", "para_path": "3-Resources/MyTools"}])
     tool = next(c for c in load_config(pack_dir, overlay_dir)["categories"] if c["id"] == "tool")
     assert tool["para_path"] == "3-Resources/MyTools"
-    assert tool["label"] == "Tools" and len(tool["sessions"]) == 5
+    assert tool["label"] == "Tools" and len(tool["sessions"]) == 6
 
 
 def test_enabled_false_removes_category(pack_dir, overlay_dir, write_json):
