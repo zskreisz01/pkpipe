@@ -18,7 +18,7 @@ from pkpipe.adapters.model_openai import (
     resolve_value,
 )
 from pkpipe.engine.config_models import ModelsConfig
-from pkpipe.ports import ContextOverflow, ModelPort, ModelUnavailable, SchemaError
+from pkpipe.ports import ContextOverflow, ModelError, ModelPort, ModelUnavailable, SchemaError
 
 SCHEMA = {
     "type": "object",
@@ -154,6 +154,7 @@ def test_truncated_output_is_reported_not_silently_accepted():
         "This model's maximum context length is 4096 tokens",
         '{"error": {"code": "context_length_exceeded"}}',
         "Trying to keep the first 5000 tokens when context window is 4096",
+        '{"error": "the request exceeds the available context size, try increasing it"}',
     ],
 )
 def test_context_overflow_is_a_typed_error_and_not_retried(text):  # edge case
@@ -174,6 +175,36 @@ def test_other_client_errors_are_model_errors_not_unavailable():
     with pytest.raises(ModelError) as exc:
         make(lambda r: httpx.Response(400, text="bad request")).complete("s", "u")
     assert not isinstance(exc.value, ModelUnavailable)
+
+
+def test_unknown_model_404_is_a_config_error_not_transient():
+    """vLLM answers an unknown model id with HTTP 404 ("The model `x` does not exist."): no retry, no
+    fallback that would hide the typo, and the message names the model and the endpoint."""
+    hosts = []
+
+    def handler(request):
+        hosts.append(request.url.host)
+        return httpx.Response(404, json={"object": "error", "message": "The model `m` does not exist."})
+
+    models = {**MODELS, "default": {**MODELS["default"], "retries": 2}}
+    model, sleeps = make_retrying(handler, models)
+    with pytest.raises(ModelError, match="HTTP 404.*model 'm-a' is not served") as exc:
+        model.complete("s", "u")
+    assert not isinstance(exc.value, ModelUnavailable)
+    assert hosts == ["primary.invalid"] and sleeps == []
+
+
+def test_a_404_saying_the_model_is_loading_stays_transient():
+    calls = []
+
+    def handler(request):
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(404, text='{"error": "Model is loading"}')
+        return httpx.Response(200, json=reply('{"category": "tool"}'))
+
+    model, sleeps = make_retrying(handler)
+    assert model.complete("s", "u", SCHEMA) == {"category": "tool"} and sleeps == [1.5]
 
 
 def test_fallback_used_when_primary_down_and_span_event_recorded():  # US2.2
@@ -226,7 +257,7 @@ def test_all_endpoints_down_raises_model_unavailable_naming_every_profile():
         make(handler).complete("s", "u")
 
 
-@pytest.mark.parametrize("status", [500, 503, 404, 429])
+@pytest.mark.parametrize("status", [500, 503, 408, 429])
 def test_server_errors_are_unavailable(status):
     models = {"default": {"base_url": "http://x.invalid/v1", "model": "m"}}
     with pytest.raises(ModelUnavailable, match=str(status)):
@@ -483,8 +514,9 @@ def test_retries_exhausted_raise_model_unavailable_then_fallback_takes_over():
         httpx.Response(400, text="bad request"),
         httpx.Response(400, text="the prompt exceeds the context length"),
         httpx.Response(200, json=reply("garbage")),
+        httpx.Response(404, json={"object": "error", "message": "The model `m` does not exist."}),
     ],
-    ids=["client-error", "context-overflow", "schema-error"],
+    ids=["client-error", "context-overflow", "schema-error", "unknown-model-404"],
 )
 def test_non_transient_errors_are_never_retried(response):
     """Only transient endpoint failures are retried: a client error, a context overflow and invalid output

@@ -34,6 +34,7 @@ _CONTEXT_HINTS = (
     "maximum context",
     "n_ctx",
     "too many tokens",
+    "context size",  # llama.cpp / LM Studio: "exceeds the available context size"
 )
 # HTTP 4xx bodies that mean "the model is not ready right now" (LM Studio swaps, JIT-loads or TTL-unloads
 # models; a request that arrives meanwhile gets HTTP 400 "Model unloaded"): transient, like a 503.
@@ -350,9 +351,9 @@ class OpenAIModel:
         self, p: ResolvedProfile, messages: list[dict[str, str]], schema: dict[str, Any] | None, span: Span
     ) -> tuple[str, dict[str, Any], str | None]:
         """:meth:`_request` with up to ``retries`` extra tries on a transient failure (connection, timeout,
-        5xx, 408/429, "Model unloaded"), waiting ``retry_backoff_s`` * 2^n between them. Each retry is a
-        ``model.retry`` span event; when every try fails the last :class:`ModelUnavailable` is raised (and a
-        configured fallback profile takes over)."""
+        5xx, 408/429, "Model unloaded"; never a 404 for an unknown model), waiting ``retry_backoff_s`` * 2^n
+        between them. Each retry is a ``model.retry`` span event; when every try fails the last
+        :class:`ModelUnavailable` is raised (and a configured fallback profile takes over)."""
         for retry in range(p.retries + 1):
             try:
                 return self._request(p, messages, schema)
@@ -382,7 +383,7 @@ class OpenAIModel:
             )
         except httpx.HTTPError as exc:
             raise ModelUnavailable(f"{p.base_url}: {type(exc).__name__}: {exc}") from exc
-        if resp.status_code >= 500 or resp.status_code in (404, 408, 429):
+        if resp.status_code >= 500 or resp.status_code in (408, 429):
             raise ModelUnavailable(f"{p.base_url}: HTTP {resp.status_code}: {resp.text[:300]}")
         if resp.status_code >= 400:
             text = resp.text
@@ -390,6 +391,13 @@ class OpenAIModel:
                 raise ContextOverflow(f"prompt does not fit the context window of '{p.model}': {text[:300]}")
             if any(h in text.lower() for h in _TRANSIENT_HINTS):
                 raise ModelUnavailable(f"{p.base_url}: HTTP {resp.status_code}: {text[:300]}")
+            if resp.status_code == 404:
+                # vLLM / OpenAI: unknown model id (or a wrong base_url path): a configuration error that a
+                # retry or a fallback would only hide
+                raise ModelError(
+                    f"HTTP 404 from {p.base_url}: model '{p.model}' is not served there (check the profile's "
+                    f"model and base_url): {text[:300]}"
+                )
             raise ModelError(f"HTTP {resp.status_code} from {p.base_url}: {text[:300]}")
         try:
             payload = resp.json()
