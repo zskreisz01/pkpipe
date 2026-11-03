@@ -17,9 +17,9 @@ UNREACHABLE = "http://127.0.0.1:9/v1"  # discard port, nothing listens
 def _unreachable(monkeypatch):
     monkeypatch.setenv("PKPIPE_MODEL_BASE_URL", UNREACHABLE)
     monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)  # the inner run is a plain (serial) run
-    live.lmstudio_models.cache_clear()
+    live.served_models.cache_clear()
     yield
-    live.lmstudio_models.cache_clear()
+    live.served_models.cache_clear()
 
 
 def _project(pytester: pytest.Pytester) -> None:

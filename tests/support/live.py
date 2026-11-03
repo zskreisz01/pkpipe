@@ -52,15 +52,26 @@ def judge_model_name() -> str:
     return os.environ.get("PKPIPE_JUDGE_MODEL", DEFAULT_JUDGE_MODEL)
 
 
+def judge_base_url() -> str:
+    """The judge's endpoint, resolved like the pack's ``judge`` profile (``models.json``):
+    ``PKPIPE_JUDGE_BASE_URL``, else the model URL (one server serving both models)."""
+    return (os.environ.get("PKPIPE_JUDGE_BASE_URL") or model_base_url()).rstrip("/")
+
+
 @cache
-def lmstudio_models() -> tuple[str, ...]:
-    """Model ids served at /v1/models, or () when the server is unreachable."""
+def served_models(base_url: str) -> tuple[str, ...]:
+    """Model ids served at ``<base_url>/models``, or () when the server is unreachable."""
     try:
-        with urllib.request.urlopen(f"{model_base_url()}/models", timeout=2) as resp:
+        with urllib.request.urlopen(f"{base_url}/models", timeout=2) as resp:
             payload = json.load(resp)
         return tuple(m["id"] for m in payload.get("data", []))
-    except (urllib.error.URLError, OSError, ValueError, KeyError):
+    except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError):
         return ()
+
+
+def lmstudio_models() -> tuple[str, ...]:
+    """Model ids served at the model URL (``PKPIPE_MODEL_BASE_URL``), or () when unreachable."""
+    return served_models(model_base_url())
 
 
 def _lmstudio() -> str | None:
@@ -73,13 +84,19 @@ def _lmstudio() -> str | None:
 
 
 def _judge() -> str | None:
+    """The model under test and the judge, each at its own endpoint: a one-model-per-port server (vLLM,
+    ``PKPIPE_JUDGE_BASE_URL``) lists only the judge at the judge's port."""
     reason = _lmstudio()
     if reason:
         return reason
     if judge_model_name() == model_name():
         return "judge model equals the model under test (set PKPIPE_JUDGE_MODEL)"
-    if judge_model_name() not in lmstudio_models():
-        return f"judge model '{judge_model_name()}' is not available in LM Studio"
+    url = judge_base_url()
+    models = served_models(url)
+    if not models:
+        return f"judge server not reachable at {url}"
+    if judge_model_name() not in models:
+        return f"judge model '{judge_model_name()}' is not available at {url} (have: {', '.join(models)})"
     return None
 
 
