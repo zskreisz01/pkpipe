@@ -19,7 +19,9 @@ from jinja2 import TemplateError
 from jinja2.sandbox import SandboxedEnvironment
 
 #: Conservative per-channel text limits (Discord 2000 content chars, Teams / Apprise services vary).
-LIMITS = {"discord_webhook": 2000, "teams_webhook": 4000, "apprise": 4000, "log": 4000}
+LIMITS = {"discord_webhook": 2000, "discord_bot": 2000, "teams_webhook": 4000, "apprise": 4000, "log": 4000}
+#: A channel type that has no templates of its own uses those of another (a bot sends what a webhook sends).
+TEMPLATE_ALIASES = {"discord_bot": "discord_webhook"}
 TEXT_KEYS = ("content", "description", "text", "body")
 
 _env = SandboxedEnvironment(autoescape=False, keep_trailing_newline=False)
@@ -81,6 +83,8 @@ def render_event(
     warning = None
     for suffix in ("json", "md"):
         source = assets.get(f"templates/{event}.{channel_type}.{suffix}")
+        if source is None and channel_type in TEMPLATE_ALIASES:
+            source = assets.get(f"templates/{event}.{TEMPLATE_ALIASES[channel_type]}.{suffix}")
         if source is None:
             continue
         try:
