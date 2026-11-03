@@ -48,7 +48,7 @@ scripts/lmstudio-test-setup.sh                    # loads the local model; repor
 uv run pkpipe eval --suite all --concurrency 1    # match the judge's parallel predictions on its device
 ```
 
-The remote judge's parallel predictions and context are set on its own device; with `parallel 1` there, keep `--concurrency` at 1 (or 2) so judge requests do not queue past the judge profile's `timeout_s`. The system preflight already lowers the eval concurrency to the smallest `parallel` of the required models. A judge needs only a context of 8192 tokens there (`lms load <judge> --context-length 8192`), which lets a 16 GB machine hold it. The judge must still be strong enough: `qwen/qwen3.5-4b` failed the sessions gate while `google/gemma-4-e4b` judged close to the 12B ([evaluation](evaluation.md#concurrency)), so run the sessions suite before adopting one.
+The remote judge's parallel predictions and context are set on its own device; with `parallel 1` there, keep `--concurrency` at 1 (or 2) so judge requests do not queue past the judge profile's `timeout_s`. The system preflight already lowers the eval concurrency to the smallest `parallel` of the required models. A judge needs only a context of 8192 tokens there (`lms load <judge> --context-length 8192`), which lets a 16 GB machine hold it. The judge must still be strong enough: `qwen/qwen3.5-4b` failed the sessions gate and `google/gemma-4-e4b`, though close to the 12B, misjudged anonymized outputs in one session: it suits quick runs, a 12B-class judge the gated ones ([evaluation](evaluation.md#concurrency)), so run the sessions suite before adopting one.
 
 ## 3. Security components (required for processing web content)
 
