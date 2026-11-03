@@ -156,3 +156,18 @@ def test_check_reports_a_stopped_server_with_the_headless_commands(lms):
     assert result.returncode == 1
     assert "lms daemon up && lms server start --bind 127.0.0.1" in result.stderr
     assert not [c for c in calls if c.startswith(("daemon up", "server start", "load"))]
+
+
+@pytest.mark.parametrize("args", [(), ("--check",)])
+def test_a_judge_served_by_another_device_over_lm_link_is_reported_never_reloaded(lms, args):
+    """LM Link: the judge runs on a second machine (``deviceIdentifier`` set). Its load settings live on that
+    device, so a parallel-1 remote judge is neither unloaded nor loaded here (a local load would pull the
+    model onto this machine); it names the device and the --concurrency that fits, and --check passes."""
+    remote = {**_model("qwen/qwen3.5-4b", None, 1), "deviceIdentifier": "77874fbc"}
+    result, calls = lms(
+        [_model("qwen3.5-9b-mlx", None, 4), remote], *args, PKPIPE_JUDGE_MODEL="qwen/qwen3.5-4b"
+    )
+    assert result.returncode == 0, result.stderr
+    assert _changes(calls) == []
+    assert "qwen/qwen3.5-4b: served by LM Link device 77874fbc (parallel 1" in result.stdout
+    assert "--concurrency 1" in result.stderr

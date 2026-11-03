@@ -39,6 +39,17 @@ pkpipe only needs LM Studio's OpenAI-compatible server, not its window. On a mac
 
 Stop with `lms server stop` and `lms daemon down`. A server with one model per port (vLLM) works too: set `PKPIPE_JUDGE_BASE_URL` to the judge's endpoint, next to `PKPIPE_MODEL_BASE_URL`.
 
+**Judge on a second machine (LM Link).** LM Studio's LM Link (`lms link status`) lets the local server serve a model that is loaded on another of your devices, under its usual id at the same `http://127.0.0.1:1234/v1`. To judge with a smaller model on a second machine while this one runs the model under test, load the judge there and set only the model name:
+
+```bash
+lms link status                                   # the other device is "connected" and lists the judge
+export PKPIPE_MODEL_NAME=qwen3.5-9b-mlx PKPIPE_JUDGE_MODEL=google/gemma-4-e4b
+scripts/lmstudio-test-setup.sh                    # loads the local model; reports the remote judge, never reloads it
+uv run pkpipe eval --suite all --concurrency 1    # match the judge's parallel predictions on its device
+```
+
+The remote judge's parallel predictions and context are set on its own device; with `parallel 1` there, keep `--concurrency` at 1 (or 2) so judge requests do not queue past the judge profile's `timeout_s`. The system preflight already lowers the eval concurrency to the smallest `parallel` of the required models. A judge needs only a context of 8192 tokens there (`lms load <judge> --context-length 8192`), which lets a 16 GB machine hold it. The judge must still be strong enough: `qwen/qwen3.5-4b` failed the sessions gate while `google/gemma-4-e4b` judged close to the 12B ([evaluation](evaluation.md#concurrency)), so run the sessions suite before adopting one.
+
 ## 3. Security components (required for processing web content)
 
 | ✓ | Component | Why | Install | Check |

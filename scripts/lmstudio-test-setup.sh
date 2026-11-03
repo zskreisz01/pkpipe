@@ -22,6 +22,11 @@
 # localhost only, port 1234 unless another was used last); it warns while the app window is open. Stop with
 # `lms server stop` and `lms daemon down` (docs/installation.md).
 #
+# LM Link: a model served by another device (the judge on a second machine, `lms link status`) is loaded and
+# configured on that device. The script never loads, unloads or reloads it; it only reports it, warns when it
+# runs fewer parallel predictions than wanted (lower `pkpipe eval --concurrency` to match) and fails --check only
+# when it is not loaded at all.
+#
 # Only these two models are touched: other loaded models stay loaded, nothing is downloaded or deleted, and no
 # other LM Studio setting changes. A model is reloaded only when it is loaded with a TTL, with fewer
 # parallel predictions or with another context length than wanted (a reload drops requests in flight: run
@@ -67,7 +72,8 @@ if ! "$LMS" server status 2>&1 | grep -q "server is running"; then  # not "... i
   "$LMS" server start --bind 127.0.0.1
 fi
 
-# state <model>: "absent", or "<status> <ttl_ms|none> <parallel> <context>" of the instance <model>
+# state <model>: "absent", or "<status> <ttl_ms|none> <parallel> <context> <device|local>" of the instance
+# <model> (device: the LM Link device identifier of a model served by another machine)
 state() {
   "$LMS" ps --json | python3 -c '
 import json, sys
@@ -76,7 +82,7 @@ for m in json.load(sys.stdin):
     if m.get("identifier") == want:
         ttl = m.get("ttlMs")
         print(m.get("status", "?"), "none" if ttl is None else ttl, m.get("parallel") or 1,
-              m.get("contextLength") or 0)
+              m.get("contextLength") or 0, m.get("deviceIdentifier") or "local")
         break
 else:
     print("absent")
@@ -91,7 +97,15 @@ load() {
 
 problems=0
 for model in "${MODELS[@]}"; do
-  read -r status ttl parallel context <<<"$(state "$model")"
+  read -r status ttl parallel context device <<<"$(state "$model")"
+  if [[ "$status" != "absent" && "$device" != "local" ]]; then
+    echo "$model: served by LM Link device $device (parallel $parallel, context $context; managed there)"
+    if [[ "$parallel" -lt "$PARALLEL" ]]; then
+      echo "note: $model runs $parallel parallel prediction(s) on its device; use pkpipe eval" \
+        "--concurrency $parallel or reload it there with --parallel $PARALLEL" >&2
+    fi
+    continue
+  fi
   if [[ "$status" == "absent" ]]; then
     echo "$model: not loaded"
     if ((CHECK)); then problems=$((problems + 1)); else load "$model"; fi
