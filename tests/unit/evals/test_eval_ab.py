@@ -167,12 +167,13 @@ def _suite(name="sessions", status=Status.PASSED, **metrics) -> SuiteReport:
 GATES = {"sessions": {"judge_mean": Threshold(min=4.0), "canary_leaks": Threshold(max=0)}}
 
 
-def _decide(base, cand, pairwise=(), errors=(), **kw):
+def _decide(base, cand, pairwise=(), errors=(), candidate_gates=None, baseline_gates=None, **kw):
     return ab.decide(
         ab.AbInputs(
             baseline=_run(base),
             candidate=_run(cand),
-            candidate_gates=GATES,
+            candidate_gates=GATES if candidate_gates is None else candidate_gates,
+            baseline_gates=baseline_gates or {},
             pairwise=list(pairwise),
             pairwise_errors=list(errors),
         ),
@@ -233,3 +234,45 @@ def test_a_failing_candidate_gate_is_never_better():
     cand = _suite(judge_mean=4.9, canary_leaks=0)
     cand.status = Status.FAILED  # e.g. another gated metric is red
     assert _decide(_suite(judge_mean=4.0, canary_leaks=0), cand).verdict == "worse"
+
+
+def test_a_spike_config_cannot_lower_or_drop_a_gate_of_the_current_config():
+    """Constitution IX (thresholds only move upwards): a candidate pack whose evals.json drops the canary
+    gate or lowers the judge gate is still measured against the current config's gates."""
+    base = _suite(judge_mean=4.5, canary_leaks=0)
+    leaky = _suite(judge_mean=4.9, canary_leaks=1)  # its own gate no longer has canary_leaks
+    dropped = _decide(base, leaky, candidate_gates={"sessions": {"judge_mean": Threshold(min=4.0)}},
+                      baseline_gates=GATES)  # fmt: skip
+    assert dropped.verdict == "worse" and not dropped.gate_green
+    assert any("canary_leaks = 1 (current gate <= 0)" in f for f in dropped.failures)
+    assert any(m.metric == "canary_leaks" and m.verdict == "worse" for m in dropped.metrics)
+    weak = _suite(judge_mean=3.5, canary_leaks=0)
+    lowered = _decide(_suite(judge_mean=3.4, canary_leaks=0), weak,
+                      candidate_gates={"sessions": {"judge_mean": Threshold(min=3.0)}},
+                      baseline_gates=GATES)  # fmt: skip
+    assert lowered.verdict == "worse" and any(
+        "judge_mean = 3.5 (current gate >= 4)" in f for f in lowered.failures
+    )
+    assert ab.strictest_gates(
+        {"s": {"a": Threshold(min=0.8), "b": Threshold(max=0)}},
+        {"s": {"a": Threshold(min=0.9), "b": Threshold(max=2)}},
+    ) == {"s": {"a": Threshold(min=0.9), "b": Threshold(max=0)}}
+
+
+def test_the_compare_runner_applies_the_current_gates_to_a_spike_that_dropped_them(pack_dir, paths, tmp_path):
+    base_snap, _ = _snaps(pack_dir, tmp_path)
+    gate = {"suites": {"sessions": {"gate": {"check_pass_rate": {"min": 1.0}}}}}
+    (tmp_path / "base/evals.json").write_text(json.dumps(gate), encoding="utf-8")
+    (tmp_path / "cand/evals.json").write_text(
+        json.dumps({"suites": {"sessions": {"gate": {"check_pass_rate": {"min": 0.0}}}}}), encoding="utf-8"
+    )
+    base = load_effective(pack_dir, tmp_path / "base").snapshot()
+    cand = load_effective(pack_dir, tmp_path / "cand").snapshot()
+    # the spike's instruction is the regression: it drops the tool name, and its own gate would accept that
+    (tmp_path / "cand/instructions/marketing/synthesize.md").write_text(
+        "Write the note badly.", encoding="utf-8"
+    )
+    cand = load_effective(pack_dir, tmp_path / "cand").snapshot()
+    report = _compare(base, cand, paths, _model(good_marker="Write the note.", winner=("A", "B")))
+    assert not report.gate_green and report.verdict == "worse"
+    assert any("check_pass_rate = 0 (current gate >= 1)" in f for f in report.failures)

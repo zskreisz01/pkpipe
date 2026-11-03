@@ -124,6 +124,12 @@ def test_a_rejection_needs_a_reason_and_a_reopening_needs_new_evidence():
     rejected = _row("rejected", reason="worse")
     assert "new evidence" in tc.check_transition(rejected, tc.Status.CANDIDATE)
     assert tc.check_transition(rejected, tc.Status.CANDIDATE, evidence="v2 fixes the leak") is None
+    # rejected again after a reopening: the same evidence is not new evidence
+    twice = _row("rejected", reason="still worse", evidence="v2 fixes the leak")
+    assert "new evidence" in tc.check_transition(twice, tc.Status.CANDIDATE, evidence=" V2 fixes the  leak")
+    assert (
+        tc.check_transition(twice, tc.Status.CANDIDATE, evidence="v3 passes the A/B on tool.compare") is None
+    )
 
 
 def test_adoption_needs_an_adr_and_a_winning_green_ab():
@@ -140,6 +146,8 @@ def test_adoption_needs_an_adr_and_a_winning_green_ab():
     assert "gate" in tc.check_transition(trial, tc.Status.ADOPTED, adr_exists=True, ab=red)
     other = tc.AbEvidence(tool="Other", verdict="better", gate_green=True)
     assert "not 'Metasea'" in tc.check_transition(trial, tc.Status.ADOPTED, adr_exists=True, ab=other)
+    unnamed = tc.AbEvidence(tool="", verdict="better", gate_green=True)  # a report that names no tool
+    assert "not 'Metasea'" in tc.check_transition(trial, tc.Status.ADOPTED, adr_exists=True, ab=unnamed)
 
 
 def test_hand_edited_rows_that_break_the_rules_are_reported():

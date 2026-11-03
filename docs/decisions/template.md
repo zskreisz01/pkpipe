@@ -45,7 +45,7 @@ A spike tries the candidate behind the matching adapter; nothing in the main con
 2. **Find the port.** The tool must fit behind an existing port or MCP server; if it needs a new port, say so in the ADR (the core depends only on ports).
 3. **Build the spike as a configuration** (a second pack or an overlay directory) and, only when needed, an adapter with a fake in `tests/fakes/`. Do not touch the main configuration.
 4. **Run the A/B:** `pkpipe candidates ab <tool> --candidate-overlay <spike overlay>` (or `--candidate-pack`). It runs the same eval suites on the current and the candidate configuration and compares gated metrics and the judge's pairwise preference.
-5. **Read the verdict.** `better` = gate green, no gated metric worse, and an improvement or a judge preference. `equal` and `inconclusive` do not adopt; `worse` is a reason to reject.
+5. **Read the verdict.** `better` = gate green (the spike's own gates and the current config's; a spike cannot lower a gate), no gated metric worse, and an improvement or a judge preference. `equal` and `inconclusive` do not adopt; `worse` is a reason to reject.
 6. **Write the ADR:** `pkpipe candidates adr <tool> --ab-report ab-<tool>.json`, edit it, accept it.
 7. **Decide:** `pkpipe candidates set <tool> --status adopted --adr <file> --ab-report <report>` (refused without both), or `--status rejected --reason "..."`. A rejected tool is not proposed again without new evidence (`--status candidate --evidence "..."`).
 8. **Publish the configuration change** through the config UI so the eval gate runs on the real change.

@@ -248,8 +248,11 @@ def check_transition(
         return None
     if new_status is Status.REJECTED and not (reason or "").strip():
         return "a rejection needs a reason"
-    if old.status is Status.REJECTED and not (evidence or "").strip():
-        return "a rejected tool is proposed again only with new evidence (SC-001): give the evidence"
+    if old.status is Status.REJECTED:
+        if not (evidence or "").strip():
+            return "a rejected tool is proposed again only with new evidence (SC-001): give the evidence"
+        if old.evidence.strip() and clean(evidence, 300).casefold() == clean(old.evidence, 300).casefold():
+            return "this evidence reopened the tool before: a rejected tool comes back only with new evidence"
     if new_status is Status.ADOPTED:
         return adoption_error(old, adr_exists=adr_exists, ab=ab)
     return None
@@ -262,7 +265,7 @@ def adoption_error(row: ToolCandidate, *, adr_exists: bool, ab: AbEvidence | Non
         return f"adoption needs an ADR in {ADR_DIR}/ (pkpipe candidates adr)"
     if ab is None:
         return "adoption needs an A/B report that beats the current component (pkpipe candidates ab)"
-    if tool_key(ab.tool) != tool_key(row.tool):
+    if not tool_key(ab.tool) or tool_key(ab.tool) != tool_key(row.tool):
         return f"the A/B report is for '{ab.tool}', not '{row.tool}'"
     if ab.verdict != "better":
         return f"the A/B comparison is '{ab.verdict}', adoption needs 'better'"

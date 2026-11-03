@@ -152,6 +152,20 @@ def test_adoption_needs_the_adr_and_a_won_ab_and_is_recorded_in_the_list(listed,
         str(wrong_tool),
     )
     assert r.returncode == 1 and "not 'Metasea'" in r.stderr
+    no_tool = _report(tmp_path, tool="")  # a report that names no tool is evidence for none
+    r = _cli(
+        vault,
+        adr_dir,
+        "set",
+        "metasea",
+        "--status",
+        "adopted",
+        "--adr",
+        adr.name,
+        "--ab-report",
+        str(no_tool),
+    )
+    assert r.returncode == 1 and "not 'Metasea'" in r.stderr
     good = _report(tmp_path)
     r = _cli(
         vault, adr_dir, "set", "metasea", "--status", "adopted", "--adr", adr.name, "--ab-report", str(good)

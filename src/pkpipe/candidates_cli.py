@@ -86,7 +86,7 @@ def _set(args: argparse.Namespace) -> int:
     ab = None
     if report is not None:
         ab = tc.AbEvidence(
-            tool=report.get("tool") or row.tool,
+            tool=str(report.get("tool") or ""),  # a report that names no tool is no evidence for this one
             verdict=str(report["verdict"]),
             gate_green=bool(report.get("gate_green")),
             summary=_summary(report),

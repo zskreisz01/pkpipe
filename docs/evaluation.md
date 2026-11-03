@@ -127,7 +127,7 @@ A spike of a system tool candidate ([System Tool Candidates](process/system-tool
 
 | Verdict | Rule |
 | --- | --- |
-| `better` | The candidate's own gates are green, no gated metric is worse than the current component's by more than 0.01 (a `min` gate means higher is better, a `max` gate lower, so a new canary leak is a loss), no pairwise score is below `pairwise.min_score`, and at least one gated metric improved or a pairwise score is at least 0.6 |
+| `better` | The candidate passes its own gates and the current config's gates (per metric the stricter threshold counts: a spike config cannot lower or drop a gate), no gated metric is worse than the current component's by more than 0.01 (a `min` gate means higher is better, a `max` gate lower, so a new canary leak is a loss), no pairwise score is below `pairwise.min_score`, and at least one gated metric improved or a pairwise score is at least 0.6 |
 | `worse` | A gate is red, a gated metric dropped or a pairwise comparison was lost: a reason to reject the candidate |
 | `equal` | Measured and not worse, but nothing beats the current component: not adopted |
 | `inconclusive` | A suite or the judge could not run on either side: never a win |

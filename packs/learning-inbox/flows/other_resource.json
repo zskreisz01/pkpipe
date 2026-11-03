@@ -111,7 +111,7 @@
     {
       "id": "candidates",
       "type": "tool",
-      "bpmn_element": "Add to System-Tool-Candidates (component, benefit, effort, status = candidate)",
+      "bpmn_element": "Add system tool candidate (code decides)",
       "config": {
         "tool": "obsidian:read_tool_candidates",
         "arguments": {}
@@ -160,7 +160,7 @@
     {
       "id": "candidate_write",
       "type": "tool",
-      "bpmn_element": "Add to System-Tool-Candidates (component, benefit, effort, status = candidate)",
+      "bpmn_element": "Add system tool candidate (code decides)",
       "config": {
         "tool": "obsidian:update_tool_candidates",
         "arguments": {
