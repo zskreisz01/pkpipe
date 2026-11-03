@@ -19,7 +19,9 @@ import pytest
 from pkpipe import app
 from pkpipe.cli import main
 from pkpipe.domain.triage import item_id_for
+from pkpipe.engine.registry import load_effective
 from pkpipe.evals.cassette import CassetteModel
+from pkpipe.evals.runner import profile_identities
 from pkpipe.obsidian import lists
 from tests.conftest import PACK, REPO
 from tests.fakes import FakeNotify
@@ -63,7 +65,10 @@ def world(variant, tmp_path, synthetic_vault, write_json, monkeypatch, capsys):
     monkeypatch.delenv("PKPIPE_OVERLAY_DIR", raising=False)
     cassette: CassetteModel | None = None
     if variant == "replay":
-        cassette = CassetteModel(CASSETTE, "replay")
+        # the model ids of the pack's profiles: a recording made with another model is refused, not replayed
+        cassette = CassetteModel(
+            CASSETTE, "replay", identities=profile_identities(load_effective(PACK).snapshot())
+        )
         monkeypatch.setattr(app, "make_model", lambda snapshot: cassette)
     elif os.environ.get("PKPIPE_E2E_RECORD") == "1":  # live variant that also writes the cassette
         real, holder = app.make_model, {}
@@ -71,7 +76,9 @@ def world(variant, tmp_path, synthetic_vault, write_json, monkeypatch, capsys):
         def recording(snapshot):
             if "c" not in holder:  # one cassette for all CLI invocations of this test
                 CASSETTE.unlink(missing_ok=True)
-                holder["c"] = CassetteModel(CASSETTE, "record", inner=real(snapshot))
+                holder["c"] = CassetteModel(
+                    CASSETTE, "record", inner=real(snapshot), identities=profile_identities(snapshot)
+                )
             return holder["c"]
 
         monkeypatch.setattr(app, "make_model", recording)

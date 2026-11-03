@@ -7,7 +7,7 @@ import httpx
 import pytest
 
 from pkpipe.engine.registry import load_effective
-from pkpipe.evals import EvalPaths, EvalRunner, Status, evals_config
+from pkpipe.evals import EvalPaths, EvalRunner, Status, evals_config, profile_identities
 from tests.conftest import REPO
 
 LLM_SUITES = ["triage", "sessions", "calibration", "improvement", "context_leak", "security"]
@@ -32,6 +32,12 @@ def snapshot(pack_dir):
     return load_effective(pack_dir, None).snapshot()
 
 
+def pack_identities(snapshot, **environ: str) -> dict[str, str]:
+    """The models the pack's profiles use (``models.json`` defaults, plus ``environ``): replay answers only
+    for those, so a model switch in the pack makes CI fail instead of replaying the old model's answers."""
+    return profile_identities(snapshot, environ)
+
+
 def test_cassettes_exist_for_every_llm_suite():
     for suite in LLM_SUITES:
         assert (REPO / "evals" / "cassettes" / f"{suite}.json").is_file(), suite
@@ -44,7 +50,7 @@ def test_all_suites_pass_their_gates_in_replay(no_network, snapshot, pack_dir):
         paths=EvalPaths.create(REPO / "evals"),
         model=None,
         mode="replay",
-        identities={"default": "recorded|qwen3.5-9b-mlx", "judge": "recorded|google/gemma-4-12b"},
+        identities=pack_identities(snapshot),
     )
     run = runner.run(["deterministic", "flows", *LLM_SUITES])
     assert run.ok, run.failures()
@@ -71,7 +77,7 @@ def test_improvement_extraction_replays_with_the_spec_015_precision(no_network, 
         paths=EvalPaths.create(REPO / "evals"),
         model=None,
         mode="replay",
-        identities={"default": "recorded|qwen3.5-9b-mlx", "judge": "recorded|google/gemma-4-12b"},
+        identities=pack_identities(snapshot),
     )
     run = runner.run(["improvement", "sessions"])
     improvement = run.suite("improvement")
@@ -80,4 +86,20 @@ def test_improvement_extraction_replays_with_the_spec_015_precision(no_network, 
     assert improvement.metrics["empty_clean_rate"] >= 0.8
     per = run.suite("sessions").metrics["per_session"]
     assert {"review_improvement.evidence", "review_improvement.verdict"} <= set(per)
+    assert no_network == []
+
+
+def test_a_model_switch_fails_replay_with_a_clear_mismatch(no_network, snapshot):
+    """After a model switch (here the judge) the recordings of the old model are refused: the suite errors
+    with CassetteModelMismatch naming both models, it is never green on the old model's answers. The base URL
+    is not part of the key, so the unreachable replay URL of ``no_network`` does not matter."""
+    ids = pack_identities(snapshot, PKPIPE_JUDGE_MODEL="other/judge-model")
+    assert ids["judge"].endswith("|other/judge-model")
+    runner = EvalRunner(
+        snapshot, paths=EvalPaths.create(REPO / "evals"), model=None, mode="replay", identities=ids
+    )
+    report = runner.run(["calibration"]).suite("calibration")
+    assert report.status is Status.ERROR, report.status
+    assert "CassetteModelMismatch" in report.reason
+    assert "google/gemma-4-12b" in report.reason and "other/judge-model" in report.reason
     assert no_network == []
