@@ -37,7 +37,10 @@ scripts/lmstudio-test-setup.sh                         # once before live tests:
   with the same prompt replays it, while every changed request still reaches the model.
 - **LM Studio.** `scripts/lmstudio-test-setup.sh` loads the model under test and the judge together with no
   idle TTL, 4 parallel predictions and a 32768-token context (`--check` only reports; other loaded models are
-  left alone). Without it, a TTL unload or a JIT load of one model while the other is serving shows up as
+  left alone). Run LM Studio headless for live runs: quit the app (its window must not be open; the script
+  prints a note while it is), then `lms daemon up` and `lms server start --bind 127.0.0.1`; the script does
+  both when nothing serves (docs/installation.md, "LM Studio headless"). Stop with
+  `lms server stop` and `lms daemon down`. Without it, a TTL unload or a JIT load of one model while the other is serving shows up as
   "Model unloaded" (HTTP 400); the pack's model profiles retry that and other transient errors twice
   (`retries`). Keep other clients off LM Studio during a live run: a stalled server times out requests and
   leaves eval cases unjudged (`docs/evaluation.md`, Concurrency); rerun that test alone before calling it a
@@ -82,7 +85,7 @@ reachable, `tests/support/preflight.py` runs the system preflight (`pkpipe docto
 
 | Marker | Meaning |
 | --- | --- |
-| `live` | Needs a real local service. `@pytest.mark.live` = LM Studio at `PKPIPE_MODEL_BASE_URL` (default `http://127.0.0.1:1234/v1`) with model `PKPIPE_MODEL_NAME` (default `qwen3.5-9b-mlx`). `@pytest.mark.live("judge")` = the eval judge model `PKPIPE_JUDGE_MODEL` (default `google/gemma-4-12b`) on the same server, different from the model under test (spec 013). `@pytest.mark.live("open_notebook")` = Open Notebook + Speaches (spec 012; `PKPIPE_LIVE_AUDIO=1` also generates a full podcast, 10 to 40 minutes; the tests start `deploy/open-notebook` or `~/tools/open-notebook` when it is down and stop it again). Other services: `@pytest.mark.live("docker")`, `@pytest.mark.live("lightpanda")`, `@pytest.mark.live("browser")` (Playwright Chromium for the UI e2e test, spec 014, and the secure-fetch fallback, spec 008: `uv run playwright install chromium`), combinations allowed. |
+| `live` | Needs a real local service. `@pytest.mark.live` = LM Studio at `PKPIPE_MODEL_BASE_URL` (default `http://127.0.0.1:1234/v1`) with model `PKPIPE_MODEL_NAME` (default `qwen3.5-9b-mlx`). `@pytest.mark.live("judge")` = the eval judge model `PKPIPE_JUDGE_MODEL` (default `google/gemma-4-12b`), different from the model under test (spec 013), listed at `PKPIPE_JUDGE_BASE_URL` (a one-model-per-port server such as vLLM), else on the model's server. `@pytest.mark.live("open_notebook")` = Open Notebook + Speaches (spec 012; `PKPIPE_LIVE_AUDIO=1` also generates a full podcast, 10 to 40 minutes; the tests start `deploy/open-notebook` or `~/tools/open-notebook` when it is down and stop it again). Other services: `@pytest.mark.live("docker")`, `@pytest.mark.live("lightpanda")`, `@pytest.mark.live("browser")` (Playwright Chromium for the UI e2e test, spec 014, and the secure-fetch fallback, spec 008: `uv run playwright install chromium`), combinations allowed. |
 | `docs` | Builds the Docusaurus site (`npm run build`); skipped when `website/node_modules` is missing. |
 
 Live tests are **skipped** when the service is unreachable, so GitHub CI stays green. On the machine that owns the

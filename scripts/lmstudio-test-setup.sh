@@ -16,6 +16,12 @@
 # PKPIPE_LMSTUDIO_PARALLEL (default 4), PKPIPE_LMSTUDIO_CONTEXT (context length; default 32768; empty:
 # the model's own default), LMS (path of the lms CLI; default: lms on PATH, else ~/.lmstudio/bin/lms).
 #
+# Headless (recommended on a busy machine): quit the LM Studio app (its window, renderer and GPU helper cost
+# memory the models need) and let the llmster daemon serve instead. This script starts it when nothing serves:
+# `lms daemon up` (the daemon), then `lms server start --bind 127.0.0.1` (the OpenAI-compatible server on
+# localhost only, port 1234 unless another was used last); it warns while the app window is open. Stop with
+# `lms server stop` and `lms daemon down` (docs/installation.md).
+#
 # Only these two models are touched: other loaded models stay loaded, nothing is downloaded or deleted, and no
 # other LM Studio setting changes. A model is reloaded only when it is loaded with a TTL, with fewer
 # parallel predictions or with another context length than wanted (a reload drops requests in flight: run
@@ -43,12 +49,22 @@ if [[ -z "$LMS" ]]; then
   exit 1
 fi
 
-if ! "$LMS" server status 2>&1 | grep -q "running"; then
+# The LM Studio app with its window (not the headless daemon, which runs the same binary --run-as-service)
+if ps -axo command= | grep -E '/LM Studio\.app/Contents/MacOS/LM Studio( |$)' | grep -qv -- '--run-as-service'; then
+  echo "note: the LM Studio app is open; for headless mode quit it and rerun (lms daemon up)" >&2
+fi
+
+has_daemon() { "$LMS" daemon --help >/dev/null 2>&1; }  # lms 0.4+: the llmster daemon
+
+if ! "$LMS" server status 2>&1 | grep -q "server is running"; then  # not "... is not running"
   if ((CHECK)); then
-    echo "LM Studio server is not running" >&2
+    echo "LM Studio server is not running (start it: lms daemon up && lms server start --bind 127.0.0.1)" >&2
     exit 1
   fi
-  "$LMS" server start
+  if has_daemon && ! "$LMS" daemon status 2>&1 | grep -q "is running"; then
+    "$LMS" daemon up
+  fi
+  "$LMS" server start --bind 127.0.0.1
 fi
 
 # state <model>: "absent", or "<status> <ttl_ms|none> <parallel> <context>" of the instance <model>

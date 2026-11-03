@@ -27,6 +27,18 @@ Everything you need on your machine to run pkpipe in its reference setup: local 
 | [ ] | An instruct model with JSON-schema output | Triage and category sessions | In LM Studio / Ollama, download a ~9B instruct model (default in `.env.example`) | Model listed by the check above |
 | [ ] | Docker runtime | Lightpanda, SearXNG, Phoenix, Open Notebook | Docker Desktop, OrbStack or Colima | `docker compose version` |
 
+### LM Studio headless (recommended)
+
+pkpipe only needs LM Studio's OpenAI-compatible server, not its window. On a machine that also runs other programs, run LM Studio headless: the app's window, renderer and GPU helper cost memory the models need.
+
+1. Quit the LM Studio app (menu bar icon, Quit). The headless daemon and the app window are not run together; while the app is open, `scripts/lmstudio-test-setup.sh` prints a note.
+2. Start the daemon (llmster, LM Studio 0.4+): `lms daemon up` (`lms` lives in `~/.lmstudio/bin` once the app has run once).
+3. Start the server on localhost only: `lms server start --bind 127.0.0.1` (port 1234 unless another was used last; `--port` changes it).
+4. Load the models: `scripts/lmstudio-test-setup.sh` (model under test and judge, no idle TTL, parallel 4, context 32768). It also runs steps 2 and 3 when nothing is serving.
+5. Check: `lms daemon status`, `lms server status`, `lms ps`, `curl http://127.0.0.1:1234/v1/models`.
+
+Stop with `lms server stop` and `lms daemon down`. A server with one model per port (vLLM) works too: set `PKPIPE_JUDGE_BASE_URL` to the judge's endpoint, next to `PKPIPE_MODEL_BASE_URL`.
+
 ## 3. Security components (required for processing web content)
 
 | ✓ | Component | Why | Install | Check |
