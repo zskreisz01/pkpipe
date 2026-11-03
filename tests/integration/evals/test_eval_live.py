@@ -132,7 +132,9 @@ def test_publish_gate_live_on_a_changed_session_instruction(
     assert {"sessions", "security"} <= set(decision.affected)
     [pairwise] = decision.pairwise
     assert pairwise["session"] == "marketing.synthesize"
-    assert len(pairwise["outcomes"]) == 5  # all cases of its dataset
+    dataset = REPO / "evals/datasets/sessions/marketing/synthesize.jsonl"
+    cases = sum(1 for line in dataset.read_text(encoding="utf-8").splitlines() if line.strip())
+    assert len(pairwise["outcomes"]) == min(6, cases)  # every case up to the limit, each judged
     assert 0.0 <= pairwise["score"] <= 1.0
     if decision.allowed:
         assert decision.status == "passed" and not decision.failures
