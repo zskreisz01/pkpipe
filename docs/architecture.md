@@ -92,7 +92,7 @@ C4Container
         ContainerDb(db, "App DB", "SQLite (WAL)", "Runs, config snapshots, checkpoints, jobs, drafts, publishes, audit")
         ContainerDb(cfg, "Config", "git: JSON + Markdown", "Public pack + private overlay")
         Container(mvault, "obsidian-vault :8701", "FastMCP, pkpipe.obsidian", "Notes, triage and processing lists, improvements, tool candidates, quarantine")
-        Container(msearch, "web-search :8702", "MCP, not in this repo", "SearXNG or Brave")
+        Container(msearch, "web-search :8702", "MCP, pkpipe.websearch", "SearXNG or Brave")
         Container(mfetch, "web-fetch :8704", "FastMCP, pkpipe.webfetch", "fetch_page only: URL policy, filtering proxy, Lightpanda, Chromium fallback")
         Container(browsers, "Headless browsers", "child processes", "Lightpanda, Playwright + Chromium")
         Container(mlearn, "learning-gateway :8703", "FastMCP, pkpipe.learning", "create, status, link, audio; SQLite job store")

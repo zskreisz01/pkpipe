@@ -67,7 +67,7 @@ Without these, triage still works (it only sees URL, title and note), but no web
 
 | ✓ | Component | Enables | Install | Configure |
 | --- | --- | --- | --- | --- |
-| [ ] | SearXNG (Docker) or a Brave Search API key | Web search in research sessions | `docker compose -f deploy/docker-compose.yml up -d searxng` | `mcp_servers.json` |
+| [ ] | SearXNG (Docker) or a Brave Search API key | Web search in research sessions | `SEARXNG_SECRET=$(openssl rand -hex 32) docker compose -f deploy/docker-compose.yml up -d searxng` | Then run the web-search server: `uv run python -m pkpipe.websearch.server` (127.0.0.1:8702; `--backend brave` with `BRAVE_API_KEY`) |
 | [ ] | Open Notebook + SurrealDB (Docker) | Notebooks for learning material | `cd deploy/open-notebook && cp .env.example .env && docker compose up -d` | `learning-gateway` backend `open_notebook` (default), then `uv run python -m pkpipe.learning.open_notebook_setup` |
 | [ ] | Local TTS (Speaches, Kokoro voice, same compose file) | Podcasts generated locally | Started with Open Notebook; the setup script downloads the voice model (once) | Done by the setup script, see [`deploy/open-notebook/README.md`](https://github.com/zskreisz01/pkpipe/tree/master/deploy/open-notebook) |
 | [ ] | Google account for NotebookLM | Alternative learning backend (browser automation, you bring the driver) | – | `learning-gateway` backend `notebooklm_browser`, `options.backend_options.driver` |

@@ -22,6 +22,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [014-config-ui-and-app-mcp](014-config-ui-and-app-mcp/spec.md) | Config UI and app MCP server | Completed | research · data-model · contracts |
 | [015-self-improvement-cycle](015-self-improvement-cycle/spec.md) | Self-improvement cycle (overlay) | Completed | data-model |
 | [016-system-tool-candidates](016-system-tool-candidates/spec.md) | System tool candidates | Completed | data-model |
+| [017-web-search](017-web-search/spec.md) | web-search MCP server | Completed |  |
 
 ## Implementation order
 

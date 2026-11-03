@@ -1,0 +1,13 @@
+# SearXNG for pkpipe (spec 017): the JSON API must be enabled, the instance listens on loopback only.
+use_default_settings: true
+general:
+  instance_name: pkpipe-search
+  enable_metrics: false
+search:
+  safe_search: 1
+  formats: [html, json]
+server:
+  # Set SEARXNG_SECRET in the environment (compose passes it); the default key makes SearXNG refuse to start.
+  secret_key: "change-me-via-SEARXNG_SECRET"
+  limiter: false          # loopback-only, single user
+  image_proxy: false
