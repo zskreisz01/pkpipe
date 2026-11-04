@@ -20,11 +20,14 @@ from pkpipe.adapters.app_store_sqlite import AppStore
 from pkpipe.api.publish import Publisher, PublishError
 from pkpipe.api.workspace import ConfigWorkspace, WorkspaceError, category_entry
 from pkpipe.domain.triage import ItemState
+from pkpipe.domain.vault_snapshot import SnapshotError, UnknownSnapshot
+from pkpipe.engine.restore import restore_run
 from pkpipe.engine.runs import ACTIVE, RunService
 from pkpipe.engine.snapshot import ConfigSnapshot
 from pkpipe.evals.gate import GateDecision, PublishGate
 from pkpipe.obsidian.errors import VaultError
 from pkpipe.obsidian.vault import Vault
+from pkpipe.ports import SnapshotPort
 
 log = logging.getLogger("pkpipe.api")
 MAX_RESOURCE_CHARS = 300
@@ -123,6 +126,8 @@ class AppServices:
     on_config_change: Callable[[], None] | None = None
     #: Where released quarantine items become eval candidates (spec 009); None = not exported.
     candidates_dir: Path | None = None
+    #: Vault snapshots of writing runs (spec 019); None = no vault configured, nothing to restore.
+    snapshots: SnapshotPort | None = None
 
     # -- runs -----------------------------------------------------------------------------------------------
     def flows(self) -> list[str]:
@@ -158,6 +163,42 @@ class AppServices:
             return []
         values = tup.checkpoint.get("channel_values", {})
         return sorted({*(values.get("outputs") or {}), *(values.get("item_outputs") or {})})
+
+    # -- snapshots and restore (spec 019) -------------------------------------------------------------------
+    def _snapshots(self) -> SnapshotPort:
+        if self.snapshots is None:
+            raise Refused("no vault configured (PKPIPE_VAULT_DIR or --vault): there are no snapshots")
+        return self.snapshots
+
+    def list_snapshots(self) -> list[dict[str, Any]]:
+        return [i.model_dump(mode="json") for i in self._snapshots().list()]
+
+    def snapshot_of_run(self, run_id: str) -> dict[str, Any] | None:
+        """The snapshot row of a run (for the run page), or None when it took none or no vault is set."""
+        if self.snapshots is None:
+            return None
+        return next((i.model_dump(mode="json") for i in self.snapshots.list() if i.run_id == run_id), None)
+
+    def restore_run(
+        self, run_id: str, *, apply: bool = False, force: bool = False, actor: str
+    ) -> dict[str, Any]:
+        """Owner action (spec 019 FR-004): the restore plan of a run, applied only with ``apply``. Audited
+        when applied (counts and the safety snapshot, never paths); a refusal is audited too."""
+        port = self._snapshots()
+        try:
+            plan = restore_run(port, run_id, apply=apply, force=force, runs=self.runs)
+        except UnknownSnapshot as exc:
+            raise NotFound(str(exc)) from None
+        except SnapshotError as exc:
+            if apply:
+                self.store.audit(actor, "restore_run_refused", run_id, reason=str(exc))
+            raise Refused(str(exc)) from None
+        counts = plan.counts()
+        if apply:
+            self.store.audit(
+                actor, "restore_run", plan.run_id, force=force, **counts, safety=plan.safety_snapshot
+            )
+        return {**plan.to_json(), "counts": counts}
 
     # -- triage ---------------------------------------------------------------------------------------------
     def _vault(self) -> Vault:

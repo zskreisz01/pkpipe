@@ -13,12 +13,15 @@ from pathlib import Path
 
 import uvicorn
 
+from pkpipe.adapters.app_store_sqlite import AppStore
+from pkpipe.adapters.snapshot_files import FileSnapshots
 from pkpipe.adapters.state_sqlite import SqliteRunStore, open_checkpointer
 from pkpipe.api.app import create_app
 from pkpipe.api.security import Tokens
 from pkpipe.engine.registry import load_effective
 from pkpipe.engine.runs import RunService
 from pkpipe.evals.gate import PublishGate
+from pkpipe.obsidian.policy import VaultPolicy
 from pkpipe.serve import build_services
 from tests.conftest import REPO
 from tests.fakes import FakeClock, FakeModel, FakeNotify, RecordingTracer
@@ -156,11 +159,18 @@ def make_stack(
         tracer=RecordingTracer(),
         clock=FakeClock(),
     )
+    snapshots = FileSnapshots(
+        tmp_path / "data" / "snapshots",
+        synthetic_vault,
+        index=AppStore(db),
+        policy=VaultPolicy(vault_dir=synthetic_vault),
+    )
     runs = RunService(
         store=SqliteRunStore(db),
         checkpointer=open_checkpointer(db),
         config=lambda: load_effective(pack, overlay).snapshot(),
         ports_for=lambda snapshot: ports,
+        snapshots_for=lambda snapshot: snapshots,
     )
     paths = gate_paths(tmp_path / "gate-evals")
     holder = {"current": gate_model()}
@@ -175,6 +185,7 @@ def make_stack(
         db,
         synthetic_vault,
         run_service=runs,
+        snapshots=snapshots,
         gate_factory=gate_factory
         or (
             lambda snapshot: PublishGate(
