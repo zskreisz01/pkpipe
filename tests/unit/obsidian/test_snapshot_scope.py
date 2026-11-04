@@ -1,0 +1,94 @@
+"""Spec 019 FR-002 / spec 020 FR-009: the snapshot scope is derived from the vault policy, so it follows
+any layout and names no folder of the public pack."""
+
+from __future__ import annotations
+
+from pkpipe.domain.layout import VaultLayout
+from pkpipe.obsidian.policy import VaultPolicy
+from pkpipe.obsidian.scope import derive_scope
+
+REAL = VaultLayout(
+    inbox_dir="1-Inbox",
+    inbox_list_file="1-Inbox/INBOX.md",
+    triage_file="1-Inbox/Inbox-Triage.md",
+    processing_list="1-Inbox/Manual-Resource-Processing-List.md",
+    archive_dir="6-Archive/Inbox",
+    inbox_archive_pattern="6-Archive/Inbox/Inbox-Archive-{yyyy-MM-dd}.md",
+    agent_tasks_dir="3-Areas/Agent-Tasks",
+    tool_candidates_file="3-Areas/System/System-Tool-Candidates.md",
+    improvement_file="3-Areas/Self-Improvement/Improvement-Backlog.md",
+    proposals_dir="3-Areas/Self-Improvement/System-Changes",
+    quarantine_dir="1-Inbox/_quarantine",
+    journal_pattern="DailyJournals/{yyyy}/{yyyy-MM-dd}.md",
+    attachments_dir="1-Inbox/attachments",
+    projects_dir="2-Projects",
+    areas_dir="3-Areas",
+    resources_dir="4-Resources",
+    context_review_dir="3-Areas/Context-Review",
+)
+
+
+def real_policy(vault) -> VaultPolicy:
+    """The owner grants the journal folder to the read tools (the journal pattern is deliberately free)."""
+    allow = REAL.default_allow()
+    for tool in ("read_note", "read_notes"):
+        allow[tool] = [*allow[tool], "DailyJournals"]
+    return VaultPolicy(vault_dir=vault, layout=REAL, allow=allow)
+
+
+def test_default_layout_scope(tmp_path):
+    scope = derive_scope(VaultPolicy(vault_dir=tmp_path))
+    assert scope.folders == ("0-INBOX", "1-Projects", "2-Areas", "3-Resources", "4-Archive")
+    assert "0-INBOX/Inbox-Triage.md" in scope.managed
+    assert scope.exclude == ("2-Areas/Journal",)  # the journal folder below a scope folder
+
+
+def test_real_layout_scope_follows_the_policy_not_the_pack_names(tmp_path):
+    scope = derive_scope(real_policy(tmp_path))
+    assert scope.folders == ("1-Inbox", "2-Projects", "3-Areas", "4-Resources", "6-Archive")
+    assert scope.managed == tuple(
+        sorted(
+            [
+                "1-Inbox/INBOX.md",
+                "1-Inbox/Inbox-Triage.md",
+                "1-Inbox/Manual-Resource-Processing-List.md",
+                "3-Areas/Self-Improvement/Improvement-Backlog.md",
+                "3-Areas/System/System-Tool-Candidates.md",
+            ]
+        )
+    )
+    # the journal lives outside every scope folder: nothing to exclude, and it is never copied
+    assert scope.exclude == ()
+    assert not scope.covers("DailyJournals/2026/2026-11-04.md")
+    assert scope.covers("6-Archive/Inbox/Inbox-Archive-2026-11-04.md")
+    assert not scope.covers("0-INBOX/x.md")  # the old default folder is not part of this layout
+
+
+def test_scope_covers_every_folder_of_the_layout_snapshot_roots(tmp_path):
+    """FR-009 of spec 020: the layout's own scope (``snapshot_roots``) is contained in the snapshot scope."""
+    policy = real_policy(tmp_path)
+    scope = derive_scope(policy)
+    for root in REAL.snapshot_roots():
+        assert scope.covers(f"{root}/some-note.md"), root
+
+
+def test_scope_includes_the_folders_of_the_writing_tool_allowlists(tmp_path):
+    policy = VaultPolicy(
+        vault_dir=tmp_path,
+        layout=VaultLayout(),
+        allow={**VaultLayout().default_allow(), "write_note": ["0-INBOX", "1-Projects", "9-Extra"]},
+    )
+    assert "9-Extra" in derive_scope(policy).folders
+
+
+def test_journal_excluded_only_when_it_sits_below_a_scope_folder(tmp_path):
+    layout = VaultLayout(journal_pattern="2-Areas/Diary/{yyyy}/{yyyy-MM-dd}.md")
+    assert derive_scope(VaultPolicy(vault_dir=tmp_path, layout=layout)).exclude == ("2-Areas/Diary",)
+    flat = VaultLayout(journal_pattern="2-Areas/{yyyy-MM-dd}.md")  # day files directly in the folder
+    assert derive_scope(VaultPolicy(vault_dir=tmp_path, layout=flat)).exclude == ()
+
+
+def test_the_digest_changes_with_the_scope(tmp_path):
+    a = derive_scope(VaultPolicy(vault_dir=tmp_path)).digest
+    b = derive_scope(real_policy(tmp_path)).digest
+    assert a != b and len(a) == 64

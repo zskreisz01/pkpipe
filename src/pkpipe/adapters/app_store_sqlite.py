@@ -45,6 +45,16 @@ CREATE TABLE IF NOT EXISTS audit (
     target TEXT,
     detail TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS snapshots (
+    run_id TEXT PRIMARY KEY,
+    flow_id TEXT NOT NULL,
+    taken_at TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    files INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('kept', 'restored', 'pruned')),
+    reverted INTEGER NOT NULL DEFAULT 0,
+    restored_at TEXT
+);
 """
 
 
@@ -167,6 +177,41 @@ class AppStore:
     def mark_reverted(self, publish_id: str, by: str) -> None:
         with self._conn() as c:
             c.execute("UPDATE publishes SET reverted_by = ? WHERE publish_id = ?", (by, publish_id))
+
+    # -- vault snapshots (spec 019 FR-008): the index of ``$PKPIPE_DATA_DIR/snapshots/`` ---------------------
+    SNAPSHOT_FIELDS = frozenset(
+        {"flow_id", "taken_at", "bytes", "files", "status", "reverted", "restored_at"}
+    )
+
+    def snapshot_upsert(self, row: dict[str, Any]) -> None:
+        with self._conn() as c:
+            c.execute(
+                "INSERT INTO snapshots "
+                "(run_id, flow_id, taken_at, bytes, files, status, reverted, restored_at) "
+                "VALUES (:run_id, :flow_id, :taken_at, :bytes, :files, :status, :reverted, :restored_at) "
+                "ON CONFLICT(run_id) DO UPDATE SET flow_id = excluded.flow_id, taken_at = excluded.taken_at, "
+                "bytes = excluded.bytes, files = excluded.files, status = excluded.status",
+                {"status": "kept", "reverted": 0, "restored_at": None, **row},
+            )
+
+    def snapshot_get(self, run_id: str) -> dict[str, Any] | None:
+        with self._conn() as c:
+            row = c.execute("SELECT * FROM snapshots WHERE run_id = ?", (run_id,)).fetchone()
+        return dict(row) if row else None
+
+    def snapshot_list(self) -> list[dict[str, Any]]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute("SELECT * FROM snapshots ORDER BY taken_at DESC, run_id")]
+
+    def snapshot_update(self, run_id: str, **fields: Any) -> None:
+        bad = set(fields) - self.SNAPSHOT_FIELDS
+        if bad:
+            raise ValueError(f"snapshot fields {sorted(bad)} cannot be set")
+        if not fields:
+            return
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        with self._conn() as c:
+            c.execute(f"UPDATE snapshots SET {sets} WHERE run_id = ?", [*fields.values(), run_id])
 
     # -- audit ----------------------------------------------------------------------------------------------
     def audit(self, actor: str, action: str, target: str | None = None, **detail: Any) -> None:

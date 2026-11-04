@@ -246,8 +246,8 @@ def parse_list(text: str, config: InboxListConfig | None = None) -> list[InboxEn
     """The entries of the list in file order (duplicates included).
 
     * the header (front matter, title, intro) ends at the first ``header_end`` line that comes before the
-      first bullet (or after a title above it); a list with no header starts at the first bullet and a later rule
-      only ends the entry above;
+      first bullet (or after a title above it); a list with no header starts at the first bullet and a
+      later rule only ends the entry above;
     * an entry starts with a bullet marker followed by a space and runs over the following non-blank,
       non-bullet lines (a URL on the next, unindented line belongs to the entry above);
     * ``<!-- comments -->`` are never entries and end the entry above;
