@@ -486,6 +486,27 @@ class EvalsConfig(_Strict):
     )
 
 
+class SnapshotsConfig(_Strict):
+    """Vault snapshots (spec 019 FR-006): what is kept of the state before each writing run."""
+
+    retention_days: int = Field(
+        default=14,
+        ge=1,
+        le=3650,
+        description="Snapshots older than this are pruned (the newest per flow stays)",
+    )
+    max_bytes: int = Field(
+        default=1024**3,
+        ge=1_000_000,
+        description="Upper bound of all snapshot copies; the oldest go first (the newest per flow stays)",
+    )
+    max_file_bytes: int = Field(
+        default=5 * 1024**2,
+        ge=1024,
+        description="A note larger than this is recorded in the manifest but not copied (a restore skips it)",
+    )
+
+
 # registry --------------------------------------------------------------------------------------------------
 from pkpipe.domain.layout import VaultLayout  # noqa: E402  (layout.json is validated by the domain model)
 
@@ -498,6 +519,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "categories": CategoriesConfig,
     "security": SecurityConfig,
     "layout": VaultLayout,
+    "snapshots": SnapshotsConfig,
     "telemetry": TelemetrySettings,
     "evals": EvalsConfig,
 }

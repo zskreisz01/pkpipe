@@ -43,6 +43,8 @@ CORE_DEFAULTS: dict[str, Any] = {
     },
     #: spec 020: every vault folder and file the flows and steps use (``${config.layout.<name>}``)
     "layout": DEFAULT_LAYOUT.model_dump(),
+    #: spec 019: retention of the vault snapshots taken before a writing run
+    "snapshots": {"retention_days": 14, "max_bytes": 1024**3, "max_file_bytes": 5 * 1024**2},
     "channels": {"channels": {}, "routes": {}},
     "telemetry": {"capture_content": {"flows": []}},
     # Code-only levels are all-or-nothing (docs/evaluation.md); LLM gates come from the pack.
