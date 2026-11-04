@@ -50,15 +50,17 @@ Spec 020. Every folder or file of the vault that pkpipe names comes from one `la
 | `inbox_archive_pattern` | Dated archive file of entries removed from the list file | `4-Archive/Inbox/Inbox-Archive-{yyyy-MM-dd}.md` |
 | `agent_tasks_dir`, `proposals_dir`, `context_review_dir` | Agent task notes, system change proposals, context review notes | `2-Areas/Agent-Tasks`, `2-Areas/Self-Improvement/System-Changes`, `2-Areas/Context-Review` |
 | `tool_candidates_file`, `improvement_file` | System tool candidates, improvement backlog | `2-Areas/System/System-Tool-Candidates.md`, `2-Areas/Self-Improvement/Improvement-Backlog.md` |
-| `quarantine_dir` | Quarantine folder (also `security.json` `quarantine_dir`; keep both equal) | `0-INBOX/_quarantine` |
+| `quarantine_dir` | Quarantine folder (the single source: `security.json` `quarantine_dir` is deprecated and must equal it when still present) | `0-INBOX/_quarantine` |
 | `journal_pattern` | Journal day note; placeholders `{yyyy}`, `{MM}`, `{dd}`, `{yyyy-MM-dd}` | `2-Areas/Journal/{yyyy-MM-dd}.md` |
 | `attachments_dir` | Embedded images of list entries | `0-INBOX/attachments` |
 | `projects_dir`, `areas_dir`, `resources_dir` | The PARA folders (project notes for the context refresh) | `1-Projects`, `2-Areas`, `3-Resources` |
 | `inbox_list` | How the list file is read: `bullet_markers`, `header_end` (regex of the line that ends the header), `strip_params` (tracking parameters, `*` wildcard), `comments_ignored` | `["-", "*"]`, `^---\s*$`, `utm_*`, `fbclid`, `gclid`, `igshid`, `mc_*`, `true` |
 
-The category's PARA folder stays in `categories.json` (`para_path`): move it together with `resources_dir`.
+The category's PARA folder is `para_path` in `categories.json`. The pack writes it as `{resources_dir}/Tools`; the placeholders `{inbox_dir}`, `{projects_dir}`, `{areas_dir}`, `{resources_dir}` and `{archive_dir}` are filled from the layout, so renaming the Resources folder moves the category folders with it. A literal path (`4-Resources/Tools`) still works.
 
 **Vault policy.** The vault server derives the folder allow lists of its tools from the layout (`inbox_dir`, the PARA folders, the archive root). Anything else is an explicit `allow` entry, and the layout is validated against the allow lists when the policy loads: every path that its tool may not use fails with the field, the path and the tool, for example the journal folder of the layout `DailyJournals/{yyyy}/{yyyy-MM-dd}.md` needs `"allow": {"read_note": [..., "DailyJournals"], "read_notes": [..., "DailyJournals"]}`. The top-level keys `triage_file`, `processing_list`, `improvement_file`, `tool_candidates_file` and `quarantine_dir` of older policy files still work.
+
+**Checks at validate and publish.** `pkpipe validate` and the publish gate of the UI check the layout without a running vault server: the managed files (triage file, processing list, improvement backlog, tool candidates, list file) are distinct and none of them is in the quarantine folder, the archive pattern is never a managed file, and every structural path (triage file, processing list, improvement file, tool candidates, quarantine folder, list file, archive) lies in the folders that the PARA roots and `inbox_dir` define, so a half-moved layout fails. When the vault policy file is given (`pkpipe validate --vault-policy deploy/vault-policy.json` or `PKPIPE_VAULT_POLICY`), the overlay layout must also equal the layout of that file and every path must be allowed for its tool, with the error naming the field, the path and the tool.
 
 ```json
 {
@@ -130,7 +132,7 @@ Webhook and Apprise URLs contain secrets, so the config accepts only `env:NAME` 
 | --- | --- | --- |
 | `output_guard.block_on` | Qwen3Guard safety labels that make a harm category a `malicious_content` flag (`Unsafe`, `Controversial`) | `["Unsafe"]` |
 | `canary.rotate` | The canary of sessions with `canary: true`: `per_run` (from the run id), `daily`, `never` | `per_run` |
-| `quarantine_dir` | Quarantine folder of the vault (the vault server's `quarantine_dir` policy must match) | `0-INBOX/_quarantine` |
+| `quarantine_dir` | Deprecated duplicate of `layout.json` `quarantine_dir`; omit it. `pkpipe validate` fails when it is set and differs | none |
 | `query_guard.blocked_terms`, `query_guard.terms_file` | Names that no web query of a session with tools may contain (spec 010 FR-002, [Sessions instead of skills](#plan-rules)) | none |
 
 An `llm` / `llm_tools` step over external content sets `"canary": true`; validation then requires that every successor is an `output_guard` step whose `input` lists it. The `output_guard` step (`{"input": ["summarize"], "canary": true}`) sets `item.flagged` and the flow routes the item to the `handle_security_flag` subflow. That flow writes `security/malicious_urls.jsonl` and the deny-list in the overlay (`<overlay>/security/`, the deny-list file of `url_filter.deny_list`, started from the pack's list) or, without an overlay, in `$PKPIPE_DATA_DIR/security/`. Owner releases write eval candidates to `<overlay>/evals/candidates/security.jsonl` (else `$PKPIPE_DATA_DIR/candidates/`).
@@ -202,7 +204,7 @@ Session references (`system`, `instruction`, `context`, `output_schema`) are rel
 ```json
 {
   "id": "tool",
-  "para_path": "3-Resources/Tools",
+  "para_path": "{resources_dir}/Tools",
   "triage_hint": "Software, library or service that could become part of my ecosystem.",
   "sessions": [
     {"id": "research", "system": "researcher", "instruction": "tool/research.md", "tools": ["websearch:search"], "inputs": ["item.extract"], "output_schema": "tool_research"},
@@ -234,7 +236,7 @@ The public plans: **Tool** `research` (web search) â†’ `compare` (web search) â†
 A new category is an overlay entry, nothing else (test: `tests/integration/engine/test_category_sessions.py`):
 
 ```json
-{"id": "paper", "label": "Papers", "subflow": "other_resource", "para_path": "3-Resources/Papers",
+{"id": "paper", "label": "Papers", "subflow": "other_resource", "para_path": "{resources_dir}/Papers",
  "triage_hint": "A research paper worth keeping.",
  "sessions": [{"id": "summarize", "system": "synthesizer", "instruction": "other/summarize.md",
                "inputs": ["item.extract"], "output_schema": "resource_note"}]}

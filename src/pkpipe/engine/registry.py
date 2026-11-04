@@ -40,7 +40,6 @@ CORE_DEFAULTS: dict[str, Any] = {
     "security": {
         "canary": {"rotate": "per_run"},
         "url_filter": {"block_private_networks": True, "max_bytes": 2_000_000},
-        "quarantine_dir": DEFAULT_LAYOUT.quarantine_dir,
     },
     #: spec 020: every vault folder and file the flows and steps use (``${config.layout.<name>}``)
     "layout": DEFAULT_LAYOUT.model_dump(),
@@ -308,12 +307,33 @@ def _check_judge_profile(data: dict[str, Any]) -> list[str]:
     return []
 
 
+VAULT_POLICY_ENV = "PKPIPE_VAULT_POLICY"
+
+
+def vault_policy_errors(data: dict[str, Any], policy_file: Path) -> list[str]:
+    """The effective ``layout`` against the vault policy file the vault server runs with (spec 020 FR-008)."""
+    from pkpipe.domain.layout import layout_from, policy_file_errors
+
+    try:
+        policy = json.loads(policy_file.read_text(encoding="utf-8"))
+        layout = layout_from(data.get("layout"))
+    except (OSError, ValueError) as exc:
+        return [f"vault policy '{policy_file}': {exc}"]
+    return [f"{policy_file.name}: {e}" for e in policy_file_errors(layout, policy)]
+
+
 def load_effective(
-    pack_dir: Path | None = None, overlay_dir: Path | None = None, *, strict: bool = True
+    pack_dir: Path | None = None,
+    overlay_dir: Path | None = None,
+    *,
+    strict: bool = True,
+    vault_policy: Path | None = None,
 ) -> EffectiveConfig:
     """Load pack + optional overlay, validate shape and references, compute the version hash.
 
     ``overlay_dir=None`` falls back to ``PKPIPE_OVERLAY_DIR``. Raises :class:`ConfigError` when ``strict``.
+    A ``vault_policy`` file (or ``PKPIPE_VAULT_POLICY``) is checked against the layout, so a publish or
+    ``pkpipe validate`` fails when the overlay layout and the vault policy disagree (spec 020 FR-008).
     """
     pack_dir = pack_dir or default_pack_dir()
     overlay_dir = overlay_dir if overlay_dir is not None else overlay_dir_from_env()
@@ -327,6 +347,11 @@ def load_effective(
     assets = load_assets(pack_dir, overlay_dir)
     cfg = EffectiveConfig(data, snapshot_version(data, assets), pack_dir, overlay_dir, warnings, assets)
     errors = validate_effective(data)
+    policy_file = vault_policy or (
+        Path(os.environ[VAULT_POLICY_ENV]) if os.environ.get(VAULT_POLICY_ENV) else None
+    )
+    if policy_file is not None and not errors:
+        errors += vault_policy_errors(data, policy_file)
     ref_errors, ref_warnings = check_references(cfg) if not errors else ([], [])
     cfg.warnings.extend(ref_warnings)
     errors += ref_errors

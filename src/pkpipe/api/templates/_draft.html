@@ -48,7 +48,7 @@
     <div><label for="cat-id">Id</label><input id="cat-id" name="id" type="text" required pattern="[a-z0-9_\-]+"></div>
     <div><label for="cat-label">Label</label><input id="cat-label" name="label" type="text" required></div>
     <div><label for="cat-subflow">Subflow</label><select id="cat-subflow" name="subflow">{% for f in flows %}<option>{{ f }}</option>{% endfor %}</select></div>
-    <div><label for="cat-para">PARA path</label><input id="cat-para" name="para_path" type="text" required placeholder="3-Resources/Topic"></div>
+    <div><label for="cat-para">PARA path</label><input id="cat-para" name="para_path" type="text" required placeholder="{resources_dir}/Topic"></div>
   </div>
   <label for="cat-hint">Triage hint (what belongs here)</label>
   <input id="cat-hint" name="triage_hint" type="text" required class="wide">
