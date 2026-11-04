@@ -82,8 +82,10 @@ updated: 2026-11-04
 - `domain/layout.py` (`VaultLayout`, `InboxListSettings`), `domain/inbox_list.py`, `layout.json` (core default + pack file), `VaultPolicy.layout` with allowlist validation, vault tool `inbox_remove_entries`.
 - `kind` / `needs_owner` are optional triage columns: written when a row needs them (a note-only triage file stays byte-identical).
 - A list item has no note: `inbox.source_note` builds the text the flows work from; the flows' note read node is `fetch_note`, the merged result is still `read`.
-- Flows name no folder; `categories.json` `para_path` stays category config.
-- FR-009: `VaultLayout.snapshot_roots()` is the layout-derived scope; spec 019 itself is not part of this repository yet and uses it when added.
+- Flows name no folder; `categories.json` `para_path` is written `{resources_dir}/<name>` and expanded from the layout (a literal path still works).
+- FR-009: **partly met.** `VaultLayout.snapshot_roots()` is the layout-derived scope (unit-tested); spec 019 is not in this repository, so nothing consumes it yet and there is no integration test. It is met when spec 019 uses it.
+- Review hardening (2026-11-04): the archive and the list file can never be a managed file or sit in the quarantine folder (layout validator and run time check); the archive text comes from what the locked list rewrite removes (re-planned when the list changed; at least once, never in neither file); `kind` and `needs_owner` of a triage row are fixed at creation; a failed item (processing status `failed`) and a quarantined item keep their entry; the run reports a vanished entry as `not_found` (`inbox.report`, in the summary); `pkpipe validate` and the publish gate check the layout structure and, with `--vault-policy` / `PKPIPE_VAULT_POLICY`, the vault policy file (field, path and tool named); `security.quarantine_dir` is deprecated (must equal the layout when present).
+- Known limit: removal matches by raw text; between the flow's read of the list and the removal an identical new entry can take the place of the one read (the window is two tool calls, the effect is that an equal entry leaves the list).
 
 ## Success Criteria
 

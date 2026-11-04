@@ -33,4 +33,4 @@ Format: `- [x] T001 [USx] Description` · `[USx]` = user story
 
 - [x] T012 [P] Docs (configuration, vault layout), CHANGELOG
 - [x] T013 [P] BPMN: drawio, PNG, Mermaid together
-- [x] T014 Spec 019 scope from the layout (`VaultLayout.snapshot_roots()`; spec 019 is not in this repository yet)
+- [x] T014 Spec 019 scope from the layout: provides `VaultLayout.snapshot_roots()` only; no consumer exists until spec 019 is added (FR-009 partly met)
