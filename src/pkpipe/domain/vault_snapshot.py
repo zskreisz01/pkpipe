@@ -255,7 +255,7 @@ def diff_manifests(pre: Mapping[str, FileEntry], now: Mapping[str, FileEntry]) -
                 size=entry.size,
                 sha256=entry.sha256,
                 mtime=entry.mtime,
-                from_path=source,
+                **{"from": source},
             )
         else:
             entry = created[path]
@@ -371,7 +371,7 @@ def build_plan(
                 else:
                     skip(dst, "destination_exists")
             else:
-                steps.append(RestoreStep(verb="move_back", from_path=dst, to=src))
+                steps.append(RestoreStep.model_validate({"verb": "move_back", "from": dst, "to": src}))
     steps.sort(key=lambda s: (_ORDER[s.verb], s.path or s.from_path or ""))
     return RestorePlan(run_id=run_id, steps=steps)
 

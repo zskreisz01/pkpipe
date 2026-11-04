@@ -1,6 +1,6 @@
 ---
 spec_id: 019-vault-snapshots
-status: Draft
+status: Completed
 description: Snapshot directory layout, manifest and restore plan formats
 updated: 2026-11-04
 ---
@@ -46,4 +46,10 @@ $PKPIPE_DATA_DIR/snapshots/<run_id>/
 
 ## SQLite (app DB)
 
-`snapshots(run_id PRIMARY KEY, flow_id, taken_at, bytes, files, status CHECK IN ('kept','restored','pruned'), restored_at)`.
+`snapshots(run_id PRIMARY KEY, flow_id, taken_at, bytes, files, status CHECK IN ('kept','restored','pruned'), reverted INTEGER, restored_at)`; a pruned snapshot keeps its row.
+
+## Config: `snapshots.json`
+
+`retention_days` (14), `max_bytes` (1 GiB), `max_file_bytes` (5 MiB, larger notes are manifest-only).
+
+The manifest also records `managed` (managed files) and `exclude` (excluded folders), and a file entry `conflict: true` for a sync-conflict copy (listed, never copied or restored). A restore plan step has `outcome` (`done`, `skipped:<reason>`) once applied, `save_current` under `--force`, and the plan has `safety_snapshot` (the snapshot of the state before the restore, id `restore-<run>-<time>-<n>`).

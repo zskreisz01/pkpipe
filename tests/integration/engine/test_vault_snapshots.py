@@ -125,7 +125,7 @@ def pack_service(env: Env):
     )
 
 
-# -- SC-001 ------------------------------------------------------------------------------------------------------
+# -- SC-001 ----------------------------------------------------------------------------------------
 def test_every_writing_flow_of_the_pack_is_covered(pack_dir):
     flows = load_effective(pack_dir, None).snapshot().data["flows"]
     writing = {fid for fid in flows if flow_writes_vault(flows, fid)}
@@ -270,7 +270,7 @@ def test_context_refresh_round_trip(env, tmp_path, vault):
     restore_clean(env, run.run.run_id, before)
 
 
-# -- failure handling ---------------------------------------------------------------------------------------------
+# -- failure handling ------------------------------------------------------------------------------
 def test_a_snapshot_that_cannot_be_written_stops_the_run_before_it_changes_anything(env, vault, monkeypatch):
     before = tree(vault)
     svc = pack_service(env)
@@ -316,3 +316,33 @@ def test_a_failed_run_is_restorable_too(env, vault, monkeypatch):
     assert tree(vault) != before  # the run wrote before it stopped
     env.snaps.apply_restore(run.run.run_id)
     assert tree(vault) == before
+
+
+def test_real_layout_vault_tools_then_restore_is_byte_identical(tmp_path):
+    """Spec 020 FR-009 / T014b: the snapshot scope comes from the policy with the real layout (list INBOX,
+    PARA folders 1-6, journals elsewhere); the real vault tools write, the restore undoes it."""
+    from pkpipe.obsidian.vault import Vault
+    from tests.unit.obsidian.test_snapshot_scope import real_policy
+
+    root = tmp_path / "real"
+    files = {
+        "1-Inbox/INBOX.md": "# Inbox\n\n---\n\n- https://example.invalid/a\n- https://example.invalid/b\n",
+        "4-Resources/Tools/old.md": "old\n",
+        "DailyJournals/2026/2026-11-03.md": "PRIVATE\n",
+    }
+    for rel, text in files.items():
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text(text)
+    policy = real_policy(root)
+    snaps = FileSnapshots(tmp_path / "s", root, index=AppStore(tmp_path / "a.db"), policy=policy)
+    before = tree(root)
+    snaps.take("r1", "triage")
+    vault = Vault(policy, today=lambda: datetime(2026, 11, 4).date())
+    vault.write_note("4-Resources/Tools/new.md", "new note")
+    vault.move_note("4-Resources/Tools/old.md", "6-Archive/Inbox/old.md")
+    vault.inbox_remove_entries(["- https://example.invalid/a"])
+    assert tree(root) != before
+    snaps.finish("r1")
+    assert not [p for p in tree(tmp_path / "s") if "DailyJournals" in p]
+    snaps.apply_restore("r1")
+    assert tree(root) == before

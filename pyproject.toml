@@ -82,6 +82,10 @@ files = [
   "src/pkpipe/obsidian/policy.py",
   "src/pkpipe/obsidian/vault.py",
   "src/pkpipe/steps/triage_code.py",
+  "src/pkpipe/domain/vault_snapshot.py",
+  "src/pkpipe/obsidian/scope.py",
+  "src/pkpipe/adapters/snapshot_files.py",
+  "src/pkpipe/engine/restore.py",
 ]
 ignore_missing_imports = true
 follow_imports = "silent"

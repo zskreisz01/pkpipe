@@ -1,8 +1,8 @@
 ---
 spec_id: 019-vault-snapshots
 title: Vault snapshots and restore
-status: Draft
-status_reason: Gate 1 open; clarifications 1 and 2 need the owner's decision
+status: Completed
+status_reason: Implemented 2026-11-04; Gate 1 clarifications decided by default (owner delegated)
 description: Before every run that can write to the vault the pipeline saves a snapshot of the files it manages and of the folders it writes to; the owner can undo a run (dry run first) and the restore refuses to overwrite what the owner changed since.
 relevant_when:
   - snapshot
@@ -18,15 +18,16 @@ updated: 2026-11-04
 
 **Feature Branch**: `spec/019-vault-snapshots`
 **Created**: 2026-11-04
-**Status**: Draft
+**Status**: Completed
 **Input**: Owner request: if something goes wrong in production, the data must be recoverable. A snapshot before each run and a function that restores the previous state replace a shadow mode and an event store (both dropped for now). `docs/operations.md` release ladder, `runbook/release.md` rollback.
 **Companions**: [data-model.md](data-model.md)
 
 ## Clarifications
 
-1. **Snapshot per run, restore per run.** A daily snapshot would also undo what the owner did in between (ticks, overrides, edits). So the unit is the run: "restore the state before run X". Restoring to before an older run is a chain: later runs are undone first. *Open: confirm.*
-2. **Scope source.** The scope is derived from the vault policy (spec 004: managed files, quarantine folder and the folders of `write_note`, `append_note`, `move_note`), so it follows any vault layout. It does not depend on the folder names of the public pack. *Open: confirm that attachments (images) are out of scope; the pipeline never writes them.*
+1. **Snapshot per run, restore per run.** A daily snapshot would also undo what the owner did in between (ticks, overrides, edits). So the unit is the run: "restore the state before run X". Restoring to before an older run is a chain: later runs are undone first. **Decided 2026-11-04 (owner delegated; defaults):** the unit is the run, not a day.
+2. **Scope source.** The scope is derived from the vault policy (spec 004: managed files, quarantine folder and the folders of `write_note`, `append_note`, `move_note`), so it follows any vault layout. It does not depend on the folder names of the public pack. **Decided 2026-11-04 (owner delegated; defaults):** attachments (images) are out of scope; the pipeline never writes them.
 3. **Not covered, by design.** The app DB, the learning gateway's job store, Open Notebook content and messages already sent. A restore marks the run `reverted` in its own table and says what stays.
+5. **Large notes.** **Decided 2026-11-04 (owner delegated; defaults):** the plan's proposed manifest-only fallback: a note over `snapshots.max_file_bytes` (default 5 MiB) is recorded in the manifest but not copied; a restore skips it with the reason `not_copied`.
 4. **No git dependency.** The vault is a git repository today, but the snapshot is plain files so it works without one and cannot interfere with the owner's own commits and tooling.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -87,6 +88,14 @@ updated: 2026-11-04
 - **Snapshot**: run id, flow id, taken at, policy digest, manifest, copies.
 - **Restore plan**: ordered list of `{verb, path, reason}`.
 - See [data-model.md](data-model.md).
+
+## Implementation notes (2026-11-04)
+
+- `domain/vault_snapshot.py` (formats, `build_plan`, `diff_manifests`, `flow_writes_vault`, the writing / read-only tool sets), `obsidian/scope.py` (`derive_scope(VaultPolicy)`: managed files, writing-tool allow folders, `VaultLayout.snapshot_roots()` of spec 020 FR-009, quarantine folder; the journal folder below a scope folder is excluded), `ports.SnapshotPort`, `adapters/snapshot_files.py`, `engine/restore.py`, `snapshot_cli.py`, `restore_run` in `AppServices`, the JSON API (`POST /api/runs/{id}/restore`, `GET /api/snapshots`), the UI run page and the app MCP tool, `snapshots` table, `snapshots.json`, `pkpipe doctor`.
+- Tools count by name only (the server key is a local name); a runtime-chosen subflow counts as writing. Flows with the `journal` data class still snapshot (they write their managed backlog file); the journal itself is never copied.
+- A restore needs the scope recorded in the manifest, not a policy. A run without a post manifest (still active, or the process died) is refused. Run ids are validated as directory names.
+- Status values follow data-model.md (`kept`, `restored`, `pruned`); the `reverted` flag of FR-008 is the column `reverted` (1 once a restore changed something).
+- Known limits: two flows that run at the same time record each other's writes in their post manifests (restore in reverse order; a later change is a conflict); empty folders a run created are not tracked (the file set is); a run whose pinned config is missing at `resume_incomplete` stays unfinished and cannot be restored; the engine process needs `PKPIPE_VAULT_DIR` (and `PKPIPE_VAULT_POLICY` when the vault server uses a policy file), otherwise a writing run logs a warning and takes no snapshot.
 
 ## Success Criteria
 

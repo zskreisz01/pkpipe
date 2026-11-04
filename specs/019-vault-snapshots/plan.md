@@ -1,6 +1,6 @@
 ---
 spec_id: 019-vault-snapshots
-status: Draft
+status: Completed
 description: Plan for vault snapshots and restore
 updated: 2026-11-04
 ---
@@ -44,4 +44,4 @@ A `SnapshotPort` (take, finish, plan_restore, apply_restore, list, prune) with a
 ## Risks
 
 - A flow that writes through a tool this spec does not list: the writing-tools list is derived from the vault policy's tool names, and a test fails when a new vault tool is not classified.
-- Snapshot size grows with notes in scope: bounded by `max_bytes` and retention; the manifest-only fallback for files over a size limit is a clarification for Gate 1.
+- Snapshot size grows with notes in scope: bounded by `max_bytes` and retention; files over `snapshots.max_file_bytes` are manifest-only (decided 2026-11-04, owner delegated; defaults).
