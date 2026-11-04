@@ -1,6 +1,6 @@
 ---
 spec_id: 020-vault-layout-and-inbox-list
-status: Draft
+status: Completed
 description: Data model for the vault layout and the inbox list
 updated: 2026-11-04
 ---
@@ -21,3 +21,5 @@ updated: 2026-11-04
 | `- some text` | text | normalised text | the text |
 
 Item id = `sha256(resource)[:12]` (unchanged). Row fields added to the triage file: `kind`, `needs_owner`.
+
+**Implemented additions**: `VaultLayout` also has `proposals_dir`, `context_review_dir`, `projects_dir`, `areas_dir`, `resources_dir` and `inbox_list` (the `InboxListConfig` settings), so that no folder is spelled outside the layout. `ListItem` adds `raws` (the raw text of every duplicate entry, removed together) and `source: list`. Triage columns `kind` and `needs_owner` are optional: a row of a note carries neither.

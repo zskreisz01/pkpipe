@@ -24,6 +24,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `channels.json` | Notification channels and routing per event type |
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
+| `layout.json` | The vault layout: every folder and file the flows and steps name ([Vault layout](#vault-layout)) |
 | `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir ([Secure fetch](#secure-fetch)) |
 | `security/deny_list.txt` | Deny-list of the URL filter: one domain per line (subdomains included), `#` comments |
 | `security/query_guard_terms.txt` | Terms no web query may contain (`security.query_guard.terms_file`): one per line, `#` comments; the overlay's copy is maintained by `context_refresh` (names of the enterprise notes are appended, nothing is ever removed) |
@@ -35,6 +36,48 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `instructions/<category>/<session>.md` | Session instructions, injected into the user prompt |
 | `contexts/*.md` | Context packs (`system.md` public, shipped in the pack; `personal.md`, `enterprise.md` private, written by the weekly `context_refresh` flow into the overlay; `<pack>.md.proposed` is a proposal, not a pack) |
 | `schemas/*.json` | Structured-output schemas |
+
+## Vault layout
+
+Spec 020. Every folder or file of the vault that pkpipe names comes from one `layout.json` block (flows and steps read it as `${config.layout.<name>}`) and from the same `layout` block of the obsidian-vault server's policy file. Defaults equal the folders pkpipe used before the layout existed, so the public pack behaves as before. A private overlay changes only the values it needs; a path is relative to the vault root, free of `..`, hidden folders and `:`.
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `inbox_dir` | Folder of the INBOX notes | `0-INBOX` |
+| `inbox_list_file` | A single list file whose bullet entries are the triage items (empty: one note per item) | none |
+| `triage_file`, `processing_list` | The triage table and the manual processing list | `0-INBOX/Inbox-Triage.md`, `0-INBOX/Manual-Resource-Processing-List.md` |
+| `archive_dir` | Where a processed INBOX note moves to | `4-Archive/Inbox` |
+| `inbox_archive_pattern` | Dated archive file of entries removed from the list file | `4-Archive/Inbox/Inbox-Archive-{yyyy-MM-dd}.md` |
+| `agent_tasks_dir`, `proposals_dir`, `context_review_dir` | Agent task notes, system change proposals, context review notes | `2-Areas/Agent-Tasks`, `2-Areas/Self-Improvement/System-Changes`, `2-Areas/Context-Review` |
+| `tool_candidates_file`, `improvement_file` | System tool candidates, improvement backlog | `2-Areas/System/System-Tool-Candidates.md`, `2-Areas/Self-Improvement/Improvement-Backlog.md` |
+| `quarantine_dir` | Quarantine folder (also `security.json` `quarantine_dir`; keep both equal) | `0-INBOX/_quarantine` |
+| `journal_pattern` | Journal day note; placeholders `{yyyy}`, `{MM}`, `{dd}`, `{yyyy-MM-dd}` | `2-Areas/Journal/{yyyy-MM-dd}.md` |
+| `attachments_dir` | Embedded images of list entries | `0-INBOX/attachments` |
+| `projects_dir`, `areas_dir`, `resources_dir` | The PARA folders (project notes for the context refresh) | `1-Projects`, `2-Areas`, `3-Resources` |
+| `inbox_list` | How the list file is read: `bullet_markers`, `header_end` (regex of the line that ends the header), `strip_params` (tracking parameters, `*` wildcard), `comments_ignored` | `["-", "*"]`, `^---\s*$`, `utm_*`, `fbclid`, `gclid`, `igshid`, `mc_*`, `true` |
+
+The category's PARA folder stays in `categories.json` (`para_path`): move it together with `resources_dir`.
+
+**Vault policy.** The vault server derives the folder allow lists of its tools from the layout (`inbox_dir`, the PARA folders, the archive root). Anything else is an explicit `allow` entry, and the layout is validated against the allow lists when the policy loads: every path that its tool may not use fails with the field, the path and the tool, for example the journal folder of the layout `DailyJournals/{yyyy}/{yyyy-MM-dd}.md` needs `"allow": {"read_note": [..., "DailyJournals"], "read_notes": [..., "DailyJournals"]}`. The top-level keys `triage_file`, `processing_list`, `improvement_file`, `tool_candidates_file` and `quarantine_dir` of older policy files still work.
+
+```json
+{
+  "vault_dir": "/path/to/vault",
+  "layout": {
+    "inbox_dir": "1-Inbox",
+    "inbox_list_file": "1-Inbox/INBOX.md",
+    "triage_file": "1-Inbox/Inbox-Triage.md",
+    "journal_pattern": "DailyJournals/{yyyy}/{yyyy-MM-dd}.md"
+  },
+  "allow": { "read_note": ["1-Inbox", "DailyJournals"], "read_notes": ["1-Inbox", "DailyJournals"] }
+}
+```
+
+### The INBOX list file
+
+With `inbox_list_file` set, triage reads that file instead of the notes of `inbox_dir`: the front matter, title and intro up to the `header_end` line are the header, and every bullet entry below is an item. A line that is not a bullet and not blank continues the entry above (so a title with its URL on the next line is one entry); `<!-- comments -->` are never entries. Kinds: `link`, `image` (`![[name.jpg]]`), `text_link` (title plus URL) and `text`. The item is identified by its normalised resource (the URL without tracking parameters, the embed target or the text), so the same link twice is one item. A row of the triage file gets the columns `kind` and `needs_owner`; they appear in a file the first time a list item needs them. The local model reads no pixels: an image row has the suggestion `none` and `needs_owner`, and its category is your override.
+
+After an item is processed, its entries (duplicates included) are removed from the list file by the vault tool `inbox_remove_entries` and appended to the dated archive file; entries are matched by their text, never by line number, and every other byte of the list stays. Quarantined and failed items stay in the list.
 
 ## Notifications
 `channels.json` defines channels and routes events to them; `NotifyPort.send(event, payload)` delivers to every channel routed for the event (a `notify` step, or `channels` to override the route). Every delivery is a `notify.send` span with `notify.event`, `notify.channel`, `notify.channel_type` and the flow, step and item attributes of the sending step. One failing channel never stops the others; the failure sets that span to error status and is listed in the step output.

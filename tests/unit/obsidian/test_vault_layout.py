@@ -91,3 +91,15 @@ def test_journal_pattern_placeholders():
     lay = VaultLayout(journal_pattern="DailyJournals/{yyyy}/{MM}/{dd}-{yyyy-MM-dd}.md")
     assert lay.journal_path(date(2026, 3, 9)) == "DailyJournals/2026/03/09-2026-03-09.md"
     assert lay.inbox_archive_path(date(2026, 3, 9)) == "4-Archive/Inbox/Inbox-Archive-2026-03-09.md"
+
+
+def test_snapshot_scope_follows_the_layout():
+    """FR-009 / T014: spec 019 takes its scope from the layout, not from a list of its own."""
+    assert DEFAULT_LAYOUT.snapshot_roots() == ["0-INBOX", "1-Projects", "2-Areas", "3-Resources", "4-Archive"]
+    assert VaultLayout(**REAL).snapshot_roots() == [
+        "1-Inbox",
+        "2-Projects",
+        "3-Areas",
+        "4-Resources",
+        "6-Archive",
+    ]

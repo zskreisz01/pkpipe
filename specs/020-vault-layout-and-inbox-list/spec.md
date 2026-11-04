@@ -1,8 +1,7 @@
 ---
 spec_id: 020-vault-layout-and-inbox-list
 title: Configurable vault layout and list-style INBOX
-status: Draft
-status_reason: Gate 1 open; clarifications 3 and 4 need the owner's decision
+status: Completed
 description: The vault folders and files the engine uses become one configurable layout, and the INBOX can be a single list file whose bullet entries (links, image embeds, text with a link) are the triage items.
 relevant_when:
   - vault layout
@@ -18,7 +17,7 @@ updated: 2026-11-04
 
 **Feature Branch**: `spec/020-vault-layout-and-inbox-list`
 **Created**: 2026-11-04
-**Status**: Draft
+**Status**: Completed
 **Input**: Owner: the INBOX must be parsed as it really is (one list file, entries marked with bullets); the vault structure must be configurable. Real vault: `1-Inbox`, `2-Projects`, `3-Areas`, `4-Resources`, `6-Archive`, `DailyJournals/<year>/`.
 **Companions**: [data-model.md](data-model.md)
 
@@ -31,8 +30,8 @@ updated: 2026-11-04
    - `<!-- … -->` comments are owner notes: kept, never an entry. The same link can occur twice.
    - Tracking parameters (`utm_*`, `fbclid`, …) are part of the line and are not part of the item identity.
 2. **One layout, one place.** Every folder or file the engine names (INBOX folder and list file, triage file, processing list, archive folder, agent-task folder, tool candidates file, improvement file, quarantine folder, journal pattern, attachments folder) comes from one `layout` block of the vault policy. Defaults equal today's constants, so the public pack behaves as before.
-3. **Consuming an entry.** After an item is processed, its raw entry is removed from the list and appended to a dated archive file; the rest of the list (header, comments, entries added meanwhile) stays byte-identical. *Open: confirm removal. Alternative: leave the list as is and mark processed entries with a checkbox or a trailing marker.*
-4. **Images.** An image entry is an item (kind `image`) but the local model reads no pixels: it is triaged from file name, date and embed only and the owner decides the category (`needs_owner`). OCR or a vision model is a later spec. *Open: confirm; also whether the owner wants image items to be skipped entirely until then.*
+3. **Consuming an entry.** After an item is processed, its raw entry is removed from the list and appended to a dated archive file; the rest of the list (header, comments, entries added meanwhile) stays byte-identical. **Decided 2026-11-04 (owner delegated; defaults):** processed entries are removed from the list and appended to a dated archive file (`inbox_archive_pattern`). Quarantined and failed items stay in the list. Alternative (checkbox marker) not taken.
+4. **Images.** An image entry is an item (kind `image`) but the local model reads no pixels: it is triaged from file name, date and embed only and the owner decides the category (`needs_owner`). OCR or a vision model is a later spec. **Decided 2026-11-04 (owner delegated; defaults):** image entries are items of kind `image` decided by the owner (`needs_owner`; no model call, suggestion `none`); they are not skipped.
 5. **No new write power.** The only new write path is "remove entries from the declared list file"; it is a vault tool of its own, limited to that file, and it is covered by the snapshot of spec 019.
 
 ## User Scenarios & Testing *(mandatory)*
@@ -77,6 +76,14 @@ updated: 2026-11-04
 - **FR-007**: `journal_pattern` placeholders `{yyyy}`, `{MM}`, `{dd}`, `{yyyy-MM-dd}`
 - **FR-008**: Layout validation at publish: every path is relative, free of `..`, and allowed by the policy for the tool that uses it
 - **FR-009**: Spec 019 derives its snapshot scope from the same layout
+
+## Implementation notes (Completed 2026-11-04)
+
+- `domain/layout.py` (`VaultLayout`, `InboxListSettings`), `domain/inbox_list.py`, `layout.json` (core default + pack file), `VaultPolicy.layout` with allowlist validation, vault tool `inbox_remove_entries`.
+- `kind` / `needs_owner` are optional triage columns: written when a row needs them (a note-only triage file stays byte-identical).
+- A list item has no note: `inbox.source_note` builds the text the flows work from; the flows' note read node is `fetch_note`, the merged result is still `read`.
+- Flows name no folder; `categories.json` `para_path` stays category config.
+- FR-009: `VaultLayout.snapshot_roots()` is the layout-derived scope; spec 019 itself is not part of this repository yet and uses it when added.
 
 ## Success Criteria
 

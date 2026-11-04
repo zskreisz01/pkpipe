@@ -1,6 +1,6 @@
 ---
 spec_id: 020-vault-layout-and-inbox-list
-status: Draft
+status: Completed
 description: Plan for the configurable vault layout and the list-style INBOX
 updated: 2026-11-04
 ---
@@ -29,7 +29,7 @@ A pure `domain/inbox_list.py` (parser, normaliser, remover) and `domain/layout.p
 | VI. Human in the loop | Yes | Images and unknown kinds go to the owner |
 | VII. Public / private separation | Yes | Fixture is synthetic, shaped like the real list; the real INBOX stays private |
 | IX. Measured change | Yes | SC-001..003 |
-| XI. Design as diagram and as code | Yes | BPMN capture and triage pages: "Parse INBOX list" and "Remove processed entry" tasks (drawio, PNG, Mermaid) |
+| XI. Design as diagram and as code | Yes (done) | BPMN capture and triage pages: "Parse INBOX list" and "Remove processed entry" tasks (drawio, PNG, Mermaid) |
 | Others | n/a | |
 
 ## Structure

@@ -156,6 +156,15 @@ class VaultLayout(BaseModel):
             names.append(PurePosixPath(self.inbox_list_file).name)
         return tuple(names)
 
+    def snapshot_roots(self) -> list[str]:
+        """The vault folders the pipeline writes to, one per top level: the scope a vault snapshot (spec 019)
+        covers, derived from the layout instead of its own list (FR-009)."""
+        roots = [self.inbox_dir, self.projects_dir, self.areas_dir, self.resources_dir, self.archive_root]
+        paths = [self.triage_file, self.processing_list, self.improvement_file, self.tool_candidates_file]
+        roots += [p.split("/")[0] for p in (*paths, self.quarantine_dir, self.agent_tasks_dir)]
+        top = {r.split("/")[0] for r in roots}
+        return sorted(top)
+
     def format_pattern(self, pattern: str, day: date) -> str:
         """Fill ``{yyyy}``, ``{MM}``, ``{dd}`` and ``{yyyy-MM-dd}`` of a path pattern."""
         values = {
