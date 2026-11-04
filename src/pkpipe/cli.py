@@ -142,6 +142,18 @@ def _candidates(args: argparse.Namespace) -> int:
     return candidates_command(args)
 
 
+def _snapshot(args: argparse.Namespace) -> int:
+    from pkpipe.snapshot_cli import snapshot_command
+
+    return snapshot_command(args)
+
+
+def _restore(args: argparse.Namespace) -> int:
+    from pkpipe.snapshot_cli import restore_command
+
+    return restore_command(args)
+
+
 def _serve(args: argparse.Namespace) -> int:
     from pkpipe.serve import serve_command
 
@@ -161,6 +173,8 @@ HANDLERS: dict[str, Handler] = {
     "eval": _eval,
     "doctor": _doctor,
     "candidates": _candidates,
+    "snapshot": _snapshot,
+    "restore": _restore,
     "validate": _validate,
     "schema": _schema,
 }
@@ -203,6 +217,16 @@ def build_parser() -> argparse.ArgumentParser:
     from pkpipe.candidates_cli import add_arguments as add_candidate_arguments
 
     add_candidate_arguments(cand)
+    snap = sub.add_parser("snapshot", help="vault snapshots taken before writing runs: list, show, prune")
+    from pkpipe.snapshot_cli import add_snapshot_arguments
+
+    add_snapshot_arguments(snap)
+    rest = sub.add_parser(
+        "restore", help="undo a run: restore the vault to the state before it (dry run first)"
+    )
+    from pkpipe.snapshot_cli import add_restore_arguments
+
+    add_restore_arguments(rest)
     val = sub.add_parser("validate", help="validate the layered config (pack + overlay)")
     val.add_argument("--pack", help="pack directory (default: packs/learning-inbox or PKPIPE_PACK_DIR)")
     val.add_argument("--overlay", help="overlay directory (default: PKPIPE_OVERLAY_DIR)")
