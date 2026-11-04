@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from pkpipe.domain.layout import VaultLayout, layout_errors
+from pkpipe.domain.layout import LEGACY_LAYOUT_KEYS, VaultLayout, layout_errors
 
 from .errors import PathRejected
 
@@ -37,13 +37,6 @@ TOOLS = (
 )
 #: Folder allowlists of the default layout (a layout derives its own: ``VaultLayout.default_allow``).
 DEFAULT_ALLOW: dict[str, list[str]] = VaultLayout().default_allow()
-LEGACY_LAYOUT_KEYS = (
-    "triage_file",
-    "processing_list",
-    "improvement_file",
-    "tool_candidates_file",
-    "quarantine_dir",
-)
 CONFLICT_RE = re.compile(r"\([^)]*conflict[^)]*\)|\.sync-conflict-", re.IGNORECASE)
 
 

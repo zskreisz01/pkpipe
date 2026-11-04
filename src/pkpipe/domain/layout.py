@@ -17,7 +17,7 @@ from datetime import date
 from pathlib import PurePosixPath
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pkpipe.domain.inbox_list import InboxListConfig
 
@@ -142,6 +142,35 @@ class VaultLayout(BaseModel):
             raise ValueError(f"{info.field_name} must name a .md file")
         return value
 
+    @model_validator(mode="after")
+    def _no_overlapping_files(self) -> VaultLayout:
+        """The files the tools maintain are distinct, and the list file and the archive are not among them
+        (a layout where the archive is the triage file would let ``inbox_remove_entries`` write it)."""
+        managed = {
+            "triage_file": self.triage_file,
+            "processing_list": self.processing_list,
+            "improvement_file": self.improvement_file,
+            "tool_candidates_file": self.tool_candidates_file,
+        }
+        if self.inbox_list_file:
+            managed["inbox_list_file"] = self.inbox_list_file
+        seen: dict[str, str] = {}
+        for field, path in managed.items():
+            key = path.casefold()
+            if key in seen:
+                raise ValueError(f"layout.{field} and layout.{seen[key]} name the same file '{path}'")
+            seen[key] = field
+        quarantine = self.quarantine_dir.casefold()
+        for field, path in managed.items():
+            if path.casefold() == quarantine or path.casefold().startswith(quarantine + "/"):
+                raise ValueError(f"layout.{field} '{path}' lies in the quarantine folder")
+        for field, path in (("inbox_archive_pattern", self.inbox_archive_pattern),):
+            if "{" not in path and path.casefold() in seen:
+                raise ValueError(
+                    f"layout.{field} '{path}' is the managed file layout.{seen[path.casefold()]}"
+                )
+        return self
+
     # -- derived places --------------------------------------------------------------------------------
     @property
     def archive_root(self) -> str:
@@ -174,6 +203,18 @@ class VaultLayout(BaseModel):
             "yyyy-MM-dd": day.isoformat(),
         }
         return _PLACEHOLDER.sub(lambda m: values[m.group(1)], pattern)
+
+    def expand(self, path: str) -> str:
+        """A configured path with ``{inbox_dir}``, ``{projects_dir}``, ``{areas_dir}``, ``{resources_dir}``
+        and ``{archive_dir}`` filled from this layout (a category ``para_path`` follows its folders)."""
+        values = {
+            "inbox_dir": self.inbox_dir,
+            "projects_dir": self.projects_dir,
+            "areas_dir": self.areas_dir,
+            "resources_dir": self.resources_dir,
+            "archive_dir": self.archive_dir,
+        }
+        return _PLACEHOLDER.sub(lambda m: values.get(m.group(1), m.group(0)), path)
 
     def journal_path(self, day: date) -> str:
         return self.format_pattern(self.journal_pattern, day)
@@ -263,6 +304,64 @@ def layout_errors(layout: VaultLayout, allow: Mapping[str, Sequence[str]]) -> li
     return errors
 
 
+#: Fields whose place follows from the PARA structure; the journal pattern is deliberately free (an owner
+#: grants its folder in the vault policy ``allow``), so it is not part of the structure check.
+STRUCTURAL_FIELDS = (
+    "triage_file",
+    "processing_list",
+    "improvement_file",
+    "tool_candidates_file",
+    "quarantine_dir",
+    "inbox_list_file",
+    "inbox_archive_pattern",
+)
+
+
+def layout_structure_errors(layout: VaultLayout) -> list[str]:
+    """Paths that lie outside the folders the vault tool defaults derive from this layout (``inbox_dir``,
+    the PARA roots, the archive root). Catches a half-moved layout, for example a new ``inbox_dir`` with the
+    triage file still in the old folder, when the config is validated or published (FR-008)."""
+    errors = layout_errors(layout, layout.default_allow())
+    return [e for e in errors if any(e.startswith(f"layout.{f} ") for f in STRUCTURAL_FIELDS)]
+
+
+#: Top level keys of an older vault policy file that are layout fields (pre spec 020 spelling).
+LEGACY_LAYOUT_KEYS = (
+    "triage_file",
+    "processing_list",
+    "improvement_file",
+    "tool_candidates_file",
+    "quarantine_dir",
+)
+
+
+def policy_file_errors(layout: VaultLayout, policy: Mapping[str, Any]) -> list[str]:
+    """Errors of an overlay layout against the vault policy file the vault server runs with (FR-008).
+
+    The layout of the policy and the overlay ``layout.json`` must be the same, and every layout path must be
+    allowed for the tool using it by the allowlists the policy ends up with (explicit ``allow`` entries over
+    the defaults derived from the policy layout). Each error names the path and the tool."""
+    data = dict(policy)
+    raw = dict(data.get("layout") or {})
+    for key in LEGACY_LAYOUT_KEYS:
+        if key in data:
+            raw.setdefault(key, data[key])
+    try:
+        policy_layout = VaultLayout(**raw)
+    except ValueError as exc:
+        return [f"vault policy layout is invalid: {exc}"]
+    errors = [
+        f"layout.{name} '{getattr(layout, name)}' differs from the vault policy layout "
+        f"'{getattr(policy_layout, name)}'"
+        for name in VaultLayout.model_fields
+        if getattr(layout, name) != getattr(policy_layout, name)
+    ]
+    allow = policy_layout.default_allow()
+    allow.update({k: list(v) for k, v in (data.get("allow") or {}).items()})
+    errors += [f"vault policy: {e}" for e in layout_errors(layout, allow)]
+    return errors
+
+
 def layout_from(data: Mapping[str, Any] | None) -> VaultLayout:
     """The layout of an effective config (``layout.json`` merged over the defaults)."""
     return VaultLayout(**dict(data or {}))
@@ -276,5 +375,8 @@ __all__ = [
     "allowed_by",
     "check_relative",
     "layout_errors",
+    "layout_structure_errors",
     "layout_from",
+    "policy_file_errors",
+    "LEGACY_LAYOUT_KEYS",
 ]
