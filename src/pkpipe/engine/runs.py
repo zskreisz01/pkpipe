@@ -109,8 +109,13 @@ class RunService:
         ports_for: Callable[[ConfigSnapshot], StepPorts],
         registry: StepRegistry | None = None,
         snapshots_for: Callable[[ConfigSnapshot], SnapshotPort | None] | None = None,
+        unsnapshotted_writes: bool = False,
     ):
+        """``snapshots_for`` gives the snapshot port of a config. Without it a flow that can write to the
+        vault does not run (FR-001), unless ``unsnapshotted_writes=True`` says so on purpose (the eval
+        harness and tests on a synthetic vault)."""
         self.snapshots_for = snapshots_for
+        self.unsnapshotted_writes = unsnapshotted_writes
         self.store = store
         self.checkpointer = checkpointer
         self.config = config
@@ -171,6 +176,9 @@ class RunService:
             # the inputs are gone, so the run cannot continue; the next trigger starts a new one
             self._finish_snapshot(run, snapshot)
             return self._fail(run, LookupError("no checkpoint: the run stopped before its first step"))
+        failure = self._check_snapshot_for_resume(run, snapshot)
+        if failure is not None:
+            return self._fail(run, failure)
         self._set_status(run.run_id, RunStatus.RUNNING)
         return self._execute(run, snapshot, None)
 
@@ -189,23 +197,56 @@ class RunService:
     # -- internals ------------------------------------------------------------------------------------------
     def _snapshot_port(self, run: Run, snapshot: ConfigSnapshot) -> SnapshotPort | None:
         """The snapshot port when the run's flow can write to the vault (FR-001), else ``None``."""
-        if self.snapshots_for is None or not flow_writes_vault(snapshot.data.get("flows") or {}, run.flow_id):
+        if self.snapshots_for is None or not self._writes(run, snapshot):
             return None
         return self.snapshots_for(snapshot)
+
+    def _writes(self, run: Run, snapshot: ConfigSnapshot) -> bool:
+        return flow_writes_vault(snapshot.data.get("flows") or {}, run.flow_id)
+
+    def _require_port(self, run: Run, snapshot: ConfigSnapshot) -> SnapshotPort | None:
+        """The port of a writing flow; ``None`` for a read-only flow (or an explicit opt-out). Raises when a
+        writing flow has no port: no snapshot service, or no vault configured in this process."""
+        if not self._writes(run, snapshot):
+            return None
+        if self.snapshots_for is None:
+            if self.unsnapshotted_writes:
+                return None
+            raise SnapshotError(
+                "this run service has no snapshot port; a flow that writes to the vault needs one"
+            )
+        port = self.snapshots_for(snapshot)
+        if port is None:
+            raise SnapshotError(
+                "no vault is configured for snapshots in this process "
+                "(set PKPIPE_VAULT_DIR where the flows run)"
+            )
+        return port
+
+    def _check_snapshot_for_resume(self, run: Run, snapshot: ConfigSnapshot) -> SnapshotFailed | None:
+        """A resumed writing run needs its snapshot still (a waiting run can outlive the retention, a crash
+        can leave a run whose snapshot was pruned): without it the run would write with no way back."""
+        try:
+            port = self._require_port(run, snapshot)
+            if port is not None:
+                port.show(run.run_id)
+        except Exception as exc:  # noqa: BLE001 - becomes the run's error; the text names no path
+            log.error(
+                "run %s (%s): snapshot unusable on resume: %s", run.run_id, run.flow_id, type(exc).__name__
+            )
+            failure = SnapshotFailed(
+                f"{_snapshot_cause(exc)}; the run cannot continue without its snapshot (no way back)"
+            )
+            failure.__cause__ = exc
+            return failure
+        return None
 
     def _take_snapshot(self, run: Run, snapshot: ConfigSnapshot) -> SnapshotFailed | None:
         """Snapshot before the first node. Writing without a way back is not allowed (FR-001): a writing
         flow with no snapshot port (no vault configured in this process) does not start either."""
         try:
-            port = self._snapshot_port(run, snapshot)
+            port = self._require_port(run, snapshot)
             if port is None:
-                if self.snapshots_for is not None and flow_writes_vault(
-                    snapshot.data.get("flows") or {}, run.flow_id
-                ):
-                    raise SnapshotError(
-                        "no vault is configured for snapshots in this process "
-                        "(set PKPIPE_VAULT_DIR where the flows run)"
-                    )
                 return None
             port.take(run.run_id, run.flow_id)
         except Exception as exc:  # noqa: BLE001 - becomes the run's error; the text names no path

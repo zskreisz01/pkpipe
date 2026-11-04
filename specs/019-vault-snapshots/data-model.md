@@ -54,4 +54,4 @@ $PKPIPE_DATA_DIR/snapshots/<run_id>/
 
 The manifest also records `managed` (managed files) and `exclude` (excluded folders), and a file entry `conflict: true` for a sync-conflict copy (listed, never copied or restored). A restore plan step has `outcome` (`done`, `skipped:<reason>`) once applied, `save_current` under `--force`, the plan has `scope` (the manifest's folders) and `safety_snapshot` (the snapshot of the state before the restore, id `restore-<run>-<time>-<n>`).
 
-A skip reason `overlapping_run:<run>` marks a path that another run, overlapping in time, changed too. A folder `<snapshot>/.restoring` exists while a restore uses the snapshot (prune leaves it alone).
+A skip reason `overlapping_run:<run>` marks a path that another run, overlapping in time, changed too. A file `<snapshot>/.restoring.<token>` exists per running restore (mtime refreshed per step; prune leaves the snapshot alone while one is fresh). Prune also keeps the snapshots of active runs. Every restore step that overwrites a file saves its current bytes in `trash/` first.

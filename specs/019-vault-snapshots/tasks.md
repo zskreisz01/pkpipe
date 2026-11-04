@@ -38,3 +38,8 @@ Format: `- [x] T001 [USx] Description` · `[USx]` = user story
 - [x] T013 A restore protects its snapshot from pruning (`.restoring`); trash never recreates a vanished snapshot folder
 - [x] T014 Steps re-check right before writing or removing (`changed_during_restore`); not-copied files warned; policy layout checked against `layout.json`; scope printed in the plan; run id prefix hint
 - [x] T015 Tests: every writing subflow ran in its round trip (SC-001), SC-002 deterministic (reads, no model call; timing opt-in `PKPIPE_PERF_TESTS=1`)
+- [x] T016 Spec text aligned with the code: journal-class edge case, `inbox_remove_entries` in FR-001, clarification order and decision marker
+- [x] T017 No fail-open for a `RunService` without a snapshot port (explicit `unsnapshotted_writes`); a resumed writing run needs its snapshot
+- [x] T018 Prune and restore know the active runs (run store, files as fallback): snapshots of active runs are never pruned, their paths are `overlapping_run`, an active run is not restored
+- [x] T019 Restore always saves the bytes it overwrites and re-checks them; one marker per restore with a refreshed mtime; the scan checks every parent folder for symlinks
+- [x] T020 Tests: SC-002 timing in the default suite, an edit during the snapshot, regression tests for T017-T019

@@ -155,7 +155,12 @@ def test_restore_returns_the_vault_to_the_state_before_the_run(snaps, vault):
     assert applied.applied and all(s.outcome == "done" for s in applied.steps)
     assert tree(vault) == before  # SC-001: same bytes, same file set
     trash = tree(snaps.directory / "run-1" / "trash")
-    assert trash == {"3-Resources/Tools/new1.md": b"new 1\n", "3-Resources/Tools/new2.md": b"new 2\n"}
+    # removed files, and the post-run bytes of every file a restore overwrote (the way back of a restore)
+    assert trash == {
+        "3-Resources/Tools/new1.md": b"new 1\n",
+        "3-Resources/Tools/new2.md": b"new 2\n",
+        "0-INBOX/Inbox-Triage.md": b"triage v2\n",
+    }
 
 
 def test_dry_run_is_the_default_and_changes_nothing(snaps, vault):
@@ -341,6 +346,7 @@ def test_prune_keeps_the_total_under_max_bytes_oldest_first(tmp_path, vault):
     for i in range(3):
         clock["now"] += timedelta(hours=1)
         snaps.take(f"r{i}", "triage")
+        snaps.finish(f"r{i}")  # an unfinished snapshot is an active run's and is never evicted
     snaps.max_bytes = snaps.list()[0].bytes * 2
     assert snaps.prune()["pruned"] == ["r0"]
     assert [i.run_id for i in snaps.list() if i.status == "kept"] == ["r2", "r1"]
@@ -431,7 +437,7 @@ def test_a_restore_is_not_pruned_away_by_its_own_safety_snapshot(tmp_path, vault
     assert all(s.outcome == "done" for s in plan.steps), [s.outcome for s in plan.steps]
     assert tree(vault) == before
     assert (snaps.directory / "old" / "manifest.json").is_file()
-    assert not (snaps.directory / "old" / ".restoring").exists()  # the marker ends with the restore
+    assert not list((snaps.directory / "old").glob(".restoring*"))  # the marker ends with the restore
     assert (snaps.directory / "old" / "trash" / "3-Resources/Tools/new1.md").is_file()
     assert {p.name for p in snaps.directory.iterdir()} == {p.name for p in snaps._run_dirs()}  # no orphans
 
@@ -588,17 +594,258 @@ def test_a_snapshot_reads_every_note_once_and_calls_no_model(tmp_path, monkeypat
     assert not any("model" in name.lower() for name in vars(module))
 
 
-@pytest.mark.skipif(
-    not os.environ.get("PKPIPE_PERF_TESTS"), reason="timing: PKPIPE_PERF_TESTS=1 (machine dependent)"
-)
-def test_a_thousand_notes_snapshot_in_under_two_seconds(tmp_path):
-    """SC-002 wall clock; opt-in because a loaded CI runner makes it flaky."""
+def test_a_thousand_notes_snapshot_within_the_time_bound(tmp_path):
+    """SC-002 wall clock. Always runs, with a ceiling of five times the spec's 2 seconds so a loaded runner
+    does not make it flaky; ``PKPIPE_PERF_TESTS=1`` checks the spec's own 2 seconds (reference machine)."""
     import time
 
     root = _thousand_notes(tmp_path)
     snaps = FileSnapshots(
         tmp_path / "s", root, index=AppStore(tmp_path / "a.db"), policy=VaultPolicy(vault_dir=root)
     )
+    bound = 2.0 if os.environ.get("PKPIPE_PERF_TESTS") else 10.0
     t0 = time.perf_counter()
     info = snaps.take("r", "f")
-    assert info.files == 1000 and time.perf_counter() - t0 < 2.0
+    elapsed = time.perf_counter() - t0
+    assert info.files == 1000 and elapsed < bound, f"{elapsed:.2f}s"
+
+
+# -- review follow-up 2: active runs, overlap with unfinished runs, restore bytes, symlinks ----------------
+def test_prune_never_removes_the_snapshot_of_a_run_that_is_still_active(tmp_path, vault):
+    """Two runs of one flow, the older one still running (here: reported by the run store): age and the size
+    cap would take its snapshot, and its finish() would then be a silent no-op."""
+    clock = {"now": datetime(2026, 10, 1, tzinfo=UTC)}
+    active = {"ids": {"old"}}
+    snaps = FileSnapshots(
+        tmp_path / "s",
+        vault,
+        index=AppStore(tmp_path / "a.db"),
+        policy=VaultPolicy(vault_dir=vault),
+        now=lambda: clock["now"],
+        active_runs=lambda: active["ids"],
+    )
+    snaps.take("old", "triage")
+    snaps.finish("old")  # a waiting run has a post manifest from its first leg
+    clock["now"] = datetime(2026, 10, 2, tzinfo=UTC)
+    snaps.take("new", "triage")
+    snaps.finish("new")
+    clock["now"] = datetime(2026, 11, 4, tzinfo=UTC)
+    snaps.max_bytes = 1
+    assert snaps.prune()["pruned"] == []
+    active["ids"] = set()  # it ended
+    assert snaps.prune()["pruned"] == ["old"]
+
+
+def test_an_unfinished_snapshot_within_the_retention_is_not_evicted_by_the_size_cap(tmp_path, vault):
+    clock = {"now": datetime(2026, 11, 1, tzinfo=UTC)}
+    snaps = FileSnapshots(
+        tmp_path / "s",
+        vault,
+        index=AppStore(tmp_path / "a.db"),
+        policy=VaultPolicy(vault_dir=vault),
+        now=lambda: clock["now"],
+    )
+    snaps.take("running", "triage")  # no post manifest: still running
+    clock["now"] += timedelta(hours=1)
+    snaps.take("newer", "triage")
+    snaps.max_bytes = 1
+    assert snaps.prune()["pruned"] == []
+
+
+def test_a_restore_skips_the_paths_of_a_run_that_has_not_finished_yet(snaps, vault):
+    """Run B is still running (no post manifest). Run A's post manifest is a full rescan and holds B's
+    output; a non-forced restore of A must not revert it."""
+    snaps.take("run-a", "flow-a")
+    snaps.take("run-b", "flow-b")
+    (vault / "3-Resources/Tools/from-a.md").write_text("written by A\n")
+    (vault / "3-Resources/Tools/from-b.md").write_text("B is still producing this\n")
+    snaps.finish("run-a")  # B has no post.json
+    after = tree(vault)
+    plan = snaps.apply_restore("run-a")
+    assert tree(vault) == after
+    assert {s.path: (s.verb, (s.reason or "").split(":")[0]) for s in plan.steps} == {
+        "3-Resources/Tools/from-a.md": ("skip", "overlapping_run"),
+        "3-Resources/Tools/from-b.md": ("skip", "overlapping_run"),
+    }
+    forced = snaps.apply_restore("run-a", force=True)
+    assert forced.safety_snapshot and not (vault / "3-Resources/Tools/from-a.md").exists()
+
+
+def test_a_waiting_run_with_a_partial_post_manifest_counts_as_active_for_the_overlap(tmp_path, vault):
+    store = AppStore(tmp_path / "a.db")
+    active = {"ids": {"run-b"}}
+    snaps = FileSnapshots(
+        tmp_path / "s",
+        vault,
+        index=store,
+        policy=VaultPolicy(vault_dir=vault),
+        active_runs=lambda: active["ids"],
+    )
+    snaps.take("run-a", "flow-a")
+    snaps.take("run-b", "flow-b")
+    (vault / "3-Resources/Tools/from-a.md").write_text("A\n")
+    snaps.finish("run-b")  # B waits: first leg recorded, it will write more after the owner answers
+    snaps.finish("run-a")
+    plan = snaps.plan_restore("run-a")
+    assert [(s.verb, (s.reason or "").split(":")[0]) for s in plan.steps] == [("skip", "overlapping_run")]
+    active["ids"] = set()  # B ended meanwhile: it left its own record, which does not hold A's note
+    snaps.finish("run-b")
+    assert [s.verb for s in snaps.plan_restore("run-a").steps] == ["skip"]  # B's rescan holds A's note too
+
+
+def test_a_run_that_is_still_active_cannot_be_restored(tmp_path, vault):
+    snaps = FileSnapshots(
+        tmp_path / "s",
+        vault,
+        index=AppStore(tmp_path / "a.db"),
+        policy=VaultPolicy(vault_dir=vault),
+        active_runs=lambda: {"run-1"},
+    )
+    snaps.take("run-1", "triage")
+    run_changes(vault)
+    snaps.finish("run-1")
+    with pytest.raises(SnapshotError, match="still running or waiting"):
+        snaps.plan_restore("run-1")
+
+
+def test_a_forced_restore_saves_the_current_bytes_even_when_the_plan_saw_the_post_run_state(snaps, vault):
+    snaps.take("run-1", "triage")
+    (vault / "1-Projects/p.md").write_text("after the run\n")
+    snaps.finish("run-1")
+    plan = snaps.apply_restore("run-1", force=True)  # cur == post sha: the plan has no save_current
+    assert [s.outcome for s in plan.steps] == ["done"]
+    assert (vault / "1-Projects/p.md").read_text() == "project\n"
+    assert tree(snaps.directory / "run-1" / "trash")["1-Projects/p.md"] == b"after the run\n"
+
+
+def test_a_forced_restore_does_not_overwrite_an_edit_made_after_its_trash_copy(snaps, vault, monkeypatch):
+    snaps.take("run-1", "triage")
+    (vault / "1-Projects/p.md").write_text("after the run\n")
+    snaps.finish("run-1")
+    original = snaps._to_trash
+
+    def trash_then_autosave(*a, **k):
+        dest = original(*a, **k)
+        (vault / "1-Projects/p.md").write_text("autosave after the copy\n")
+        return dest
+
+    monkeypatch.setattr(snaps, "_to_trash", trash_then_autosave)
+    plan = snaps.apply_restore("run-1", force=True)
+    assert [s.outcome for s in plan.steps] == ["skipped:changed_during_restore"]
+    assert (vault / "1-Projects/p.md").read_text() == "autosave after the copy\n"
+
+
+def test_a_file_that_grew_past_max_file_bytes_during_the_run_is_saved_before_the_restore(tmp_path, vault):
+    """The safety snapshot does not copy a file over max_file_bytes, so the restore itself saves the
+    post-run bytes: a restore stays undoable for files the run made big."""
+    snaps = FileSnapshots(
+        tmp_path / "s",
+        vault,
+        index=AppStore(tmp_path / "a.db"),
+        policy=VaultPolicy(vault_dir=vault),
+        max_file_bytes=1000,
+    )
+    snaps.take("run-1", "triage")
+    grown = "x" * 5000
+    (vault / "1-Projects/p.md").write_text(grown)
+    snaps.finish("run-1")
+    plan = snaps.apply_restore("run-1")
+    assert [s.outcome for s in plan.steps] == ["done"]
+    assert (vault / "1-Projects/p.md").read_text() == "project\n"
+    assert tree(snaps.directory / "run-1" / "trash")["1-Projects/p.md"] == grown.encode()
+
+
+def test_two_restores_of_one_run_do_not_unprotect_each_other(tmp_path, vault):
+    """Each restore has its own marker: the first to end removes only its own, so the snapshot stays out of
+    the prune while the other still runs. The marker's mtime is refreshed per step (long restores)."""
+    clock = {"now": datetime(2026, 10, 1, tzinfo=UTC)}
+    snaps = FileSnapshots(
+        tmp_path / "s",
+        vault,
+        index=AppStore(tmp_path / "a.db"),
+        policy=VaultPolicy(vault_dir=vault),
+        now=lambda: clock["now"],
+    )
+    snaps.take("old", "triage")
+    run_changes(vault)
+    snaps.finish("old")
+    clock["now"] = datetime(2026, 10, 2, tzinfo=UTC)
+    snaps.take("new", "triage")
+    clock["now"] = datetime(2026, 11, 4, tzinfo=UTC)
+    other = snaps.directory / "old" / ".restoring.other"
+    other.write_text("second restore")
+    os.utime(other, (clock["now"].timestamp(),) * 2)
+    snaps.apply_restore("old")  # the first restore ends and removes its own marker
+    assert other.exists()
+    assert snaps._in_use("old") and "old" not in snaps.prune()["pruned"]
+
+
+def test_a_restore_refreshes_its_marker_after_every_step(snaps, vault, monkeypatch):
+    snaps.take("run-1", "triage")
+    run_changes(vault)
+    snaps.finish("run-1")
+    touched = []
+    original = os.utime
+    monkeypatch.setattr(os, "utime", lambda p, *a, **k: touched.append(Path(p).name) or original(p, *a, **k))
+    plan = snaps.apply_restore("run-1")
+    assert sum(1 for n in touched if n.startswith(".restoring.")) == len(
+        [s for s in plan.steps if s.verb != "skip"]
+    )
+
+
+def test_a_managed_file_below_a_nested_symlinked_folder_is_never_read_or_copied(tmp_path, vault):
+    """``2-Areas/System`` is a symlink to a folder outside the vault; the managed backlog file below it is
+    not read (only the leaf and the top scope folder used to be checked)."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "System-Tool-Candidates.md").write_text("PRIVATE OUTSIDE\n")
+    (vault / "2-Areas/System").symlink_to(outside)
+    snaps = FileSnapshots(
+        tmp_path / "s", vault, index=AppStore(tmp_path / "a.db"), policy=VaultPolicy(vault_dir=vault)
+    )
+    snaps.take("run-1", "triage")
+    assert b"PRIVATE OUTSIDE" not in b"".join(
+        p.read_bytes() for p in snaps.directory.rglob("*") if p.is_file()
+    )
+    assert "2-Areas/System/System-Tool-Candidates.md" not in {e.path for e in snaps._load("run-1")[1].files}
+
+
+def test_a_managed_file_below_a_symlinked_folder_is_never_read_or_copied(tmp_path, vault):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "Inbox-Triage.md").write_text("PRIVATE OUTSIDE\n")
+    import shutil
+
+    shutil.rmtree(vault / "0-INBOX")
+    (vault / "0-INBOX").symlink_to(outside)
+    snaps = FileSnapshots(
+        tmp_path / "s", vault, index=AppStore(tmp_path / "a.db"), policy=VaultPolicy(vault_dir=vault)
+    )
+    snaps.take("run-1", "triage")
+    assert b"PRIVATE OUTSIDE" not in b"".join(
+        p.read_bytes() for p in snaps.directory.rglob("*") if p.is_file()
+    )
+
+
+def test_the_manifest_hash_matches_the_bytes_copied_when_the_note_changes_during_the_snapshot(
+    snaps, vault, monkeypatch
+):
+    """Obsidian saves a note right after the snapshot read it: the manifest holds the hash of the bytes that
+    were copied (not of the file as it is now), so it never claims a state it did not copy."""
+    target = vault / "1-Projects/p.md"
+    original = Path.read_bytes
+
+    def read_then_autosave(self):
+        data = original(self)
+        if self == target.resolve():
+            target.write_text("autosaved while the snapshot ran\n")
+        return data
+
+    monkeypatch.setattr(Path, "read_bytes", read_then_autosave)
+    snaps.take("run-1", "triage")
+    monkeypatch.undo()
+    copied = (snaps.directory / "run-1" / "files" / "1-Projects/p.md").read_bytes()
+    entry = next(e for e in snaps._load("run-1")[1].files if e.path == "1-Projects/p.md")
+    assert copied == b"project\n" and entry.sha256 == hashlib.sha256(copied).hexdigest()
+    assert entry.sha256 != hashlib.sha256(target.read_bytes()).hexdigest()
+    assert entry.size == len(copied)

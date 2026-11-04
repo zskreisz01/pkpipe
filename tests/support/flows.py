@@ -90,4 +90,5 @@ def make_service(
         ports_for=lambda snapshot: ports,
         registry=registry,
         snapshots_for=snapshots_for,
+        unsnapshotted_writes=snapshots_for is None,
     )

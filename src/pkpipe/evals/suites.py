@@ -935,6 +935,7 @@ class FlowsSuite(Suite):
                 checkpointer=InMemorySaver(),
                 config=lambda: snapshot,
                 ports_for=lambda _s: ports,
+                unsnapshotted_writes=True,  # synthetic vault: nothing to restore
             )
             statuses: list[str] = []
             errors: list[str] = []

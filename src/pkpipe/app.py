@@ -84,10 +84,16 @@ def make_snapshots(
         return None
     db = db_path or default_db_path()
     cfg = snapshot.data.get("snapshots") or {}
+
+    def active_runs() -> list[str]:
+        store = SqliteRunStore(db)
+        return [r["run_id"] for status in ("running", "waiting") for r in store.list_runs(status=status)]
+
     return FileSnapshots(
         snapshots_dir(db),
         policy.vault_dir,
         index=AppStore(db),
+        active_runs=active_runs,
         policy=policy,
         expected_layout=layout_from(snapshot.data.get("layout")),
         **{k: cfg[k] for k in ("retention_days", "max_bytes", "max_file_bytes") if k in cfg},

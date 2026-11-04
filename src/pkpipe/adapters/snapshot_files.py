@@ -20,7 +20,7 @@ import os
 import secrets
 import shutil
 import tempfile
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Protocol
@@ -52,7 +52,9 @@ MANIFEST, POST, FILES, TRASH = "manifest.json", "post.json", "files", "trash"
 DEFAULT_RETENTION_DAYS = 14
 DEFAULT_MAX_BYTES = 1024**3
 DEFAULT_MAX_FILE_BYTES = 5 * 1024**2
-#: Marker file in a snapshot folder while a restore uses it: ``prune`` never removes such a folder.
+#: Marker files (``.restoring.<token>``, one per restore) in a snapshot folder while a restore uses it:
+#: ``prune`` never removes such a folder. Each restore has its own marker, so one that ends cannot unprotect
+#: another that still runs; the marker's mtime is refreshed after every step.
 RESTORING = ".restoring"
 _RESTORING_MAX_AGE_S = 3600
 _CHUNK = 1024 * 1024
@@ -129,6 +131,7 @@ class FileSnapshots:
         max_bytes: int = DEFAULT_MAX_BYTES,
         max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
         now: Callable[[], datetime] = _now,
+        active_runs: Callable[[], Iterable[str]] | None = None,
     ):
         self.directory = Path(directory)
         self.vault_dir = Path(vault_dir)
@@ -139,6 +142,10 @@ class FileSnapshots:
         self.max_bytes = max_bytes
         self.max_file_bytes = max_file_bytes
         self._now = now
+        #: ids of the runs that are running or waiting now (the run store); their snapshots are never pruned
+        #: and a restore of another run treats them as overlapping. Without it the files decide: a snapshot
+        #: with no post manifest that is younger than the retention counts as active.
+        self._active_runs = active_runs
 
     # -- paths -------------------------------------------------------------------------------------------
     @property
@@ -163,6 +170,18 @@ class FileSnapshots:
             if current.is_symlink():
                 raise SnapshotError("a folder in the snapshot's paths is a symlink now")
         return root / rel
+
+    def _plain_dirs(self, rel_dir: str) -> bool:
+        """No folder on the way from the vault root down to ``rel_dir`` is a symlink (the scan never reads
+        or copies through one, the same rule ``_vault_path`` applies to a restore)."""
+        current = self.root
+        for part in rel_dir.split("/"):
+            if not part:
+                continue
+            current = current / part
+            if current.is_symlink():
+                return False
+        return True
 
     def _load(self, run_id: str) -> tuple[Path, Manifest]:
         base = self._snapshot_dir(run_id)
@@ -189,7 +208,7 @@ class FileSnapshots:
         seen: set[str] = set()
         for folder in scope.folders:
             top = root / folder
-            if top.is_symlink() or not top.is_dir():
+            if not self._plain_dirs(folder) or not top.is_dir():
                 continue
             for dirpath, dirnames, filenames in os.walk(top, followlinks=False):
                 here = Path(dirpath).relative_to(root).as_posix()
@@ -206,7 +225,12 @@ class FileSnapshots:
                         seen.add(rel)
                         yield rel
         for rel in scope.managed:
-            if rel not in seen and _valid_rel(rel) and not any(under(rel, ex) for ex in scope.exclude):
+            if (
+                rel not in seen
+                and _valid_rel(rel)
+                and not any(under(rel, ex) for ex in scope.exclude)
+                and self._plain_dirs(rel.rpartition("/")[0])
+            ):
                 seen.add(rel)
                 yield rel
 
@@ -379,6 +403,8 @@ class FileSnapshots:
     def plan_restore(self, run_id: str, *, force: bool = False) -> RestorePlan:
         """The dry run: what a restore would do, changing nothing (FR-005, US2 scenario 1)."""
         base, manifest = self._load(run_id)
+        if run_id in self._active_ids():
+            raise SnapshotError(f"run '{run_id}' is still running or waiting: restore it after it ends")
         post = self._load_post(base, run_id)
         if post is None:
             raise SnapshotError(
@@ -407,27 +433,53 @@ class FileSnapshots:
             start, end = datetime.fromisoformat(manifest.taken_at), datetime.fromisoformat(post.finished_at)
         except ValueError:
             return out
+        active = self._active_ids()
         for path in self._run_dirs():
             other = path.name
             if other == run_id:
                 continue
             try:
                 other_post = self._load_post(path, other)
-                if other_post is None:
-                    continue
-                other_end = datetime.fromisoformat(other_post.finished_at)
-                if other_end <= start:
-                    continue
                 other_start = datetime.fromisoformat(self._load(other)[1].taken_at)
             except (SnapshotError, ValueError):
                 continue
             if other_start >= end:
                 continue
+            if self._is_active(other, other_start, other_post is not None, active):
+                # still running or waiting: what it writes is unknown and this run's post manifest (a full
+                # rescan) may already hold it, so every path of this run is shared with it
+                for p in mine:
+                    out.setdefault(p, other)
+                continue
+            if other_post is None:
+                continue
+            try:
+                other_end = datetime.fromisoformat(other_post.finished_at)
+            except ValueError:
+                continue
+            if other_end <= start:
+                continue
             for e in other_post.entries:
-                for p in (e.path, e.from_path):
-                    if p and p in mine:
-                        out.setdefault(p, other)
+                for theirs in (e.path, e.from_path):
+                    if theirs and theirs in mine:
+                        out.setdefault(theirs, other)
         return out
+
+    def _active_ids(self) -> set[str]:
+        if self._active_runs is None:
+            return set()
+        try:
+            return set(self._active_runs())
+        except Exception:  # noqa: BLE001 - the run store is housekeeping here: fall back to the files
+            log.warning("the active runs could not be listed; snapshot files decide")
+            return set()
+
+    def _is_active(self, run_id: str, taken: datetime, has_post: bool, active: set[str]) -> bool:
+        """A run that is running or waiting (the run store says so), or, as the files' own evidence, one
+        that has no post manifest yet and was taken within the retention."""
+        if run_id in active:
+            return True
+        return not has_post and taken > self._now() - timedelta(days=self.retention_days)
 
     def apply_restore(self, run_id: str, *, force: bool = False) -> RestorePlan:
         """Apply the plan after a snapshot of the current state (a restore is undoable too). Nothing is
@@ -442,13 +494,13 @@ class FileSnapshots:
         post_sha = {e.path: e.sha256 for e in post.entries}
         pre = {e.path: e for e in manifest.files}
         safety = f"restore-{run_id[:70]}-{self._now().strftime('%Y%m%dT%H%M%S')}-{secrets.token_hex(2)}"
-        marker = base / RESTORING
+        marker = base / f"{RESTORING}.{secrets.token_hex(4)}"
         try:
             marker.write_text(safety, encoding="utf-8")  # prune keeps this folder until the restore ends
         except OSError as exc:
             raise SnapshotError(f"cannot start the restore: {_cause(exc)}") from None
         try:
-            return self._apply(run_id, base, plan, pre, post_sha, safety, force)
+            return self._apply(run_id, base, plan, pre, post_sha, safety, force, marker)
         finally:
             with contextlib.suppress(OSError):
                 marker.unlink()
@@ -462,6 +514,7 @@ class FileSnapshots:
         post_sha: Mapping[str, str | None],
         safety: str,
         force: bool,
+        marker: Path | None = None,
     ) -> RestorePlan:
         _, manifest = self._load(run_id)
         scope = SnapshotScope(tuple(manifest.scope), tuple(manifest.managed), tuple(manifest.exclude))
@@ -475,6 +528,9 @@ class FileSnapshots:
                     step.outcome = f"skipped:{step.reason}"
                     continue
                 step.outcome = self._apply_step(step, base, pre, post_sha, force)
+                if marker is not None:  # a long restore keeps its snapshot out of the prune
+                    with contextlib.suppress(OSError):
+                        os.utime(marker)
             self.finish(safety)
             plan.applied = True
             counts = {
@@ -508,13 +564,16 @@ class FileSnapshots:
                 copy = base / FILES / step.path
                 if not copy.is_file() or _hash_file(copy)[0] != pre[step.path].sha256:
                     return "skipped:snapshot_copy_damaged"
-                if step.save_current and cur is not None:
-                    self._to_trash(base, step.path, keep_original=True)
+                saved: str | None = None
+                if cur is not None:
+                    # whatever is in the vault now is saved first, forced or not: the safety snapshot does
+                    # not hold a file over max_file_bytes or an edit made after it was taken
+                    saved = _hash_file(self._to_trash(base, step.path, keep_original=True))[0]
+                    if not force and saved not in (pre[step.path].sha256, post_sha.get(step.path)):
+                        return "skipped:changed_during_restore"
                 allowed = (
-                    None
-                    if force or step.save_current
-                    else (None, pre[step.path].sha256, post_sha.get(step.path))
-                )
+                    (None,) if saved is None else (None, saved)
+                )  # a later edit is not overwritten unseen
                 if not self._write_restored(
                     target, copy.read_bytes(), pre[step.path].mtime, allowed, self._current_sha, step.path
                 ):
@@ -708,7 +767,21 @@ class FileSnapshots:
         newest: dict[str, str] = {}
         for info in sorted(infos, key=lambda i: (i.taken_at, i.run_id)):
             newest[info.flow_id] = info.run_id
-        protected = set(newest.values()) | {i.run_id for i in infos if self._in_use(i.run_id)}
+        active = self._active_ids()
+        protected = (
+            set(newest.values())
+            | {i.run_id for i in infos if self._in_use(i.run_id)}
+            | {
+                i.run_id
+                for i in infos
+                if self._is_active(
+                    i.run_id,
+                    datetime.fromisoformat(i.taken_at),
+                    (self._snapshot_dir(i.run_id) / POST).is_file(),
+                    active,
+                )
+            }
+        )
         cutoff = self._now() - timedelta(days=self.retention_days)
         removable = [
             i for i in sorted(infos, key=lambda i: (i.taken_at, i.run_id)) if i.run_id not in protected
@@ -729,12 +802,13 @@ class FileSnapshots:
         return {"pruned": pruned, "freed_bytes": freed, "kept": len(infos) - len(pruned)}
 
     def _in_use(self, run_id: str) -> bool:
-        """A restore is using this snapshot now (its marker is fresh; a stale one is a crashed restore)."""
+        """A restore is using this snapshot now (a marker is fresh; a stale one is a crashed restore)."""
         try:
-            age = self._now().timestamp() - (self._snapshot_dir(run_id) / RESTORING).stat().st_mtime
+            base = self._snapshot_dir(run_id)
+            ages = [self._now().timestamp() - m.stat().st_mtime for m in base.glob(f"{RESTORING}*")]
         except (OSError, SnapshotError):
             return False
-        return age < _RESTORING_MAX_AGE_S
+        return any(age < _RESTORING_MAX_AGE_S for age in ages)
 
     def _remove(self, run_id: str) -> None:
         path = self._snapshot_dir(run_id)
