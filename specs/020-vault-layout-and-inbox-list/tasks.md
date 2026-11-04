@@ -1,6 +1,6 @@
 ---
 spec_id: 020-vault-layout-and-inbox-list
-status: Completed
+status: Partially completed (FR-009 pending spec 019)
 description: Tasks for the configurable vault layout and the list-style INBOX
 updated: 2026-11-04
 ---
@@ -33,4 +33,5 @@ Format: `- [x] T001 [USx] Description` · `[USx]` = user story
 
 - [x] T012 [P] Docs (configuration, vault layout), CHANGELOG
 - [x] T013 [P] BPMN: drawio, PNG, Mermaid together
-- [x] T014 Spec 019 scope from the layout: provides `VaultLayout.snapshot_roots()` only; no consumer exists until spec 019 is added (FR-009 partly met)
+- [x] T014a Provide `VaultLayout.snapshot_roots()` (layout-derived scope, unit-tested)
+- [ ] T014b Spec 019 consumes `snapshot_roots()` with an integration test (FR-009; blocked: spec 019 is not in this repository)

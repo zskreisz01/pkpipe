@@ -1,6 +1,6 @@
 ---
 spec_id: 020-vault-layout-and-inbox-list
-status: Completed
+status: Partially completed (FR-009 pending spec 019)
 description: Data model for the vault layout and the inbox list
 updated: 2026-11-04
 ---

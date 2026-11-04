@@ -27,7 +27,7 @@ _ID_REF = re.compile(r"\{id:([^}]+)\}")
 
 
 def expand_ids(text: str) -> str:
-    """``{id:0-INBOX/x.md}`` -> the triage item id of that resource (cases name files, not hashes)."""
+    """``{id:<resource>}`` -> the triage item id of that resource (cases name files, not hashes)."""
     return _ID_REF.sub(lambda m: item_id_for(m.group(1)), text)
 
 

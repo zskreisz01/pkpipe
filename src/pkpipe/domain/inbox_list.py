@@ -245,8 +245,9 @@ def _bullet_body(line: str, markers: Sequence[str]) -> str:
 def parse_list(text: str, config: InboxListConfig | None = None) -> list[InboxEntry]:
     """The entries of the list in file order (duplicates included).
 
-    * the header (front matter, title, intro) ends at the first ``header_end`` line; without one, entries
-      start at the first bullet;
+    * the header (front matter, title, intro) ends at the first ``header_end`` line that comes before the
+      first bullet (or after a title above it); a list with no header starts at the first bullet and a later rule
+      only ends the entry above;
     * an entry starts with a bullet marker followed by a space and runs over the following non-blank,
       non-bullet lines (a URL on the next, unindented line belongs to the entry above);
     * ``<!-- comments -->`` are never entries and end the entry above;
@@ -256,11 +257,6 @@ def parse_list(text: str, config: InboxListConfig | None = None) -> list[InboxEn
     lines = text.splitlines()
     start = _front_matter_end(lines)
     header_end = re.compile(cfg.header_end)
-    first = None
-    for i in range(start, len(lines)):
-        if header_end.match(lines[i]):
-            first = i + 1
-            break
     markers = tuple(m + " " for m in cfg.bullet_markers)
     marker_alone = tuple(cfg.bullet_markers)
 
@@ -268,11 +264,20 @@ def parse_list(text: str, config: InboxListConfig | None = None) -> list[InboxEn
         return line.startswith(markers) or line in marker_alone
 
     stripped = _strip_comments(lines, cfg.comments_ignored)
-    if first is None:
-        first = next(
-            (i for i in range(start, len(lines)) if is_bullet(stripped[i][0]) and not stripped[i][1]),
-            len(lines),
-        )
+    first_bullet = next(
+        (i for i in range(start, len(lines)) if is_bullet(stripped[i][0]) and not stripped[i][1]),
+        len(lines),
+    )
+    # The rule ends the header when there is a header: text (a title) above the first bullet, or the rule
+    # itself above it. Bullets with nothing above them are a list without a header, and a later rule is
+    # just a line of the list, never a reason to drop the entries above it.
+    first = first_bullet
+    has_header = any(
+        header_end.match(lines[i]) or (lines[i].strip() and not stripped[i][1])
+        for i in range(start, first_bullet)
+    )
+    if has_header:
+        first = next((i + 1 for i in range(start, len(lines)) if header_end.match(lines[i])), first_bullet)
     entries: list[InboxEntry] = []
     current: list[int] = []
 
@@ -289,7 +294,7 @@ def parse_list(text: str, config: InboxListConfig | None = None) -> list[InboxEn
 
     for i in range(first, len(lines)):
         content, comment_only = stripped[i]
-        if comment_only:
+        if comment_only or header_end.match(lines[i]):  # a rule inside the list ends the entry, is no entry
             flush()
         elif not lines[i].strip():
             flush()

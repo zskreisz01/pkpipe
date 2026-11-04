@@ -52,14 +52,13 @@ def parse_inbox_list(ctx: StepContext, note: dict[str, Any]) -> dict[str, Any]:
     """
     cfg = layout_of(ctx).inbox_list.to_config()
     entries = parse_list((note or {}).get("body", ""), cfg)
-    items = []
+    items: list[dict[str, object]] = []
+    by_kind: dict[str, int] = {}
     for item in list_items(entries):
         d = item.as_dict()
         d["needs_owner"] = item.kind is EntryKind.IMAGE
         items.append(d)
-    by_kind: dict[str, int] = {}
-    for item in items:
-        by_kind[item["kind"]] = by_kind.get(item["kind"], 0) + 1
+        by_kind[item.kind.value] = by_kind.get(item.kind.value, 0) + 1
     return {"items": items, "count": len(items), "entries": len(entries), "kinds": by_kind}
 
 
@@ -95,7 +94,7 @@ def select_new(
     resolve = getattr(ctx, "resolve", None)  # the eval harness passes a bare context
     parsed = resolve("parse_list", required=False) if resolve else None
     list_mode = isinstance(parsed, dict)
-    listed = {i["id"]: i for i in parsed["items"]} if list_mode else {}
+    listed = {i["id"]: i for i in parsed["items"]} if isinstance(parsed, dict) else {}
     items: list[dict[str, Any]] = []
     owner_items: list[dict[str, Any]] = []
     seen: set[str] = set()

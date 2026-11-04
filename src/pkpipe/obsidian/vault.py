@@ -187,7 +187,8 @@ class Vault:
         if not target.is_file():
             raise NoteNotFound(f"inbox list not found: {layout.inbox_list_file}")
         config = layout.inbox_list.to_config()
-        archive_rel = layout.inbox_archive_path(self._today())
+        day = self._today()  # once per call: one dated archive, one header
+        archive_rel = layout.inbox_archive_path(day)
         archive = self.policy.resolve(archive_rel, "inbox_remove_entries")
         if is_conflict_name(archive.name) or self.policy.in_quarantine(archive):
             raise PathRejected("refusing to write the archive there")
@@ -202,7 +203,7 @@ class Vault:
             planned = remove_entries(target.read_text(encoding="utf-8"), entries, config)
             fresh = list((Counter(planned.removed) - archived).elements())
             if fresh:
-                update_text(archive, self._archive_appender(fresh))
+                update_text(archive, self._archive_appender(fresh, day))
                 archived.update(fresh)
             outcome.clear()
 
@@ -226,8 +227,7 @@ class Vault:
             }
         raise WriteConflict(f"{layout.inbox_list_file} kept changing while removing entries; retry")
 
-    def _archive_appender(self, raws: list[str]) -> Callable[[str | None], str]:
-        day = self._today()
+    def _archive_appender(self, raws: list[str], day: date) -> Callable[[str | None], str]:
         return lambda existing: archive_text(existing, raws, day)
 
     def _is_managed_other_than(self, target: Path) -> bool:

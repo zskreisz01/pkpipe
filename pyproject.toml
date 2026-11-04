@@ -81,6 +81,7 @@ files = [
   "src/pkpipe/domain/inbox_list.py",
   "src/pkpipe/obsidian/policy.py",
   "src/pkpipe/obsidian/vault.py",
+  "src/pkpipe/steps/triage_code.py",
 ]
 ignore_missing_imports = true
 follow_imports = "silent"

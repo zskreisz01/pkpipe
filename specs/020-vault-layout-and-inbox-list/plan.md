@@ -1,6 +1,6 @@
 ---
 spec_id: 020-vault-layout-and-inbox-list
-status: Completed
+status: Partially completed (FR-009 pending spec 019)
 description: Plan for the configurable vault layout and the list-style INBOX
 updated: 2026-11-04
 ---

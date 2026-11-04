@@ -169,6 +169,16 @@ class VaultLayout(BaseModel):
                 raise ValueError(
                     f"layout.{field} '{path}' is the managed file layout.{seen[path.casefold()]}"
                 )
+        # The archive holds the only copy of removed entries: it lives outside every folder the generic
+        # note tools may write (or triage) in, so nothing else can overwrite, move into or triage it.
+        folder = "/".join(self.inbox_archive_pattern.split("/")[:-1])
+        writable = [self.inbox_dir, self.projects_dir, self.areas_dir, self.resources_dir]
+        static = folder.split("{")[0].rstrip("/")
+        if static and allowed_by(static, writable):
+            raise ValueError(
+                f"layout.inbox_archive_pattern '{self.inbox_archive_pattern}' lies in a writable or INBOX "
+                "folder; put the archive below archive_dir"
+            )
         return self
 
     # -- derived places --------------------------------------------------------------------------------
@@ -190,7 +200,19 @@ class VaultLayout(BaseModel):
         covers, derived from the layout instead of its own list (FR-009)."""
         roots = [self.inbox_dir, self.projects_dir, self.areas_dir, self.resources_dir, self.archive_root]
         paths = [self.triage_file, self.processing_list, self.improvement_file, self.tool_candidates_file]
-        roots += [p.split("/")[0] for p in (*paths, self.quarantine_dir, self.agent_tasks_dir)]
+        extra = [self.inbox_archive_pattern, *([self.inbox_list_file] if self.inbox_list_file else [])]
+        roots += [
+            p.split("/")[0]
+            for p in (
+                *paths,
+                *extra,
+                self.quarantine_dir,
+                self.agent_tasks_dir,
+                self.proposals_dir,
+                self.attachments_dir,
+                self.context_review_dir,
+            )
+        ]
         top = {r.split("/")[0] for r in roots}
         return sorted(top)
 
@@ -270,9 +292,6 @@ class VaultLayout(BaseModel):
         return out
 
 
-DEFAULT_LAYOUT = VaultLayout()
-
-
 def allowed_by(path: str, prefixes: Sequence[str]) -> bool:
     """Whether ``path`` lies at or below one of the folder prefixes (case sensitive, segment wise)."""
     parts = tuple(path.split("/"))
@@ -281,6 +300,9 @@ def allowed_by(path: str, prefixes: Sequence[str]) -> bool:
         if parts[: len(pre)] == pre:
             return True
     return False
+
+
+DEFAULT_LAYOUT = VaultLayout()
 
 
 def _static_part(pattern: str) -> str:
@@ -317,12 +339,22 @@ STRUCTURAL_FIELDS = (
 )
 
 
+#: Folders flows write notes into; they must lie in the folders the write tools default to.
+WRITE_DESTINATION_FIELDS = ("agent_tasks_dir", "proposals_dir", "attachments_dir", "context_review_dir")
+
+
 def layout_structure_errors(layout: VaultLayout) -> list[str]:
     """Paths that lie outside the folders the vault tool defaults derive from this layout (``inbox_dir``,
     the PARA roots, the archive root). Catches a half-moved layout, for example a new ``inbox_dir`` with the
     triage file still in the old folder, when the config is validated or published (FR-008)."""
-    errors = layout_errors(layout, layout.default_allow())
-    return [e for e in errors if any(e.startswith(f"layout.{f} ") for f in STRUCTURAL_FIELDS)]
+    allow = layout.default_allow()
+    errors = layout_errors(layout, allow)
+    errors = [e for e in errors if any(e.startswith(f"layout.{f} ") for f in STRUCTURAL_FIELDS)]
+    for field in WRITE_DESTINATION_FIELDS:  # flows write notes below these (write_note / append_note)
+        path = getattr(layout, field)
+        if not allowed_by(path, allow["write_note"]):
+            errors.append(f"layout.{field} '{path}' is outside the allowlist of tool 'write_note'")
+    return errors
 
 
 #: Top level keys of an older vault policy file that are layout fields (pre spec 020 spelling).

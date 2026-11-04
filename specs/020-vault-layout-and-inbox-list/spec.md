@@ -1,7 +1,7 @@
 ---
 spec_id: 020-vault-layout-and-inbox-list
 title: Configurable vault layout and list-style INBOX
-status: Completed
+status: Partially completed (FR-009 pending spec 019)
 description: The vault folders and files the engine uses become one configurable layout, and the INBOX can be a single list file whose bullet entries (links, image embeds, text with a link) are the triage items.
 relevant_when:
   - vault layout
@@ -17,7 +17,7 @@ updated: 2026-11-04
 
 **Feature Branch**: `spec/020-vault-layout-and-inbox-list`
 **Created**: 2026-11-04
-**Status**: Completed
+**Status**: Partially completed (FR-009 pending spec 019)
 **Input**: Owner: the INBOX must be parsed as it really is (one list file, entries marked with bullets); the vault structure must be configurable. Real vault: `1-Inbox`, `2-Projects`, `3-Areas`, `4-Resources`, `6-Archive`, `DailyJournals/<year>/`.
 **Companions**: [data-model.md](data-model.md)
 
@@ -77,14 +77,14 @@ updated: 2026-11-04
 - **FR-008**: Layout validation at publish: every path is relative, free of `..`, and allowed by the policy for the tool that uses it
 - **FR-009**: Spec 019 derives its snapshot scope from the same layout
 
-## Implementation notes (Completed 2026-11-04)
+## Implementation notes (2026-11-04)
 
 - `domain/layout.py` (`VaultLayout`, `InboxListSettings`), `domain/inbox_list.py`, `layout.json` (core default + pack file), `VaultPolicy.layout` with allowlist validation, vault tool `inbox_remove_entries`.
 - `kind` / `needs_owner` are optional triage columns: written when a row needs them (a note-only triage file stays byte-identical).
 - A list item has no note: `inbox.source_note` builds the text the flows work from; the flows' note read node is `fetch_note`, the merged result is still `read`.
 - Flows name no folder; `categories.json` `para_path` is written `{resources_dir}/<name>` and expanded from the layout (a literal path still works).
-- FR-009: **partly met.** `VaultLayout.snapshot_roots()` is the layout-derived scope (unit-tested); spec 019 is not in this repository, so nothing consumes it yet and there is no integration test. It is met when spec 019 uses it.
-- Review hardening (2026-11-04): the archive and the list file can never be a managed file or sit in the quarantine folder (layout validator and run time check); the archive text comes from what the locked list rewrite removes (re-planned when the list changed; at least once, never in neither file); `kind` and `needs_owner` of a triage row are fixed at creation; a failed item (processing status `failed`) and a quarantined item keep their entry; the run reports a vanished entry as `not_found` (`inbox.report`, in the summary); `pkpipe validate` and the publish gate check the layout structure and, with `--vault-policy` / `PKPIPE_VAULT_POLICY`, the vault policy file (field, path and tool named); `security.quarantine_dir` is deprecated (must equal the layout when present).
+- FR-009: **partly met.** `VaultLayout.snapshot_roots()` is the layout-derived scope (unit-tested); spec 019 is not in this repository, so nothing consumes it yet and there is no integration test. It is met, and this spec Completed, when spec 019 uses it; until then the status stays Partially completed.
+- Review hardening (2026-11-04): the archive and the list file can never be a managed file or sit in the quarantine folder (layout validator and run time check; the archive must also lie outside every writable or INBOX folder); the archive text comes from what the locked list rewrite removes (re-planned when the list changed; at least once, never in neither file); `kind` and `needs_owner` of a triage row are fixed at creation; a failed item (processing status `failed`) and a quarantined item keep their entry; the run reports a vanished entry as `not_found` (`inbox.report`, in the summary); `pkpipe validate` and the publish gate check the layout structure and, with `--vault-policy` / `PKPIPE_VAULT_POLICY`, the vault policy file (field, path and tool named); `security.quarantine_dir` is deprecated (must equal the layout when present).
 - Known limit: removal matches by raw text; between the flow's read of the list and the removal an identical new entry can take the place of the one read (the window is two tool calls, the effect is that an equal entry leaves the list).
 
 ## Success Criteria
@@ -92,3 +92,5 @@ updated: 2026-11-04
 - **SC-001**: the real-INBOX fixture yields the expected item list exactly (golden test)
 - **SC-002**: no literal of the old PARA names remains in `src/pkpipe` outside defaults and tests
 - **SC-003**: remove-entries never changes a byte outside the removed entries (property test)
+
+- Review fixes (2026-11-04): the header rule counts only before the first bullet; one `today` per `inbox_remove_entries` call; `agent_tasks_dir`, `proposals_dir`, `attachments_dir` and `context_review_dir` are checked against the write folders at validate/publish; `snapshot_roots()` also covers the archive, list file and those folders. Known limit: an archive append that succeeded before a failed list rewrite is appended again on a later retry (at least once, never lost). Only `-` and `*` are bullet markers by default; a `1.` line continues the entry above (Clarification 1) and is removed with it.
