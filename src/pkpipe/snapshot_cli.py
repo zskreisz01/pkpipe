@@ -100,6 +100,11 @@ def format_plan(plan: RestorePlan, *, force: bool) -> str:
         lines.append(
             f"state before the restore saved as snapshot {plan.safety_snapshot} (restore it to undo)"
         )
+    if plan.scope:
+        lines.append(
+            "snapshot scope: " + ", ".join(plan.scope) + " (a vault file changed outside these folders "
+            "is not restored)"
+        )
     if plan.applied and plan.steps:
         lines.append(NOT_COVERED)
     return "\n".join(lines)

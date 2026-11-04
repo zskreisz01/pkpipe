@@ -124,6 +124,8 @@ class RestorePlan(_Model):
     steps: list[RestoreStep] = Field(default_factory=list)
     #: The snapshot of the state before the restore was applied (a restore is undoable too).
     safety_snapshot: str | None = None
+    #: The vault folders the snapshot covers (its manifest's scope): a change anywhere else is not restored.
+    scope: list[str] = Field(default_factory=list)
 
     def counts(self) -> dict[str, int]:
         out = {v: 0 for v in ("restore", "remove", "move_back", "skip")}
@@ -278,6 +280,7 @@ def build_plan(
     *,
     force: bool = False,
     run_id: str = "",
+    foreign: Mapping[str, str] | None = None,
 ) -> RestorePlan:
     """The steps that bring the paths of ``post`` back to ``pre``.
 
@@ -286,7 +289,11 @@ def build_plan(
     do) nor the bytes the run left (``post``) was changed since the run: ``skip``, or with ``force`` the step
     that saves the current bytes in the trash first. Paths the run did not touch never appear: an owner edit
     to them is out of the plan by construction (SC-004). Applying a restore twice plans nothing the second
-    time (SC-003)."""
+    time (SC-003).
+
+    ``foreign`` maps a path to the id of another run whose time span overlapped this run's and that left the
+    path different too: the post manifest of overlapping runs holds each other's writes, so the plan cannot
+    tell whose change a path carries. Without ``force`` such a step becomes ``skip`` (``overlapping_run``)."""
     steps: list[RestoreStep] = []
 
     def skip(path: str, reason: str) -> None:
@@ -372,8 +379,22 @@ def build_plan(
                     skip(dst, "destination_exists")
             else:
                 steps.append(RestoreStep.model_validate({"verb": "move_back", "from": dst, "to": src}))
+    if foreign and not force:
+        steps = [_overlap_skip(s, foreign) for s in steps]
     steps.sort(key=lambda s: (_ORDER[s.verb], s.path or s.from_path or ""))
     return RestorePlan(run_id=run_id, steps=steps)
+
+
+def _overlap_skip(step: RestoreStep, foreign: Mapping[str, str]) -> RestoreStep:
+    """``step`` as a conflict when a path it touches was also changed by an overlapping run."""
+    if step.verb == "skip":
+        return step
+    for path in (step.path, step.from_path, step.to):
+        if path is not None and path in foreign:
+            return RestoreStep(
+                verb="skip", path=step.path or step.from_path, reason=f"overlapping_run:{foreign[path][:12]}"
+            )
+    return step
 
 
 __all__ = [

@@ -132,3 +132,42 @@ def test_the_cli_has_restore_and_snapshot_commands(capsys):
     with pytest.raises(SystemExit):
         main(["restore", "--help"])
     assert "--apply" in capsys.readouterr().out
+
+
+def test_a_too_short_run_prefix_says_how_long_it_has_to_be(world, capsys):
+    vault, common, *_ = world
+    code, out, err = run_cli(capsys, "restore", "5f0c", *common)
+    assert code != 0 and "at least 6 characters" in (out + err)
+
+
+def test_the_plan_names_the_snapshot_scope_and_that_other_folders_are_not_restored(world, capsys):
+    vault, common, *_ = world
+    code, out, _ = run_cli(capsys, "restore", RUN, *common)
+    assert code == 0 and "snapshot scope: " in out and "0-INBOX" in out
+    assert "outside these folders is not restored" in out
+
+
+def test_a_policy_with_another_layout_than_layout_json_stops_the_snapshot(
+    tmp_path, synthetic_vault, pack_dir, monkeypatch
+):
+    """The vault server runs with the policy file; a scope from another layout would miss what it writes."""
+    from pkpipe.domain.vault_snapshot import SnapshotError
+
+    policy = tmp_path / "policy.json"
+    policy.write_text(
+        json.dumps(
+            {
+                "layout": {
+                    "archive_dir": "4-Archive/Elsewhere",
+                    "inbox_archive_pattern": "4-Archive/Elsewhere/{yyyy-MM-dd}.md",
+                }
+            }
+        )
+    )
+    snapshot = load_effective(pack_dir, None).snapshot()  # (loading with the variable set already fails)
+    monkeypatch.setenv("PKPIPE_VAULT_POLICY", str(policy))
+    monkeypatch.setenv("PKPIPE_DATA_DIR", str(tmp_path / "data"))
+    port = app.make_snapshots(snapshot, tmp_path / "app.db", synthetic_vault)
+    assert port is not None
+    with pytest.raises(SnapshotError, match="another layout"):
+        port.take("run-x", "triage")

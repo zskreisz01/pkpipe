@@ -42,7 +42,7 @@ def test_a_read_only_flow_takes_no_snapshot():
 
 
 def test_a_failing_snapshot_stops_the_run_before_it_starts_and_names_the_cause():
-    snaps = FakeSnapshots(fail=OSError("No space left on device"))
+    snaps = FakeSnapshots(fail=OSError(28, "No space left on device"))
     wrote: list[str] = []
     tools = FakeTools({"t:write_note": lambda: wrote.append("x") or "ok"})
     store = InMemoryRunStore()
@@ -91,10 +91,19 @@ def test_a_writing_subflow_makes_the_parent_flow_snapshot():
     assert [c[0] for c in snaps.calls] == ["take", "finish"]
 
 
-def test_no_configured_vault_logs_instead_of_blocking(caplog):
+def test_no_configured_vault_blocks_a_writing_flow(caplog):
+    """The vault server writes but this process has no vault for the snapshot: writing without a way back is
+    not allowed (FR-001), so the run does not start."""
+    wrote = []
     snap = make_snapshot(flow("w", "t:write_note"), allow=WRITE)
-    ports = make_ports(tools=FakeTools({"t:write_note": lambda: "ok"}))
+    ports = make_ports(tools=FakeTools({"t:write_note": lambda: wrote.append(1)}))
     svc = make_service(snap, ports, snapshots_for=lambda s: None)
-    with caplog.at_level("WARNING", logger="pkpipe.runs"):
-        assert svc.start("w").ok
-    assert "no vault is configured" in caplog.text
+    out = svc.start("w")
+    assert not out.ok and not wrote
+    assert "no vault is configured for snapshots" in out.run.error and "PKPIPE_VAULT_DIR" in out.run.error
+
+
+def test_no_configured_vault_does_not_block_a_read_only_flow():
+    snap = make_snapshot(flow("r", "t:read_note"), allow=["read_note"])
+    ports = make_ports(tools=FakeTools({"t:read_note": lambda: "ok"}))
+    assert make_service(snap, ports, snapshots_for=lambda s: None).start("r").ok

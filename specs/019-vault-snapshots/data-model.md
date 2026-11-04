@@ -24,7 +24,7 @@ $PKPIPE_DATA_DIR/snapshots/<run_id>/
   "version": 1,
   "run_id": "r-2026-11-04-2000-triage",
   "flow_id": "triage",
-  "taken_at": "2026-11-04T20:00:01+01:00",
+  "taken_at": "2026-11-04T20:00:01.123456+01:00",
   "policy_digest": "sha256 of the effective write scope",
   "scope": ["1-Inbox", "4-Resources/Tools"],
   "files": [{"path": "1-Inbox/Inbox-Triage.md", "size": 1234, "sha256": "…", "mtime": 1793818800, "copied": true}]
@@ -52,4 +52,6 @@ $PKPIPE_DATA_DIR/snapshots/<run_id>/
 
 `retention_days` (14), `max_bytes` (1 GiB), `max_file_bytes` (5 MiB, larger notes are manifest-only).
 
-The manifest also records `managed` (managed files) and `exclude` (excluded folders), and a file entry `conflict: true` for a sync-conflict copy (listed, never copied or restored). A restore plan step has `outcome` (`done`, `skipped:<reason>`) once applied, `save_current` under `--force`, and the plan has `safety_snapshot` (the snapshot of the state before the restore, id `restore-<run>-<time>-<n>`).
+The manifest also records `managed` (managed files) and `exclude` (excluded folders), and a file entry `conflict: true` for a sync-conflict copy (listed, never copied or restored). A restore plan step has `outcome` (`done`, `skipped:<reason>`) once applied, `save_current` under `--force`, the plan has `scope` (the manifest's folders) and `safety_snapshot` (the snapshot of the state before the restore, id `restore-<run>-<time>-<n>`).
+
+A skip reason `overlapping_run:<run>` marks a path that another run, overlapping in time, changed too. A folder `<snapshot>/.restoring` exists while a restore uses the snapshot (prune leaves it alone).

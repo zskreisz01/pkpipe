@@ -77,6 +77,7 @@ def make_snapshots(
     configured vault. Module attribute on purpose: the place a test swaps in a fake."""
     from pkpipe.adapters.app_store_sqlite import AppStore
     from pkpipe.adapters.snapshot_files import FileSnapshots
+    from pkpipe.domain.layout import layout_from
 
     policy = vault_policy_for(snapshot, vault_dir)
     if policy is None:
@@ -88,6 +89,7 @@ def make_snapshots(
         policy.vault_dir,
         index=AppStore(db),
         policy=policy,
+        expected_layout=layout_from(snapshot.data.get("layout")),
         **{k: cfg[k] for k in ("retention_days", "max_bytes", "max_file_bytes") if k in cfg},
     )
 

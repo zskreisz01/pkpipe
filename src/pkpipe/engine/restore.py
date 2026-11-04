@@ -10,9 +10,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol
 
-from pkpipe.domain.vault_snapshot import RestorePlan, SnapshotError, SnapshotInfo
+from pkpipe.domain.vault_snapshot import RestorePlan, SnapshotError, SnapshotInfo, UnknownSnapshot
 from pkpipe.engine.runs import ACTIVE, Run
 from pkpipe.ports import SnapshotPort
+
+MIN_PREFIX = 6
 
 
 class RunLookup(Protocol):
@@ -30,11 +32,15 @@ def resolve_run_id(infos: Sequence[SnapshotInfo], given: str) -> str:
     ids = [i.run_id for i in infos if i.status != "pruned"]
     if given in ids:
         return given
-    matches = [i for i in ids if len(given) >= 6 and i.startswith(given)]
+    matches = [i for i in ids if len(given) >= MIN_PREFIX and i.startswith(given)]
     if len(matches) == 1:
         return matches[0]
     if len(matches) > 1:
         raise SnapshotError(f"'{given}' names {len(matches)} snapshots; give more of the run id")
+    if len(given) < MIN_PREFIX and given not in ids:
+        raise UnknownSnapshot(
+            f"no snapshot of run '{given}' (a run id prefix needs at least {MIN_PREFIX} characters)"
+        )
     return given  # unknown: the port reports it (never taken, a read-only flow, or pruned)
 
 

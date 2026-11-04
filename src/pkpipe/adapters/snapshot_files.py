@@ -15,6 +15,7 @@ import contextlib
 import errno
 import hashlib
 import json
+import logging
 import os
 import secrets
 import shutil
@@ -24,6 +25,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Protocol
 
+from pkpipe.domain.layout import VaultLayout
 from pkpipe.domain.vault_snapshot import (
     NOT_A_FILE,
     FileEntry,
@@ -44,11 +46,20 @@ from pkpipe.obsidian.policy import VaultPolicy, is_conflict_name
 from pkpipe.obsidian.scope import SnapshotScope, derive_scope
 from pkpipe.telemetry import tool_span
 
+log = logging.getLogger("pkpipe.snapshots")
+
 MANIFEST, POST, FILES, TRASH = "manifest.json", "post.json", "files", "trash"
 DEFAULT_RETENTION_DAYS = 14
 DEFAULT_MAX_BYTES = 1024**3
 DEFAULT_MAX_FILE_BYTES = 5 * 1024**2
+#: Marker file in a snapshot folder while a restore uses it: ``prune`` never removes such a folder.
+RESTORING = ".restoring"
+_RESTORING_MAX_AGE_S = 3600
 _CHUNK = 1024 * 1024
+
+
+class _Changed(Exception):
+    """The file differs from the bytes the step checked: the step is skipped."""
 
 
 class SnapshotIndex(Protocol):
@@ -113,6 +124,7 @@ class FileSnapshots:
         *,
         index: SnapshotIndex,
         policy: VaultPolicy | None = None,
+        expected_layout: VaultLayout | None = None,
         retention_days: int = DEFAULT_RETENTION_DAYS,
         max_bytes: int = DEFAULT_MAX_BYTES,
         max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
@@ -121,6 +133,7 @@ class FileSnapshots:
         self.directory = Path(directory)
         self.vault_dir = Path(vault_dir)
         self.policy = policy
+        self.expected_layout = expected_layout
         self.index = index
         self.retention_days = retention_days
         self.max_bytes = max_bytes
@@ -257,6 +270,13 @@ class FileSnapshots:
         """Snapshot the scope the vault policy derives, before the first write of the run (FR-001, FR-002)."""
         if self.policy is None:
             raise SnapshotError("no vault policy: cannot derive the snapshot scope")
+        if self.expected_layout is not None and self.policy.layout != self.expected_layout:
+            # the writer (vault server) runs with that policy: a scope derived from another layout would
+            # leave notes the run writes outside the snapshot (no way back for them)
+            raise SnapshotError(
+                "the vault policy (PKPIPE_VAULT_POLICY) has another layout than layout.json: "
+                "the snapshot scope would not cover what the run writes"
+            )
         return self._take(run_id, flow_id, derive_scope(self.policy))
 
     def _take(self, run_id: str, flow_id: str, scope: SnapshotScope) -> SnapshotInfo:
@@ -266,10 +286,13 @@ class FileSnapshots:
             span.set_attribute("pkpipe.snapshot.run_id", run_id)
             if not self.root.is_dir():
                 raise SnapshotError("the vault folder does not exist")
-            self._ensure_dir()
-            if final.exists():
-                raise SnapshotError(f"a snapshot of run '{run_id}' exists already")
-            tmp = Path(tempfile.mkdtemp(dir=self.directory, prefix=f".tmp-{run_id[:40]}-"))
+            try:
+                self._ensure_dir()
+                if final.exists():
+                    raise SnapshotError(f"a snapshot of run '{run_id}' exists already")
+                tmp = Path(tempfile.mkdtemp(dir=self.directory, prefix=f".tmp-{run_id[:40]}-"))
+            except OSError as exc:
+                raise SnapshotError(f"cannot write the snapshot: {_cause(exc)}") from None
             try:
                 os.chmod(tmp, 0o700)
                 (tmp / FILES).mkdir(mode=0o700)
@@ -277,7 +300,7 @@ class FileSnapshots:
                 manifest = Manifest(
                     run_id=run_id,
                     flow_id=flow_id,
-                    taken_at=self._now().isoformat(timespec="seconds"),
+                    taken_at=self._now().isoformat(timespec="microseconds"),
                     policy_digest=scope.digest,
                     scope=list(scope.folders),
                     managed=list(scope.managed),
@@ -301,6 +324,16 @@ class FileSnapshots:
             )
             span.set_attribute("pkpipe.snapshot.files", info.files)
             span.set_attribute("pkpipe.snapshot.bytes", info.bytes)
+            not_copied = sum(1 for e in entries if not e.copied and not e.conflict)
+            span.set_attribute("pkpipe.snapshot.not_copied", not_copied)
+            if not_copied:
+                # no way back for these (FR-001 limit): the owner sees it in the log and `snapshot show`
+                log.warning(
+                    "snapshot of run %s: %d file(s) over max_file_bytes are listed but not copied; "
+                    "a restore skips them (not_copied)",
+                    run_id,
+                    not_copied,
+                )
         self.index.snapshot_upsert(
             {
                 "run_id": run_id,
@@ -333,7 +366,7 @@ class FileSnapshots:
                     base / POST,
                     PostManifest(
                         run_id=run_id,
-                        finished_at=self._now().isoformat(timespec="seconds"),
+                        finished_at=self._now().isoformat(timespec="microseconds"),
                         entries=entries,
                     ),
                 )
@@ -353,7 +386,48 @@ class FileSnapshots:
                 "let it finish or fail first"
             )
         pre = {e.path: e for e in manifest.files}
-        return build_plan(pre, post.entries, self._current_sha, force=force, run_id=run_id)
+        plan = build_plan(
+            pre,
+            post.entries,
+            self._current_sha,
+            force=force,
+            run_id=run_id,
+            foreign=self._overlapping(run_id, manifest, post),
+        )
+        plan.scope = list(manifest.scope)
+        return plan
+
+    def _overlapping(self, run_id: str, manifest: Manifest, post: PostManifest) -> dict[str, str]:
+        """Paths this run changed that another run, whose time span overlapped this one, changed too. Each
+        run's post manifest is a full rescan: with two runs in flight (or an owner edit during a run) the
+        manifests hold each other's writes, so a restore could not tell whose change a path carries."""
+        mine = {p for e in post.entries for p in (e.path, e.from_path) if p}
+        out: dict[str, str] = {}
+        try:
+            start, end = datetime.fromisoformat(manifest.taken_at), datetime.fromisoformat(post.finished_at)
+        except ValueError:
+            return out
+        for path in self._run_dirs():
+            other = path.name
+            if other == run_id:
+                continue
+            try:
+                other_post = self._load_post(path, other)
+                if other_post is None:
+                    continue
+                other_end = datetime.fromisoformat(other_post.finished_at)
+                if other_end <= start:
+                    continue
+                other_start = datetime.fromisoformat(self._load(other)[1].taken_at)
+            except (SnapshotError, ValueError):
+                continue
+            if other_start >= end:
+                continue
+            for e in other_post.entries:
+                for p in (e.path, e.from_path):
+                    if p and p in mine:
+                        out.setdefault(p, other)
+        return out
 
     def apply_restore(self, run_id: str, *, force: bool = False) -> RestorePlan:
         """Apply the plan after a snapshot of the current state (a restore is undoable too). Nothing is
@@ -367,8 +441,30 @@ class FileSnapshots:
         assert post is not None
         post_sha = {e.path: e.sha256 for e in post.entries}
         pre = {e.path: e for e in manifest.files}
-        scope = SnapshotScope(tuple(manifest.scope), tuple(manifest.managed), tuple(manifest.exclude))
         safety = f"restore-{run_id[:70]}-{self._now().strftime('%Y%m%dT%H%M%S')}-{secrets.token_hex(2)}"
+        marker = base / RESTORING
+        try:
+            marker.write_text(safety, encoding="utf-8")  # prune keeps this folder until the restore ends
+        except OSError as exc:
+            raise SnapshotError(f"cannot start the restore: {_cause(exc)}") from None
+        try:
+            return self._apply(run_id, base, plan, pre, post_sha, safety, force)
+        finally:
+            with contextlib.suppress(OSError):
+                marker.unlink()
+
+    def _apply(
+        self,
+        run_id: str,
+        base: Path,
+        plan: RestorePlan,
+        pre: Mapping[str, FileEntry],
+        post_sha: Mapping[str, str | None],
+        safety: str,
+        force: bool,
+    ) -> RestorePlan:
+        _, manifest = self._load(run_id)
+        scope = SnapshotScope(tuple(manifest.scope), tuple(manifest.managed), tuple(manifest.exclude))
         with tool_span("snapshot.restore") as span:
             span.set_attribute("tool.server", "pkpipe-snapshots")
             span.set_attribute("pkpipe.snapshot.run_id", run_id)
@@ -414,7 +510,15 @@ class FileSnapshots:
                     return "skipped:snapshot_copy_damaged"
                 if step.save_current and cur is not None:
                     self._to_trash(base, step.path, keep_original=True)
-                self._write_restored(target, copy.read_bytes(), pre[step.path].mtime)
+                allowed = (
+                    None
+                    if force or step.save_current
+                    else (None, pre[step.path].sha256, post_sha.get(step.path))
+                )
+                if not self._write_restored(
+                    target, copy.read_bytes(), pre[step.path].mtime, allowed, self._current_sha, step.path
+                ):
+                    return "skipped:changed_during_restore"
                 return "done"
             if step.verb == "remove" and step.path:
                 cur = self._current_sha(step.path)
@@ -422,7 +526,10 @@ class FileSnapshots:
                     return "done"
                 if not force and cur != post_sha.get(step.path):
                     return "skipped:changed_during_restore"
-                self._to_trash(base, step.path, keep_original=False)
+                try:  # the copy is of the bytes that are unlinked: they must still be the checked ones
+                    self._to_trash(base, step.path, keep_original=False, expect=None if force else cur)
+                except _Changed:
+                    return "skipped:changed_during_restore"
                 return "done"
             if step.verb == "move_back" and step.from_path and step.to:
                 src = self._vault_path(step.from_path)
@@ -435,6 +542,9 @@ class FileSnapshots:
                         os.link(src, dst, follow_symlinks=False)
                     except FileExistsError:
                         return "skipped:destination_exists"
+                    if self._current_sha(step.from_path) != post_sha.get(step.from_path):
+                        os.unlink(dst)  # the source changed after the check: leave it where it is
+                        return "skipped:changed_during_restore"
                     os.unlink(src)
                 return "done"
         except OSError as exc:
@@ -444,7 +554,17 @@ class FileSnapshots:
         return "skipped:unknown_step"
 
     @staticmethod
-    def _write_restored(target: Path, data: bytes, mtime: int) -> None:
+    def _write_restored(
+        target: Path,
+        data: bytes,
+        mtime: int,
+        allowed: tuple[str | None, ...] | None = None,
+        current: Callable[[str], str | None] | None = None,
+        rel: str = "",
+    ) -> bool:
+        """Write ``data`` atomically. With ``allowed`` (the hashes the file may have) the file is checked
+        again right before the replace and a different one is left alone (``False``): an Obsidian autosave
+        between the plan's check and the write is not overwritten unseen."""
         target.parent.mkdir(parents=True, exist_ok=True)
         with dir_lock(target.parent):
             fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=f".{target.name}.", suffix=".tmp")
@@ -456,15 +576,23 @@ class FileSnapshots:
                 if target.exists():
                     os.chmod(tmp, target.stat().st_mode & 0o777)
                 os.utime(tmp, (mtime, mtime))
+                if allowed is not None and current is not None and current(rel) not in allowed:
+                    os.unlink(tmp)
+                    return False
                 os.replace(tmp, target)
             except BaseException:
                 with contextlib.suppress(OSError):
                     os.unlink(tmp)
                 raise
+        return True
 
-    def _to_trash(self, base: Path, rel: str, *, keep_original: bool) -> Path:
+    def _to_trash(self, base: Path, rel: str, *, keep_original: bool, expect: str | None = None) -> Path:
         """Copy the vault file ``rel`` into ``trash/`` (never overwriting an earlier one); unless
-        ``keep_original`` remove it from the vault after the copy is verified."""
+        ``keep_original`` remove it from the vault after the copy is verified. With ``expect`` the bytes
+        that are copied (and then unlinked) must have that sha256, else :class:`_Changed` and nothing is
+        removed."""
+        if not base.is_dir():
+            raise SnapshotError("the snapshot folder vanished during the restore")
         source = self._vault_path(rel)
         dest = base / TRASH / rel
         n = 0
@@ -473,12 +601,18 @@ class FileSnapshots:
             dest = base / TRASH / f"{rel[:-3]}~{n}.md"
         dest.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         data = source.read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        if expect is not None and digest != expect:
+            raise _Changed
         dest.write_bytes(data)
         os.chmod(dest, 0o600)
-        if hashlib.sha256(dest.read_bytes()).hexdigest() != hashlib.sha256(data).hexdigest():
+        if hashlib.sha256(dest.read_bytes()).hexdigest() != digest:
             raise SnapshotError("the trash copy does not match; the file stays in the vault")
         if not keep_original:
             with dir_lock(source.parent):
+                if expect is not None and hashlib.sha256(source.read_bytes()).hexdigest() != expect:
+                    dest.unlink()  # edited after the copy: it stays in the vault, the stale copy goes
+                    raise _Changed
                 os.unlink(source)
         return dest
 
@@ -574,7 +708,7 @@ class FileSnapshots:
         newest: dict[str, str] = {}
         for info in sorted(infos, key=lambda i: (i.taken_at, i.run_id)):
             newest[info.flow_id] = info.run_id
-        protected = set(newest.values())
+        protected = set(newest.values()) | {i.run_id for i in infos if self._in_use(i.run_id)}
         cutoff = self._now() - timedelta(days=self.retention_days)
         removable = [
             i for i in sorted(infos, key=lambda i: (i.taken_at, i.run_id)) if i.run_id not in protected
@@ -593,6 +727,14 @@ class FileSnapshots:
             pruned.append(info.run_id)
             freed += info.bytes
         return {"pruned": pruned, "freed_bytes": freed, "kept": len(infos) - len(pruned)}
+
+    def _in_use(self, run_id: str) -> bool:
+        """A restore is using this snapshot now (its marker is fresh; a stale one is a crashed restore)."""
+        try:
+            age = self._now().timestamp() - (self._snapshot_dir(run_id) / RESTORING).stat().st_mtime
+        except (OSError, SnapshotError):
+            return False
+        return age < _RESTORING_MAX_AGE_S
 
     def _remove(self, run_id: str) -> None:
         path = self._snapshot_dir(run_id)

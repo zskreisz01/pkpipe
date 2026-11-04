@@ -61,7 +61,7 @@ updated: 2026-11-04
 
 ### Edge Cases
 
-- Two runs overlap: the engine already allows one active run per flow; snapshots of different flows are independent. A restore of a run that is not the newest touching a file reports a conflict for that file.
+- Two runs overlap: the engine already allows one active run per flow; snapshots of different flows are independent. Two flows that really overlap in time record each other's writes in their post manifests, so a restore skips every path that an overlapping run changed too (`overlapping_run:<run>`, a conflict; `--force` overrides). Decided 2026-11-04 (review follow-up): code detects the overlap from the runs' time spans and post manifests; no lock between flows.
 - A run fails half way: its snapshot is still valid; the restore undoes the partial writes.
 - Snapshot cannot be written (disk full, permissions): the run does not start and the error names the cause. Writing without a way back is not allowed.
 - The vault changes during the snapshot (Obsidian autosave): per file the hash of the copied bytes is recorded, so the manifest never claims a state it did not copy.
@@ -73,7 +73,7 @@ updated: 2026-11-04
 
 ### Functional Requirements
 
-- **FR-001**: Before the first node of a run whose flow can write to the vault (declared by the flow's tools: `write_note`, `append_note`, `move_note`, `update_triage`, `upsert_processing_list`, `update_improvements`, `update_tool_candidates`, `quarantine_note`), the run service takes a snapshot, via a new `SnapshotPort`. A failing snapshot stops the run before it starts.
+- **FR-001**: Before the first node of a run whose flow can write to the vault (declared by the flow's tools: `write_note`, `append_note`, `move_note`, `update_triage`, `upsert_processing_list`, `update_improvements`, `update_tool_candidates`, `quarantine_note`), the run service takes a snapshot, via a new `SnapshotPort`. A failing snapshot, or no snapshot port in the process that runs the flow (no vault configured: `PKPIPE_VAULT_DIR`), stops the run before it starts. Limit: a note over `snapshots.max_file_bytes` and a sync-conflict copy are listed but not copied, so for those files there is no way back (warned in the log and the span, skipped with `not_copied` at restore).
 - **FR-002**: A snapshot holds full copies of the managed files and of every `.md` file below the write scope's folders, plus a manifest (path, size, sha256, mtime) of the same files and a record of the policy it was derived from. Attachments are not copied.
 - **FR-003**: The end of a run records, per path it left different from the snapshot, the sha256 it left behind (`post` manifest). This is what a later restore compares with to detect the owner's changes.
 - **FR-004**: `pkpipe snapshot list|show <run>|prune` and `pkpipe restore <run> [--apply] [--force]`; the same actions are owner actions of the UI and the app MCP (`restore_run`, owner token only, audit-logged). `restore` is a dry run unless `--apply`.
@@ -95,7 +95,7 @@ updated: 2026-11-04
 - Tools count by name only (the server key is a local name); a runtime-chosen subflow counts as writing. Flows with the `journal` data class still snapshot (they write their managed backlog file); the journal itself is never copied.
 - A restore needs the scope recorded in the manifest, not a policy. A run without a post manifest (still active, or the process died) is refused. Run ids are validated as directory names.
 - Status values follow data-model.md (`kept`, `restored`, `pruned`); the `reverted` flag of FR-008 is the column `reverted` (1 once a restore changed something).
-- Known limits: two flows that run at the same time record each other's writes in their post manifests (restore in reverse order; a later change is a conflict); empty folders a run created are not tracked (the file set is); a run whose pinned config is missing at `resume_incomplete` stays unfinished and cannot be restored; the engine process needs `PKPIPE_VAULT_DIR` (and `PKPIPE_VAULT_POLICY` when the vault server uses a policy file), otherwise a writing run logs a warning and takes no snapshot.
+- Known limits: two flows that run at the same time record each other's writes in their post manifests (a restore skips the paths of an overlapping run as `overlapping_run`; a later change is a conflict); empty folders a run created are not tracked (the file set is); a run whose pinned config is missing at `resume_incomplete` stays unfinished and cannot be restored; the engine process needs `PKPIPE_VAULT_DIR` (and `PKPIPE_VAULT_POLICY` when the vault server uses a policy file), otherwise a writing run does not start. The vault path of the writer cannot be checked from the engine; the layout of the policy file is checked against `layout.json`.
 
 ## Success Criteria
 

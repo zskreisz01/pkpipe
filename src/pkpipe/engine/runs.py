@@ -24,7 +24,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from pkpipe.domain.vault_snapshot import flow_writes_vault
+from pkpipe.domain.vault_snapshot import SnapshotError, flow_writes_vault
 from pkpipe.engine.compiler import FlowCompiler
 from pkpipe.engine.snapshot import ConfigSnapshot
 from pkpipe.ports import RunStorePort, SnapshotPort
@@ -35,6 +35,17 @@ log = logging.getLogger("pkpipe.runs")
 
 class SnapshotFailed(RuntimeError):
     """The vault snapshot of a writing flow could not be taken: the run does not start."""
+
+
+def _snapshot_cause(exc: BaseException) -> str:
+    """Why the snapshot failed, for the run's error (shown in the UI and notifications): the message of a
+    :class:`SnapshotError` (path free by construction), the reason of an OS error without its file name, and
+    only the type of anything else (a parse or policy error can quote a path)."""
+    if isinstance(exc, SnapshotError):
+        return f"SnapshotError: {exc}"
+    if isinstance(exc, OSError):
+        return f"{type(exc).__name__}: {exc.strerror or 'os error'}"
+    return type(exc).__name__
 
 
 class RunStatus(StrEnum):
@@ -183,22 +194,23 @@ class RunService:
         return self.snapshots_for(snapshot)
 
     def _take_snapshot(self, run: Run, snapshot: ConfigSnapshot) -> SnapshotFailed | None:
-        """Snapshot before the first node. Writing without a way back is not allowed (FR-001)."""
+        """Snapshot before the first node. Writing without a way back is not allowed (FR-001): a writing
+        flow with no snapshot port (no vault configured in this process) does not start either."""
         try:
             port = self._snapshot_port(run, snapshot)
             if port is None:
                 if self.snapshots_for is not None and flow_writes_vault(
                     snapshot.data.get("flows") or {}, run.flow_id
                 ):
-                    log.warning(
-                        "run %s (%s) can write to the vault but no vault is configured: no snapshot",
-                        run.run_id,
-                        run.flow_id,
+                    raise SnapshotError(
+                        "no vault is configured for snapshots in this process "
+                        "(set PKPIPE_VAULT_DIR where the flows run)"
                     )
                 return None
             port.take(run.run_id, run.flow_id)
-        except Exception as exc:  # noqa: BLE001 - becomes the run's error; the message names no path
-            failure = SnapshotFailed(f"{type(exc).__name__}: {exc}; the run did not start")
+        except Exception as exc:  # noqa: BLE001 - becomes the run's error; the text names no path
+            log.error("run %s (%s): snapshot failed: %s", run.run_id, run.flow_id, type(exc).__name__)
+            failure = SnapshotFailed(f"{_snapshot_cause(exc)}; the run did not start")
             failure.__cause__ = exc
             return failure
         return None
