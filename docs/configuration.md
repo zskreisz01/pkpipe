@@ -25,6 +25,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
 | `layout.json` | The vault layout: every folder and file the flows and steps name ([Vault layout](#vault-layout)) |
+| `snapshots.json` | Retention of the vault snapshots taken before writing runs: `retention_days` (14), `max_bytes` (1 GiB), `max_file_bytes` (5 MiB; a larger note is manifest-only) ([operations](operations.md#vault-snapshots-and-restore)) |
 | `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir ([Secure fetch](#secure-fetch)) |
 | `security/deny_list.txt` | Deny-list of the URL filter: one domain per line (subdomains included), `#` comments |
 | `security/query_guard_terms.txt` | Terms no web query may contain (`security.query_guard.terms_file`): one per line, `#` comments; the overlay's copy is maintained by `context_refresh` (names of the enterprise notes are appended, nothing is ever removed) |

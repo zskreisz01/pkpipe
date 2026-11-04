@@ -160,12 +160,17 @@ flowchart LR
   - An item you had **confirmed** (or overridden to a category that does not exist) is never released. The 20:00 notification says "N item(s) name a category that is no longer configured", even on evenings without new items.
 - **How:** write an existing category id into **override** in `Inbox-Triage.md`. pkpipe never re-suggests a confirmed item, because your tick belongs to the old category.
 
+### Undo a run
+
+- **When:** a run wrote something wrong into the vault (a bad move, a wrong note, a production incident).
+- **How:** `pkpipe snapshot list` shows the runs that took a snapshot. `pkpipe restore <run>` prints the plan and changes nothing; read it, then add `--apply`. Notes you edited after the run are skipped and listed (use `--force` only when you want the run's state back; your version is saved in the snapshot's `trash/` folder). The state before the restore is saved too, so `pkpipe restore restore-<run>-...` undoes a restore. The run page of the UI and the app MCP tool `restore_run` do the same. The app DB, the learning service and messages already sent are not part of it.
+
 ### Keep the machine healthy
 
 | What | When | How |
 | --- | --- | --- |
 | Model server running with the configured model | After reboots, if the summary reports model errors | Start LM Studio / Ollama; check with `curl $PKPIPE_MODEL_BASE_URL/models` |
-| Back up app DB, overlay repo and trace volume | Weekly | Copy `pkpipe.db`, push the overlay repo, back up the `phoenix-data` volume |
+| Back up app DB, overlay repo and trace volume | Weekly | Copy `pkpipe.db`, push the overlay repo, back up the `phoenix-data` volume. The snapshots (`$PKPIPE_DATA_DIR/snapshots`) are a short-lived safety net, not a backup of the vault |
 | Update the engine | When a new tag is released | Pin the new tag in the deployment repo, then supervise the release |
 | Rotate secrets | When a webhook or API key may have leaked, or yearly | Replace the keychain or env value; config only references `env:NAME` |
 

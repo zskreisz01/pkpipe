@@ -32,6 +32,36 @@ The app DB is one SQLite file: `$PKPIPE_DB`, else `$PKPIPE_DATA_DIR/pkpipe.db`, 
 
 A resumed run uses the config version it started with, even if a newer one was published. See [Flows](flows.md) for the flow format.
 
+## Vault snapshots and restore
+
+Before the first node of every run whose flow can write to the vault (a tool call of `write_note`, `append_note`, `move_note`, `update_triage`, `upsert_processing_list`, `update_improvements`, `update_tool_candidates`, `quarantine_note` or `inbox_remove_entries`, also through a subflow) the run service saves a snapshot (spec 019); a flow that only reads takes none. The unit is the run: "restore the state before run X". If the snapshot cannot be written (disk full, permissions) the run fails before it starts and the error names the cause: writing without a way back is not allowed. The run's end (done or failed) records the hash of every file it left different, which is what a later restore compares with.
+
+**Scope.** Derived from the vault policy, so it follows any layout and names no folder of the pack: the managed files, every `.md` file below the folders of the writing tools' allow lists, the layout's write places (`VaultLayout.snapshot_roots()`, spec 020 FR-009) and the quarantine folder. The journal folder is never copied; attachments (images) are out of scope, the pipeline never writes them. Symlinks and hidden folders are not followed, sync-conflict copies are listed but never restored over or removed, a note over `snapshots.max_file_bytes` is recorded in the manifest only (a restore skips it and says so).
+
+**Where.** `$PKPIPE_DATA_DIR/snapshots/<run id>/` (next to the app DB when `PKPIPE_DATA_DIR` is not set), mode 0700, never in the vault, the overlay or a repository: `manifest.json`, `post.json`, `files/<path>` (the bytes before the run), `trash/<path>` (what a restore moved out of the vault). It is plain files: no git needed, no interference with the owner's own commits. The engine process that runs flows needs the vault to build the scope: set `PKPIPE_VAULT_DIR` and, when the vault server runs with a policy file, `PKPIPE_VAULT_POLICY` (the same file); without a vault a writing run only logs a warning and takes no snapshot.
+
+| Command | Effect |
+| --- | --- |
+| `pkpipe snapshot list [--json]` | Run, flow, time, size, files, status (`kept`, `restored`, `pruned`) |
+| `pkpipe snapshot show <run>` | Scope, what the run changed, notes that were not copied |
+| `pkpipe snapshot prune` | Remove snapshots past `snapshots.retention_days` and, while over `snapshots.max_bytes`, the oldest; the newest snapshot of each flow stays. Also runs after every new snapshot |
+| `pkpipe restore <run>` | **Dry run**: the plan with four verbs (`restore`, `remove`, `move_back`, `skip` with its reason); nothing changes |
+| `pkpipe restore <run> --apply` | Do it: first a snapshot of the current state (`restore-<run>-<time>-<n>`, so a restore is undoable too), then the plan. Exit 2 when a step was skipped |
+| `--force` | Also overwrite what changed since the run, after saving the current bytes in the snapshot's `trash/` |
+
+`<run>` is the run id or a unique prefix of at least 6 characters. A restore never deletes: a file the run created moves to `trash/`, and a file the owner edited after the run ended (its hash is neither the pre-run nor the run's post hash) is a conflict and is skipped, so an edit in Obsidian is never overwritten without `--force`. Applied twice, a restore plans nothing the second time. A run that is still `running` or `waiting` is refused. Restoring a run that is not the newest to touch a file reports that file as a conflict, and two flows that run at the same time record each other's writes in their post manifests (the engine allows one active run per flow), so restore in reverse order.
+
+The same restore is an owner action of the UI (the run page: plan, apply, force) and of the app MCP server (`restore_run`, owner token only, audit-logged with counts and the safety snapshot, never paths; note paths in the tool result are datamarked). Nothing about a restore is sent anywhere: spans (`snapshot.take`, `snapshot.finish`, `snapshot.restore`) carry the run id, file counts and byte totals, never paths or note text.
+
+**Not covered, by design.** The app DB (run records, drafts), the learning gateway's job store, Open Notebook content and messages already sent. A restored run keeps its run record; the `snapshots` table marks it `restored` with `reverted = 1`. `pkpipe doctor` prints the snapshot directory: number, size against the limit, free disk space and the newest snapshot.
+
+```mermaid
+flowchart LR
+    r[Run starts<br/>flow can write] --> t[Take snapshot<br/>scope from VaultPolicy] --> f[Flow runs] --> p[Record post manifest<br/>done or failed]
+    p -. owner: restore dry run .-> d[Plan: restore, remove,<br/>move back, skip]
+    d -. apply .-> s[Snapshot current state] --> a[Apply steps<br/>nothing deleted]
+```
+
 ## Learning gateway and Open Notebook
 
 `uv run python -m pkpipe.learning.server` serves `learning:create|status|link|audio` on `127.0.0.1:8703` (loopback only, launchd/systemd like the vault server). Jobs live in `$PKPIPE_DATA_DIR/learning/jobs.db` and survive a restart; downloaded podcasts are in `.../learning/audio`. A failed job keeps its reason (`select job_id, item_id, status, json_extract(data, '$.reason') from notebook_jobs`). Items whose service was down stay `released` and are retried by the next 06:00 run; a URL the gateway refuses (deny list, a host that resolves to a private address) quarantines the item like the first URL check; failed or timed-out generations are listed as `failed` in the processing list.
@@ -102,7 +132,7 @@ flowchart LR
     p -. rollback criteria .-> r[Previous git tag]
 ```
 
-Rollback when the override or quarantine rate exceeds twice the weekly average, or on any context leak.
+Rollback when the override or quarantine rate exceeds twice the weekly average, or on any context leak. A rollback of the code or config does not undo what a run already wrote to the vault: `pkpipe restore <run>` does ([Vault snapshots and restore](#vault-snapshots-and-restore)); check it with the dry run first.
 
 ## Observability
 
