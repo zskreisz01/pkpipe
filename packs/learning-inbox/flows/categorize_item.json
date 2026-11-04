@@ -2,10 +2,9 @@
   "id": "categorize_item",
   "description": "One INBOX item: read it (code), suggest a category (isolated session, no tools, datamarked input, run canary), check the suggestion with the output guard, accept only a configured category (code). A flagged suggestion is never written: the item goes to handle_security_flag (quarantine).",
   "bpmn": "process-inbox-items",
-  "start": "read",
   "nodes": [
     {
-      "id": "read",
+      "id": "fetch_note",
       "type": "tool",
       "bpmn_element": "Read new INBOX items",
       "config": {
@@ -13,6 +12,14 @@
         "arguments": {
           "path": "${item.path}"
         }
+      }
+    },
+    {
+      "id": "read",
+      "type": "code",
+      "bpmn_element": "Read new INBOX items",
+      "config": {
+        "function": "inbox.source_note"
       }
     },
     {
@@ -72,8 +79,21 @@
   ],
   "edges": [
     {
-      "from": "read",
-      "to": "menu"
+      "from": "START",
+      "to": "fetch_note",
+      "when": {
+        "path": "item.path",
+        "exists": true
+      }
+    },
+    {
+      "from": "START",
+      "to": "read",
+      "default": true
+    },
+    {
+      "from": "fetch_note",
+      "to": "read"
     },
     {
       "from": "menu",
@@ -95,6 +115,10 @@
       "from": "guard",
       "to": "check",
       "default": true
+    },
+    {
+      "from": "read",
+      "to": "menu"
     }
   ]
 }

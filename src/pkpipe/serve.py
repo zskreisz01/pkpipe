@@ -54,6 +54,7 @@ def build_services(
     *,
     run_service=None,
     gate_factory: Callable[[ConfigSnapshot], PublishGate] | None = None,
+    snapshots=None,
 ):
     """Wire the use cases to the real adapters (tests pass their own ``run_service`` and ``gate_factory``)."""
     from pkpipe import app
@@ -69,7 +70,10 @@ def build_services(
     runs = run_service or app.build_run_service(pack, overlay, db)
     store = AppStore(db)
     workspace = ConfigWorkspace(pack, overlay)
-    vault = default_vault(vault_dir if vault_dir is not None else _env_path(VAULT_ENV))
+    vault_path = vault_dir if vault_dir is not None else _env_path(VAULT_ENV)
+    vault = default_vault(vault_path)
+    if snapshots is None:  # the restore of spec 019: same vault policy as the runs' snapshots
+        snapshots = app.make_snapshots(runs.config(), db, vault_path)
     return AppServices(
         runs=runs,
         store=store,
@@ -79,6 +83,7 @@ def build_services(
         vault=vault,
         gate_factory=gate_factory or default_gate_factory(overlay),
         candidates_dir=app.candidates_dir(overlay),
+        snapshots=snapshots,
     )
 
 

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from pkpipe.domain.system import SystemSnapshot
+    from pkpipe.domain.vault_snapshot import RestorePlan, SnapshotInfo
 
 
 class ModelError(Exception):
@@ -208,3 +209,30 @@ class SystemProbePort(Protocol):
     Process entries carry names only (no arguments, no paths)."""
 
     def snapshot(self, *, include_llm: bool = True) -> SystemSnapshot: ...
+
+
+@runtime_checkable
+class SnapshotPort(Protocol):
+    """Vault snapshots and restore (spec 019). ``take`` saves the files a run can change (scope derived from
+    the vault policy) before its first write and raises when it cannot: a run never starts without a way back.
+    ``finish`` records what the run left behind and returns ``None`` when the run took no snapshot.
+    ``plan_restore`` is the dry run, ``apply_restore`` takes a snapshot of the current state first and never
+    deletes (removed files go to the snapshot's trash folder). A path the owner changed after the run is
+    skipped unless ``force``. Errors are :class:`pkpipe.domain.vault_snapshot.SnapshotError`; their messages
+    never contain a note path or text."""
+
+    def take(self, run_id: str, flow_id: str) -> SnapshotInfo: ...
+
+    def finish(self, run_id: str) -> SnapshotInfo | None: ...
+
+    def plan_restore(self, run_id: str, *, force: bool = False) -> RestorePlan: ...
+
+    def apply_restore(self, run_id: str, *, force: bool = False) -> RestorePlan: ...
+
+    def list(self) -> list[SnapshotInfo]: ...
+
+    def show(self, run_id: str) -> dict[str, Any]: ...
+
+    def prune(self) -> dict[str, Any]: ...
+
+    def summary(self) -> dict[str, Any]: ...

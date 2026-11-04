@@ -33,14 +33,13 @@ from pkpipe.steps.base import (
     StepError,
     StepExecutor,
     StepResult,
+    layout_of,
     register_code,
     register_step,
 )
 from pkpipe.steps.learning_code import find_source_url
 from pkpipe.steps.llm import LlmConfig, LlmStep, LlmToolsConfig, LlmToolsStep, guarded_session_errors
 
-#: Where the processed INBOX note moves to (the item id keeps names unique).
-ARCHIVE_FOLDER = "4-Archive/Inbox"
 #: Item fields a session may read through ``item``.
 _ITEM_FIELDS = ("id", "resource", "category")
 
@@ -253,7 +252,7 @@ def note(
     inbox = PurePosixPath(item.get("path") or item.get("resource") or f"{item['id']}.md").name
     out: dict[str, Any] = {
         "path": path,
-        "archive_path": f"{ARCHIVE_FOLDER}/{item['id']}-{inbox}",
+        "archive_path": f"{layout_of(ctx).archive_dir}/{item['id']}-{inbox}",
         "title": title,
         "body": body,
         "front_matter": front,
@@ -264,7 +263,9 @@ def note(
     }
     suggestion = plans.suggestion_of(outputs, set(categories_of(ctx)))
     if suggestion:
-        task_path, task_body, task_front = plans.agent_task_note(suggestion, item_id=item["id"], note=path)
+        task_path, task_body, task_front = plans.agent_task_note(
+            suggestion, item_id=item["id"], note=path, folder=layout_of(ctx).agent_tasks_dir
+        )
         out.update(has_task=True, task_path=task_path, task_body=task_body, task_front_matter=task_front)
     return out
 

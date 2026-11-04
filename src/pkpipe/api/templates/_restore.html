@@ -1,0 +1,32 @@
+<div id="restore" class="card" data-testid="restore-panel">
+  <h2>Vault snapshot</h2>
+  {% if snapshot %}
+    <p>Taken <code>{{ snapshot.taken_at[:19] }}</code> before the run · {{ snapshot.files }} files · {{ snapshot.status }}{% if snapshot.reverted %} · <span class="ok">reverted</span>{% endif %}{% if not snapshot.finished %} · <span class="muted">run not finished</span>{% endif %}</p>
+    {% if message %}<p class="err" data-testid="restore-message">{{ message }}</p>{% endif %}
+    {% if plan %}
+      <p data-testid="restore-summary">{% if plan.applied %}Applied{% else %}Dry run: nothing changed{% endif %}:
+        {{ plan.counts.restore }} restore, {{ plan.counts.remove }} remove, {{ plan.counts.move_back }} move back, {{ plan.counts.skip }} skipped.</p>
+      <table>
+        <thead><tr><th>Step</th><th>Note</th><th>Why / result</th></tr></thead>
+        <tbody>
+        {% for s in plan.steps %}
+          <tr><td>{{ s.verb }}</td><td><code>{% if s.verb == "move_back" %}{{ s["from"] }} &rarr; {{ s.to }}{% else %}{{ s.path }}{% endif %}</code></td><td>{{ s.outcome or s.reason or "" }}</td></tr>
+        {% else %}
+          <tr><td colspan="3" class="muted">Nothing to do: the vault already has the state from before the run.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if plan.safety_snapshot %}<p class="muted">State before the restore saved as snapshot <code>{{ plan.safety_snapshot }}</code>.</p>{% endif %}
+      {% if plan.applied %}<p class="muted">Not restored: the app DB, the learning gateway's job store, Open Notebook content and messages already sent.</p>{% endif %}
+    {% endif %}
+    {% if owner and snapshot.status != "pruned" %}
+    <form class="row" hx-post="/ui/runs/{{ run.run_id }}/restore" hx-target="#restore" hx-swap="outerHTML">
+      <button type="submit" data-testid="restore-plan">Show restore plan</button>
+      <button type="submit" name="apply" value="1" class="danger" data-testid="restore-apply" hx-confirm="Restore the vault to the state before this run?">Apply restore</button>
+      <label class="inline"><input type="checkbox" name="force" value="1"> overwrite later changes (current bytes are saved first)</label>
+    </form>
+    {% endif %}
+  {% else %}
+    <p class="muted">This run took no vault snapshot (a flow that only reads, or no vault configured).</p>
+  {% endif %}
+</div>

@@ -24,10 +24,12 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from pkpipe.domain.layout import DEFAULT_LAYOUT
+
 #: The one ADR directory of the repository (docs/decisions, the folder of ADR 0001).
 ADR_DIR = "docs/decisions"
 #: Vault file the candidates are written to (``VaultPolicy.tool_candidates_file``).
-CANDIDATES_FILE = "2-Areas/System/System-Tool-Candidates.md"
+CANDIDATES_FILE = DEFAULT_LAYOUT.tool_candidates_file
 #: Value of the ``relevance`` field of the system relevance session.
 RELEVANCE_NONE, RELEVANCE_CANDIDATE, RELEVANCE_IN_USE = "none", "candidate", "in_use"
 RELEVANCE = (RELEVANCE_NONE, RELEVANCE_CANDIDATE, RELEVANCE_IN_USE)

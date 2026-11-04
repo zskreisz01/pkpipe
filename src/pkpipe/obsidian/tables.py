@@ -37,8 +37,22 @@ class _Line:
 class TableFile:
     """A markdown document containing one table with a known header."""
 
-    def __init__(self, text: str | None, columns: tuple[str, ...], key: str, preamble: str = ""):
-        self.columns = columns
+    def __init__(
+        self,
+        text: str | None,
+        columns: tuple[str, ...],
+        key: str,
+        preamble: str = "",
+        optional: tuple[str, ...] = (),
+    ):
+        """``optional`` columns are written only when a row needs one (a non-empty value): a file without
+        them stays byte-identical, a row that needs one widens the header and every row once. Their cells
+        read as empty when the header does not have them."""
+        self.columns = columns + optional
+        self._header_columns = columns
+        self._optional = optional
+        self._widened = not optional  # nothing to widen without optional columns
+        self._rewrite_all = False
         self.key = key
         self.invalid: list[tuple[int, str]] = []  # (1-based line number, raw line)
         self._eol = "\r\n" if text and "\r\n" in text else "\n"
@@ -57,8 +71,11 @@ class TableFile:
             self._lines.append(line)
             body = raw.strip()
             if self._header_idx is None:
-                if body.startswith("|") and [c.lower() for c in split_cells(body)] == list(self.columns):
+                names = [c.lower() for c in split_cells(body)] if body.startswith("|") else []
+                if self._is_header(names):
                     self._header_idx = idx
+                    self._header_columns = self.columns[: len(names)]
+                    self._widened = len(names) == len(self.columns)
                     in_table = True
                 continue
             if not in_table:
@@ -70,13 +87,26 @@ class TableFile:
             if idx == self._header_idx + 1 and all(_SEP_CELL.match(c) for c in cells):
                 self._last_row_idx = idx
                 continue
-            if len(cells) != len(self.columns) or not cells[self.columns.index(self.key)]:
+            if len(cells) != len(self._header_columns) or not cells[self.columns.index(self.key)]:
                 self.invalid.append((idx + 1, body))
                 self._last_row_idx = idx
                 continue
+            cells = cells + [""] * (len(self.columns) - len(cells))
             line.cells = dict(zip(self.columns, cells, strict=True))
             line.orig = dict(line.cells)
             self._last_row_idx = idx
+
+    def _is_header(self, names: list[str]) -> bool:
+        required = len(self.columns) - len(self._optional)
+        if names[:required] != list(self.columns[:required]):
+            return False
+        return names[required:] == list(self._optional[: len(names) - required])
+
+    def _widen_for(self, cells: dict[str, str]) -> None:
+        if not self._widened and any(cells.get(c) for c in self._optional):
+            self._widened = True
+            self._header_columns = self.columns
+            self._rewrite_all = self._header_idx is not None
 
     def rows(self) -> list[dict[str, str]]:
         return [dict(ln.cells) for ln in self._lines if ln.cells is not None]
@@ -89,6 +119,7 @@ class TableFile:
 
     def upsert(self, cells: dict[str, str]) -> str:
         """Insert or replace the row with the same key. Returns ``inserted``, ``updated`` or ``unchanged``."""
+        self._widen_for(cells)
         for ln in self._lines:
             if ln.cells is not None and ln.cells[self.key] == cells[self.key]:
                 if ln.cells == cells:
@@ -104,8 +135,8 @@ class TableFile:
                 self._lines[-1].raw += self._eol
             if self._lines and self._lines[-1].raw.strip():
                 self._lines.append(_Line(self._eol))
-            header = join_cells(list(self.columns)) + self._eol
-            sep = join_cells(["---"] * len(self.columns)) + self._eol
+            header = join_cells(list(self._header_columns)) + self._eol
+            sep = join_cells(["---"] * len(self._header_columns)) + self._eol
             self._lines.extend([_Line(header), _Line(sep)])
             self._header_idx = len(self._lines) - 2
             self._last_row_idx = len(self._lines) - 1
@@ -118,10 +149,21 @@ class TableFile:
 
     def render(self) -> str:
         out: list[str] = []
-        for ln in self._lines:
-            if ln.cells is not None and ln.cells != ln.orig:
-                ending = ln.raw[len(ln.raw.rstrip("\r\n")) :] or self._eol
-                out.append(join_cells([ln.cells[c] for c in self.columns]) + ending)
+        for idx, ln in enumerate(self._lines):
+            ending = ln.raw[len(ln.raw.rstrip("\r\n")) :] or self._eol
+            if (
+                self._rewrite_all
+                and self._header_idx is not None
+                and idx in (self._header_idx, self._header_idx + 1)
+            ):
+                names = (
+                    list(self._header_columns)
+                    if idx == self._header_idx
+                    else ["---"] * len(self._header_columns)
+                )
+                out.append(join_cells(names) + ending)
+            elif ln.cells is not None and (ln.cells != ln.orig or self._rewrite_all):
+                out.append(join_cells([ln.cells[c] for c in self._header_columns]) + ending)
             else:
                 out.append(ln.raw)
         return "".join(out)

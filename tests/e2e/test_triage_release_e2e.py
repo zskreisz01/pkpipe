@@ -18,6 +18,7 @@ import pytest
 
 from pkpipe import app
 from pkpipe.cli import main
+from pkpipe.domain.layout import DEFAULT_LAYOUT
 from pkpipe.domain.triage import item_id_for
 from pkpipe.engine.registry import load_effective
 from pkpipe.evals.cassette import CassetteModel
@@ -58,7 +59,7 @@ def world(variant, tmp_path, synthetic_vault, write_json, monkeypatch, capsys):
         (synthetic_vault / "0-INBOX" / name).write_text(text, encoding="utf-8")
     for p in ("0-INBOX/example-tool.md", "0-INBOX/example-video.md"):
         (synthetic_vault / p).unlink()  # only the scenario's own items
-    for para in {c["para_path"] for c in CATEGORIES.values()}:
+    for para in {DEFAULT_LAYOUT.expand(c["para_path"]) for c in CATEGORIES.values()}:
         (synthetic_vault / para).mkdir(parents=True, exist_ok=True)
     notify = FakeNotify(routes=PACK_ROUTES)
     monkeypatch.setattr(app, "make_notify", lambda snapshot: notify)
@@ -166,7 +167,9 @@ def test_triage_confirm_override_release_fans_out_to_category_processes(world, v
         if item_id in decided:
             assert rows[item_id]["state"] in ("processed", "quarantined"), (name, rows[item_id])
         category = override.get(item_id) or suggestions[name]
-        notes = list((vault / CATEGORIES[category]["para_path"]).glob(f"*-{item_id}.md"))
+        notes = list(
+            (vault / DEFAULT_LAYOUT.expand(CATEGORIES[category]["para_path"])).glob(f"*-{item_id}.md")
+        )
         if item_id not in decided:
             assert not list(vault.rglob(f"*{item_id}.md")), name
         elif rows[item_id]["state"] == "processed":

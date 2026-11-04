@@ -70,13 +70,15 @@ The flow calls [Handle Security Flag](process/handle-security-flag.md) for the i
 
 1. The item stops and becomes `quarantined`; the other items of the run continue (error end event per item). At triage the row is written as `quarantined` with the suggested category `none`.
 2. One row per flag is appended to `security/malicious_urls.jsonl` (url, domain, flag, detector, score, evidence = reason code, item id, run id, timestamp) and the domain goes on the deny-list once (`# pkpipe: flagged N, last <day>` on repeats), in the overlay so every process's URL filter applies it: the web-fetch server and the learning gateway read the deny-list file again on every request, and the in-process checks (secure fetch, `learning.prepare`) merge the handler's entries.
-3. The note moves to `0-INBOX/_quarantine/` in inert form: verbatim inside a fenced code block, `security_flag` front matter with flag codes only. Only the vault tool `quarantine_note` writes there; `write_note`, `append_note` and `move_note` refuse the folder.
+3. The note moves to `0-INBOX/_quarantine/` in inert form: verbatim inside a fenced code block, `security_flag` front matter with flag codes only. Only the vault tool `quarantine_note` writes there (the folder is `layout.quarantine_dir`); `write_note`, `append_note` and `move_note` refuse the folder.
 4. An alert goes to the configured channel and a `security.flag` event to the trace.
 5. A false positive is released by the owner (UI triage page or app MCP `release_quarantine`, owner token, audited): the note is restored exactly (byte for byte: the quarantine note records the original line ends and final newline), the row is `pending` again and the text becomes a candidate case of the security eval dataset (`<overlay>/evals/candidates/security.jsonl`). Domains are never unblocked automatically.
 
 ## Private data
 
 Journals and context packs are processed only by local sessions without tools, are never sent to web search or the learning service, are excluded from trace content capture, and never appear in this repository. The flows that handle them declare the data classes `journal` and `context`; validation and every run refuse a model profile, fallback or environment value that is not on a loopback address, any `egress` tool, any session with tools and any code function that handles the data in a flow without its class, so no remote model can be selected for the enterprise notes.
+
+Vault snapshots (spec 019) hold copies of the notes a writing run can change. They live in the data directory (mode 0700), never in the vault, the overlay or a repository, exclude the journal folder, expire after `snapshots.retention_days`, and neither spans, audit entries, notifications nor the app MCP results carry note paths or text (the MCP restore plan datamarks its paths).
 
 ### Enterprise context pack (spec 011)
 

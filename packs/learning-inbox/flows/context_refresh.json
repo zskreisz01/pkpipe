@@ -19,14 +19,14 @@
             {
               "id": "personal",
               "kind": "personal",
-              "folder": "1-Projects/Personal",
+              "folder": "${config.layout.projects_dir}/Personal",
               "pack": "personal",
               "max_tokens": 1500
             },
             {
               "id": "enterprise",
               "kind": "enterprise",
-              "folder": "1-Projects/Enterprise",
+              "folder": "${config.layout.projects_dir}/Enterprise",
               "pack": "enterprise",
               "max_tokens": 1500
             }

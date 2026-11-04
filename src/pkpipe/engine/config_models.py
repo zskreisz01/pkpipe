@@ -227,9 +227,22 @@ class Category(_Strict):
     id: str
     label: str
     subflow: str
-    para_path: str
+    para_path: str = Field(
+        description="PARA folder of the notes; `{resources_dir}`, `{projects_dir}`, `{areas_dir}`, "
+        "`{inbox_dir}` and `{archive_dir}` follow `layout.json`"
+    )
     triage_hint: str
     sessions: list[Session] = Field(default_factory=list)
+
+    @field_validator("para_path")
+    @classmethod
+    def _para_placeholders(cls, value: str) -> str:
+        allowed = {"inbox_dir", "projects_dir", "areas_dir", "resources_dir", "archive_dir"}
+        unknown = sorted(set(re.findall(r"\{([^{}]*)\}", value)) - allowed)
+        if unknown:
+            raise ValueError(f"unknown placeholder {{{unknown[0]}}} (use {', '.join(sorted(allowed))})")
+        return value
+
     note_session: str | None = Field(
         default=None,
         description="Session whose validated output becomes the stored note (spec 010); default "
@@ -349,7 +362,11 @@ class SecurityConfig(_Strict):
     query_guard: QueryGuard = Field(default_factory=QueryGuard)
     canary: Canary
     url_filter: UrlFilter
-    quarantine_dir: str
+    quarantine_dir: str | None = Field(
+        default=None,
+        deprecated=True,
+        description="Deprecated: the folder is `layout.json` `quarantine_dir`; when set it must equal it",
+    )
 
 
 # telemetry.json --------------------------------------------------------------------------------------------
@@ -478,7 +495,30 @@ class EvalsConfig(_Strict):
     )
 
 
+class SnapshotsConfig(_Strict):
+    """Vault snapshots (spec 019 FR-006): what is kept of the state before each writing run."""
+
+    retention_days: int = Field(
+        default=14,
+        ge=1,
+        le=3650,
+        description="Snapshots older than this are pruned (the newest per flow stays)",
+    )
+    max_bytes: int = Field(
+        default=1024**3,
+        ge=1_000_000,
+        description="Upper bound of all snapshot copies; the oldest go first (the newest per flow stays)",
+    )
+    max_file_bytes: int = Field(
+        default=5 * 1024**2,
+        ge=1024,
+        description="A note larger than this is recorded in the manifest but not copied (a restore skips it)",
+    )
+
+
 # registry --------------------------------------------------------------------------------------------------
+from pkpipe.domain.layout import VaultLayout  # noqa: E402  (layout.json is validated by the domain model)
+
 #: config file stem -> model. Order is the order used by the CLI.
 CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "models": ModelsConfig,
@@ -487,6 +527,8 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "schedules": SchedulesConfig,
     "categories": CategoriesConfig,
     "security": SecurityConfig,
+    "layout": VaultLayout,
+    "snapshots": SnapshotsConfig,
     "telemetry": TelemetrySettings,
     "evals": EvalsConfig,
 }
@@ -516,6 +558,7 @@ def validate_effective(data: dict[str, Any]) -> list[str]:
             for err in exc.errors():
                 loc = ".".join(str(p) for p in err["loc"])
                 errors.append(f"{name}.json: {loc}: {err['msg']}" if loc else f"{name}.json: {err['msg']}")
+    errors += _layout_errors(data)
     if "flows" in data:
         from pkpipe.engine.flow_models import FlowsConfig
 
@@ -527,4 +570,24 @@ def validate_effective(data: dict[str, Any]) -> list[str]:
                 where = f"flows/{loc[0]}.json" if loc else "flows"
                 rest = ".".join(str(p) for p in loc[1:])
                 errors.append(f"{where}: {rest}: {err['msg']}" if rest else f"{where}: {err['msg']}")
+    return errors
+
+
+def _layout_errors(data: dict[str, Any]) -> list[str]:
+    """Cross-file checks of the vault layout (spec 020 FR-008): the paths sit where the vault tools may use
+    them, and ``security.quarantine_dir`` (deprecated duplicate) agrees with the layout."""
+    from pkpipe.domain.layout import layout_from, layout_structure_errors
+
+    try:
+        layout = layout_from(data.get("layout"))
+    except (ValidationError, TypeError, ValueError):
+        return []  # reported by the model validation above
+    errors = [f"layout.json: {e}" for e in layout_structure_errors(layout)]
+    security = data.get("security")
+    legacy = security.get("quarantine_dir") if isinstance(security, dict) else None
+    if legacy is not None and str(legacy).rstrip("/") != layout.quarantine_dir:
+        errors.append(
+            f"security.json: quarantine_dir '{legacy}' differs from layout.json quarantine_dir "
+            f"'{layout.quarantine_dir}' (drop the security.json key)"
+        )
     return errors

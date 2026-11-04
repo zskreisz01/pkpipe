@@ -280,7 +280,7 @@ def test_core_defaults_are_the_first_layer_and_the_pack_overrides_them(tmp_path,
     cfg = load_effective(pack)
     sec = cfg.data["security"]
     assert sec["url_filter"] == {"block_private_networks": True, "max_bytes": 1000}
-    assert sec["canary"] == {"rotate": "per_run"} and sec["quarantine_dir"] == "0-INBOX/_quarantine"
+    assert sec["canary"] == {"rotate": "per_run"} and "quarantine_dir" not in sec
     assert cfg.data["channels"] == {"channels": {}, "routes": {}}
 
 

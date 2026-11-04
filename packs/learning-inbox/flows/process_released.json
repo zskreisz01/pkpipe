@@ -1,6 +1,6 @@
 {
   "id": "process_released",
-  "description": "06:00: release confirmed or overridden items, process each released item in its own instance (parallel, limited), write states and the processing list, send the daily summary.",
+  "description": "06:00: release confirmed or overridden items, process each released item in its own instance (parallel, limited), write states and the processing list, remove the entries of processed list items from the INBOX list file (spec 020), send the daily summary.",
   "bpmn": "process-inbox-items",
   "start": "read_triage",
   "max_parallel": 2,
@@ -79,17 +79,62 @@
       }
     },
     {
+      "id": "read_list",
+      "type": "tool",
+      "bpmn_element": "Remove processed entry from the INBOX list",
+      "config": {
+        "tool": "obsidian:read_note",
+        "arguments": {
+          "path": "${config.layout.inbox_list_file}"
+        }
+      }
+    },
+    {
+      "id": "consume",
+      "type": "code",
+      "bpmn_element": "Remove processed entry from the INBOX list",
+      "config": {
+        "function": "inbox.consume",
+        "args": {
+          "list_note": "${read_list}",
+          "ids": "${finalize.consume_ids}"
+        }
+      }
+    },
+    {
+      "id": "remove_entries",
+      "type": "tool",
+      "bpmn_element": "Remove processed entry from the INBOX list",
+      "config": {
+        "tool": "obsidian:inbox_remove_entries",
+        "arguments": {
+          "entries": "${consume.entries}"
+        }
+      }
+    },
+    {
+      "id": "list_report",
+      "type": "code",
+      "bpmn_element": "Remove processed entry from the INBOX list",
+      "config": {
+        "function": "inbox.report",
+        "args": {}
+      }
+    },
+    {
       "id": "summary",
       "type": "notify",
       "bpmn_element": "Notify: daily summary",
       "config": {
         "event": "daily_summary",
-        "message": "Processed ${finalize.processed}, quarantined ${finalize.quarantined}, failed ${finalize.failed}; ${release.count_pending} item(s) still pending.",
+        "message": "Processed ${finalize.processed}, quarantined ${finalize.quarantined}, failed ${finalize.failed}; ${release.count_pending} item(s) still pending.${list_report.note}",
         "payload": {
           "processed": "${finalize.processed}",
           "quarantined": "${finalize.quarantined}",
           "failed": "${finalize.failed}",
-          "pending": "${release.count_pending}"
+          "pending": "${release.count_pending}",
+          "list_not_found": "${list_report.count_not_found}",
+          "list_remove_failed": "${list_report.remove_failed}"
         }
       }
     }
@@ -130,7 +175,7 @@
     },
     {
       "from": "finalize",
-      "to": "summary",
+      "to": "list_report",
       "default": true
     },
     {
@@ -143,11 +188,50 @@
     },
     {
       "from": "write_states",
-      "to": "summary",
+      "to": "list_report",
       "default": true
     },
     {
       "from": "write_processing",
+      "to": "read_list",
+      "when": {
+        "path": "finalize.consume_ids.0",
+        "exists": true
+      }
+    },
+    {
+      "from": "write_processing",
+      "to": "list_report",
+      "default": true
+    },
+    {
+      "from": "read_list",
+      "to": "consume"
+    },
+    {
+      "from": "consume",
+      "to": "remove_entries",
+      "when": {
+        "path": "consume.entries.0",
+        "exists": true
+      }
+    },
+    {
+      "from": "consume",
+      "to": "list_report",
+      "default": true
+    },
+    {
+      "from": "remove_entries",
+      "to": "list_report"
+    },
+    {
+      "from": "remove_entries",
+      "to": "list_report",
+      "on": "error"
+    },
+    {
+      "from": "list_report",
       "to": "summary"
     }
   ]

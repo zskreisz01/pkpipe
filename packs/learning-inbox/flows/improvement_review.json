@@ -20,8 +20,6 @@
         "function": "improvement.select_review",
         "args": {
           "backlog": "${read_backlog}",
-          "journal_folder": "2-Areas/Journal",
-          "proposals_folder": "2-Areas/Self-Improvement/System-Changes",
           "max_days": 28
         }
       }
@@ -97,7 +95,7 @@
         "args": {
           "review": "${review_rows}",
           "proposals": "${proposal_rows}",
-          "location": "2-Areas/Self-Improvement/Improvement-Backlog.md"
+          "location": "${config.layout.improvement_file}"
         }
       }
     },

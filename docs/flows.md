@@ -26,7 +26,7 @@ flowchart LR
   "max_parallel": 2,
   "nodes": [
     {"id": "list_inbox", "type": "tool", "bpmn_element": "Read new INBOX items",
-     "config": {"tool": "obsidian:list_folder", "arguments": {"path": "0-INBOX"}}},
+     "config": {"tool": "obsidian:list_folder", "arguments": {"path": "${config.layout.inbox_dir}"}}},
     {"id": "categorize", "type": "subflow", "bpmn_element": "Categorize each item",
      "for_each": "select_new.items", "on_item_error": "continue", "config": {"flow": "categorize_item"}}
   ],
@@ -101,7 +101,7 @@ Built-in `code` functions: `category.plan`, `category.note`, `category.session_f
 | `run_sessions` | The `session_plan` step. A session error after the model's retries (`SchemaError`, model unavailable) ends the plan and lists the item as failed with `session '<id>' failed: <ErrorType>` (no model output in the reason) |
 | `guard` | The `output_guard` over everything the sessions produced; a flag quarantines the item, nothing is written |
 | `candidates`, `candidate_write` | Spec 016: `obsidian:read_tool_candidates` before the note is rendered, `obsidian:update_tool_candidates` after it is written, only when `category.note` produced a row. `category.note` turns the output of the `system_relevance` session into a `## System relevance` section of the note and, for a tool relevant to a known component, into one candidate row (`status = candidate`). A tool the system context lists under `## In use` or that is adopted is marked in use; a rejected tool is never proposed again (the list tool leaves existing rows untouched); a component that is not in the system context is dropped |
-| `note`, `write`, `agent_task`, `record`, `archive` | `category.note` renders the validated output of the plan's note session (`note_session`, default `synthesize`, else the last session) to `<para_path>/<slug of the title>-<item id>.md` with front matter (`type`, `source`, `category`, `pkpipe_item`, `inbox_note`) and a section per field; a session output with a field named like a skipped session loses that field. A new-category `suggestion` of a session becomes a note `2-Areas/Agent-Tasks/new-category-<id>-<item id>.md`. The processing list row says `done`; the INBOX note moves to `4-Archive/Inbox/<item id>-<name>.md` (a failed move is only recorded) |
+| `note`, `write`, `agent_task`, `record`, `archive` | `category.note` renders the validated output of the plan's note session (`note_session`, default `synthesize`, else the last session) to `<para_path>/<slug of the title>-<item id>.md` with front matter (`type`, `source`, `category`, `pkpipe_item`, `inbox_note`) and a section per field; a session output with a field named like a skipped session loses that field. A new-category `suggestion` of a session becomes a note `<layout.agent_tasks_dir>/new-category-<id>-<item id>.md`. The processing list row says `done`; the INBOX note moves to `<layout.archive_dir>/<item id>-<name>.md` (a failed move is only recorded) |
 
 The processing list has no reason column: a failed item shows its reason in the `link` column.
 
@@ -172,7 +172,7 @@ A `for_each` step takes only plain edges: route items inside a subflow, and use 
 | `status` | `running`, `waiting` (inside a wait step), `done`, `failed` |
 | `started_at`, `ended_at`, `error` | Times; error type and message of a failed run |
 
-When a run starts, the config snapshot (JSON and assets) is stored in the app DB under its version. A run always executes against that snapshot: a config published while it waits, or a restart, does not change what it sees, and the model and tool adapters are built from the same version. Every step is checkpointed in SQLite; after a crash `pkpipe run --resume-all` (or `--resume <run id>`) continues from the last checkpoint, and finished steps and finished items are not executed again. A run that stopped before its first checkpoint has nothing to continue and is marked failed (`no checkpoint`); a run whose stored snapshot is missing is marked failed without stopping the other resumes.
+When a run starts, the config snapshot (JSON and assets) is stored in the app DB under its version. A run always executes against that snapshot: a config published while it waits, or a restart, does not change what it sees, and the model and tool adapters are built from the same version. Every step is checkpointed in SQLite; after a crash `pkpipe run --resume-all` (or `--resume <run id>`) continues from the last checkpoint, and finished steps and finished items are not executed again. A flow that can write to the vault takes a vault snapshot before its first node and records its end (spec 019, [operations](operations.md#vault-snapshots-and-restore)); a run whose snapshot cannot be written does not start. A run that stopped before its first checkpoint has nothing to continue and is marked failed (`no checkpoint`); a run whose stored snapshot is missing is marked failed without stopping the other resumes.
 
 ```bash
 pkpipe run triage                    # start now (trigger manual)

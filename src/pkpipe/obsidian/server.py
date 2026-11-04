@@ -102,6 +102,13 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         return _run(vault.update_tool_candidates, rows)
 
     @mcp.tool
+    def inbox_remove_entries(entries: list[str]) -> dict:
+        """Remove processed entries (their exact raw text) from the declared INBOX list file and append them
+        to the dated archive file. Entries are matched by text, never by line number; everything else in the
+        list stays. Returns removed / not_found. Writes only those two files."""
+        return _run(vault.inbox_remove_entries, entries)
+
+    @mcp.tool
     def quarantine_note(
         item_id: str,
         path: str | None = None,

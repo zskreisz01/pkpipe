@@ -9,6 +9,7 @@ from tests.fakes.model import FakeModel
 from tests.fakes.notify import FakeNotify
 from tests.fakes.runs import InMemoryRunStore
 from tests.fakes.security_log import FakeSecurityLog
+from tests.fakes.snapshots import FakeSnapshots
 from tests.fakes.state import InMemoryState
 from tests.fakes.system import FakeSystemProbe
 from tests.fakes.tools import FakeTools
@@ -24,6 +25,7 @@ __all__ = [
     "FakeNotify",
     "FakeSearch",
     "FakeSecurityLog",
+    "FakeSnapshots",
     "FakeSystemProbe",
     "FakeTools",
     "FakeWeb",

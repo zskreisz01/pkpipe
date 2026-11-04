@@ -24,6 +24,8 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [016-system-tool-candidates](016-system-tool-candidates/spec.md) | System tool candidates | Completed | data-model |
 | [017-web-search](017-web-search/spec.md) | web-search MCP server | Completed |  |
 | [018-discord-bot-channel](018-discord-bot-channel/spec.md) | Discord bot notification channel | Completed |  |
+| [019-vault-snapshots](019-vault-snapshots/spec.md) | Vault snapshots and restore | Completed | data-model |
+| [020-vault-layout-and-inbox-list](020-vault-layout-and-inbox-list/spec.md) | Configurable vault layout and list-style INBOX | Completed | data-model |
 
 ## Implementation order
 

@@ -6,6 +6,9 @@
 * Ports are built per snapshot (``ports_for(snapshot)``), so model profiles and tool servers are pinned too.
 * After a crash, :meth:`RunService.resume_incomplete` continues every ``running``/``waiting`` run from its
   last checkpoint; finished steps are not executed again.
+* A flow that can write to the vault takes a snapshot first (spec 019): ``snapshots_for(snapshot)`` returns
+  the :class:`SnapshotPort` of that config. A snapshot that cannot be taken fails the run before its first
+  node; the end of the run (done or failed) records what it left behind.
 """
 
 from __future__ import annotations
@@ -21,12 +24,28 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from pkpipe.domain.vault_snapshot import SnapshotError, flow_writes_vault
 from pkpipe.engine.compiler import FlowCompiler
 from pkpipe.engine.snapshot import ConfigSnapshot
-from pkpipe.ports import RunStorePort
+from pkpipe.ports import RunStorePort, SnapshotPort
 from pkpipe.steps import RunInfo, StepPorts, StepRegistry
 
 log = logging.getLogger("pkpipe.runs")
+
+
+class SnapshotFailed(RuntimeError):
+    """The vault snapshot of a writing flow could not be taken: the run does not start."""
+
+
+def _snapshot_cause(exc: BaseException) -> str:
+    """Why the snapshot failed, for the run's error (shown in the UI and notifications): the message of a
+    :class:`SnapshotError` (path free by construction), the reason of an OS error without its file name, and
+    only the type of anything else (a parse or policy error can quote a path)."""
+    if isinstance(exc, SnapshotError):
+        return f"SnapshotError: {exc}"
+    if isinstance(exc, OSError):
+        return f"{type(exc).__name__}: {exc.strerror or 'os error'}"
+    return type(exc).__name__
 
 
 class RunStatus(StrEnum):
@@ -89,7 +108,14 @@ class RunService:
         config: Callable[[], ConfigSnapshot],
         ports_for: Callable[[ConfigSnapshot], StepPorts],
         registry: StepRegistry | None = None,
+        snapshots_for: Callable[[ConfigSnapshot], SnapshotPort | None] | None = None,
+        unsnapshotted_writes: bool = False,
     ):
+        """``snapshots_for`` gives the snapshot port of a config. Without it a flow that can write to the
+        vault does not run (FR-001), unless ``unsnapshotted_writes=True`` says so on purpose (the eval
+        harness and tests on a synthetic vault)."""
+        self.snapshots_for = snapshots_for
+        self.unsnapshotted_writes = unsnapshotted_writes
         self.store = store
         self.checkpointer = checkpointer
         self.config = config
@@ -127,6 +153,9 @@ class RunService:
             started_at=_now(),
         )
         self.store.create_run(run.record())
+        failure = self._take_snapshot(run, snapshot)
+        if failure is not None:
+            return self._fail(run, failure)
         graph_input = {"input": dict(inputs or {}), "outputs": {}, "item_outputs": {}}
         return self._execute(run, snapshot, graph_input)
 
@@ -145,7 +174,11 @@ class RunService:
         if self.checkpointer.get_tuple({"configurable": {"thread_id": run.run_id}}) is None:
             # the process stopped between recording the run and its first checkpoint: nothing ran yet and
             # the inputs are gone, so the run cannot continue; the next trigger starts a new one
+            self._finish_snapshot(run, snapshot)
             return self._fail(run, LookupError("no checkpoint: the run stopped before its first step"))
+        failure = self._check_snapshot_for_resume(run, snapshot)
+        if failure is not None:
+            return self._fail(run, failure)
         self._set_status(run.run_id, RunStatus.RUNNING)
         return self._execute(run, snapshot, None)
 
@@ -162,6 +195,77 @@ class RunService:
         return outcomes
 
     # -- internals ------------------------------------------------------------------------------------------
+    def _snapshot_port(self, run: Run, snapshot: ConfigSnapshot) -> SnapshotPort | None:
+        """The snapshot port when the run's flow can write to the vault (FR-001), else ``None``."""
+        if self.snapshots_for is None or not self._writes(run, snapshot):
+            return None
+        return self.snapshots_for(snapshot)
+
+    def _writes(self, run: Run, snapshot: ConfigSnapshot) -> bool:
+        return flow_writes_vault(snapshot.data.get("flows") or {}, run.flow_id)
+
+    def _require_port(self, run: Run, snapshot: ConfigSnapshot) -> SnapshotPort | None:
+        """The port of a writing flow; ``None`` for a read-only flow (or an explicit opt-out). Raises when a
+        writing flow has no port: no snapshot service, or no vault configured in this process."""
+        if not self._writes(run, snapshot):
+            return None
+        if self.snapshots_for is None:
+            if self.unsnapshotted_writes:
+                return None
+            raise SnapshotError(
+                "this run service has no snapshot port; a flow that writes to the vault needs one"
+            )
+        port = self.snapshots_for(snapshot)
+        if port is None:
+            raise SnapshotError(
+                "no vault is configured for snapshots in this process "
+                "(set PKPIPE_VAULT_DIR where the flows run)"
+            )
+        return port
+
+    def _check_snapshot_for_resume(self, run: Run, snapshot: ConfigSnapshot) -> SnapshotFailed | None:
+        """A resumed writing run needs its snapshot still (a waiting run can outlive the retention, a crash
+        can leave a run whose snapshot was pruned): without it the run would write with no way back."""
+        try:
+            port = self._require_port(run, snapshot)
+            if port is not None:
+                port.show(run.run_id)
+        except Exception as exc:  # noqa: BLE001 - becomes the run's error; the text names no path
+            log.error(
+                "run %s (%s): snapshot unusable on resume: %s", run.run_id, run.flow_id, type(exc).__name__
+            )
+            failure = SnapshotFailed(
+                f"{_snapshot_cause(exc)}; the run cannot continue without its snapshot (no way back)"
+            )
+            failure.__cause__ = exc
+            return failure
+        return None
+
+    def _take_snapshot(self, run: Run, snapshot: ConfigSnapshot) -> SnapshotFailed | None:
+        """Snapshot before the first node. Writing without a way back is not allowed (FR-001): a writing
+        flow with no snapshot port (no vault configured in this process) does not start either."""
+        try:
+            port = self._require_port(run, snapshot)
+            if port is None:
+                return None
+            port.take(run.run_id, run.flow_id)
+        except Exception as exc:  # noqa: BLE001 - becomes the run's error; the text names no path
+            log.error("run %s (%s): snapshot failed: %s", run.run_id, run.flow_id, type(exc).__name__)
+            failure = SnapshotFailed(f"{_snapshot_cause(exc)}; the run did not start")
+            failure.__cause__ = exc
+            return failure
+        return None
+
+    def _finish_snapshot(self, run: Run, snapshot: ConfigSnapshot) -> None:
+        """Record what the run left behind (FR-003). A failure here never changes the run's result: the
+        restore then refuses this run (no post manifest) instead of guessing."""
+        try:
+            port = self._snapshot_port(run, snapshot)
+            if port is not None:
+                port.finish(run.run_id)
+        except Exception:  # noqa: BLE001
+            log.exception("run %s: the snapshot could not be finished", run.run_id)
+
     def _set_status(self, run_id: str, status: RunStatus | str) -> None:
         with self._lock:
             self.store.update_run(run_id, status=RunStatus(status).value)
@@ -201,7 +305,9 @@ class RunService:
             ):
                 state = graph.invoke(graph_input, config)
         except Exception as exc:  # noqa: BLE001 - recorded on the run, returned to the caller
+            self._finish_snapshot(run, snapshot)
             return self._fail(run, exc)
+        self._finish_snapshot(run, snapshot)
         ended = _now()
         with self._lock:
             self.store.update_run(

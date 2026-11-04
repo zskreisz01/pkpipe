@@ -12,7 +12,15 @@ from fastmcp import Client
 from pkpipe.obsidian import lists
 from tests.support.app_stack import AGENT_TOKEN, OWNER_TOKEN, running, seed_triage
 
-TOOLS = {"run_flow", "list_triage", "confirm_item", "override_item", "get_run", "release_quarantine"}
+TOOLS = {
+    "run_flow",
+    "list_triage",
+    "confirm_item",
+    "override_item",
+    "get_run",
+    "release_quarantine",
+    "restore_run",
+}
 TRIAGE_FILE = "0-INBOX/Inbox-Triage.md"
 
 
