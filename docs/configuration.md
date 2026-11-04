@@ -43,6 +43,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 {
   "channels": {
     "discord_main": {"type": "discord_webhook", "url": "env:DISCORD_WEBHOOK_URL"},
+    "discord_bot":  {"type": "discord_bot", "token": "env:DISCORD_BOT_TOKEN", "channel_id": "env:DISCORD_CHANNEL_ID"},
     "teams_main":   {"type": "teams_webhook",   "url": "env:TEAMS_WEBHOOK_URL"},
     "phone":        {"type": "apprise",         "urls": ["env:NTFY_URL"]}
   },
@@ -54,6 +55,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | Type | Delivers | Needs |
 | --- | --- | --- |
 | `discord_webhook` | `content` (or JSON template, e.g. embeds); `allowed_mentions` is always empty so untrusted text never pings | `url` |
+| `discord_bot` | The same message as `discord_webhook` (and its templates), sent with a bot token to one channel through the REST API (`Authorization: Bot`, one retry on a short 429); outgoing only, no gateway. The bot needs View Channel, Send Messages and Embed Links in that channel | `token` (`env:NAME`), `channel_id` (digits or `env:NAME`) |
 | `teams_webhook` | Adaptive Card message to a Teams Workflows webhook | `url` |
 | `apprise` | Any [Apprise](https://github.com/caronc/apprise) service, so a new channel is configuration only | `urls` (each an `env:` reference holding an Apprise URL) |
 | `log` | Writes to the log (development) | none |

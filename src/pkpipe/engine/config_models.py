@@ -92,15 +92,19 @@ class McpServersConfig(RootModel[dict[str, McpServer]]):
 
 
 # channels.json ---------------------------------------------------------------------------------------------
-CHANNEL_TYPES = ("discord_webhook", "teams_webhook", "apprise", "log")
+CHANNEL_TYPES = ("discord_webhook", "discord_bot", "teams_webhook", "apprise", "log")
 
 
 class Channel(_Strict):
     """One notification target. Secrets (webhook URLs, Apprise URLs) are ``env:NAME`` references."""
 
-    type: str = Field(description="discord_webhook | teams_webhook | apprise | log")
+    type: str = Field(description="discord_webhook | discord_bot | teams_webhook | apprise | log")
     url: str | None = Field(
         default=None, description="Webhook URL (discord_webhook, teams_webhook): env:NAME"
+    )
+    token: str | None = Field(default=None, description="Bot token (discord_bot): env:NAME")
+    channel_id: str | None = Field(
+        default=None, description="Target channel (discord_bot): a numeric id or env:NAME"
     )
     urls: list[str] = Field(
         default_factory=list, description="Apprise service URLs (apprise): each an env:NAME reference"
@@ -127,6 +131,11 @@ class Channel(_Strict):
                 raise ValueError(f"channel type '{self.type}' needs 'url' (an env:NAME reference)")
             if not ENV_REF.match(self.url):
                 raise ValueError("webhook URLs are secrets; use an env:NAME reference, not the URL itself")
+        if self.type == "discord_bot":
+            if not self.token or not ENV_REF.match(self.token):
+                raise ValueError("channel type 'discord_bot' needs 'token' (an env:NAME reference)")
+            if not self.channel_id or not (ENV_REF.match(self.channel_id) or self.channel_id.isdigit()):
+                raise ValueError("channel type 'discord_bot' needs 'channel_id' (digits or env:NAME)")
         if self.type == "apprise":
             if not self.urls:
                 raise ValueError("channel type 'apprise' needs 'urls' (env:NAME references)")

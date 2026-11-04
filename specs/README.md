@@ -23,6 +23,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [015-self-improvement-cycle](015-self-improvement-cycle/spec.md) | Self-improvement cycle (overlay) | Completed | data-model |
 | [016-system-tool-candidates](016-system-tool-candidates/spec.md) | System tool candidates | Completed | data-model |
 | [017-web-search](017-web-search/spec.md) | web-search MCP server | Completed |  |
+| [018-discord-bot-channel](018-discord-bot-channel/spec.md) | Discord bot notification channel | Completed |  |
 
 ## Implementation order
 
