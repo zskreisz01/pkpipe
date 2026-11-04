@@ -603,21 +603,35 @@ class FileSnapshots:
     # -- doctor ------------------------------------------------------------------------------------------
     def summary(self) -> dict[str, Any]:
         """The snapshot directory for ``pkpipe doctor``: free space, number, size and newest snapshot."""
-        infos = self.list()
-        kept = [i for i in infos if i.status != "pruned"]
-        probe = self.directory
-        while not probe.exists() and probe != probe.parent:
-            probe = probe.parent
-        free = shutil.disk_usage(probe).free
-        newest = kept[0] if kept else None
-        return {
-            "directory": str(self.directory),
-            "free_bytes": free,
-            "snapshots": len(kept),
-            "bytes": sum(i.bytes for i in kept),
-            "newest": {"run_id": newest.run_id, "flow_id": newest.flow_id, "taken_at": newest.taken_at}
-            if newest
-            else None,
-            "max_bytes": self.max_bytes,
-            "retention_days": self.retention_days,
-        }
+        return directory_summary(self.directory, retention_days=self.retention_days, max_bytes=self.max_bytes)
+
+
+def directory_summary(
+    directory: Path, *, retention_days: int = DEFAULT_RETENTION_DAYS, max_bytes: int = DEFAULT_MAX_BYTES
+) -> dict[str, Any]:
+    """What is on disk in the snapshot directory (no vault, no app DB needed): free space, number and size of
+    the snapshots and the newest one. Reads the manifests only; a damaged one is not counted."""
+    rows: list[tuple[str, str, str, int]] = []
+    if directory.is_dir():
+        for path in sorted(directory.iterdir()):
+            if not path.is_dir() or path.is_symlink() or path.name.startswith("."):
+                continue
+            try:
+                m = Manifest.model_validate_json((path / MANIFEST).read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            rows.append((m.taken_at, path.name, m.flow_id, sum(e.size for e in m.files if e.copied)))
+    probe = directory
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    rows.sort(reverse=True)
+    newest = rows[0] if rows else None
+    return {
+        "directory": str(directory),
+        "free_bytes": shutil.disk_usage(probe).free,
+        "snapshots": len(rows),
+        "bytes": sum(r[3] for r in rows),
+        "newest": {"run_id": newest[1], "flow_id": newest[2], "taken_at": newest[0]} if newest else None,
+        "max_bytes": max_bytes,
+        "retention_days": retention_days,
+    }

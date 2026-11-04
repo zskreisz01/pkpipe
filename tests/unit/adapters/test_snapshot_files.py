@@ -368,3 +368,22 @@ def test_a_thousand_notes_snapshot_in_under_two_seconds(tmp_path):
     t0 = time.perf_counter()
     info = snaps.take("r", "f")
     assert info.files == 1000 and time.perf_counter() - t0 < 2.0
+
+
+def test_spans_carry_run_id_and_counts_never_paths_or_text(snaps, vault, otel):
+    """FR-007 (constitution X): paths can name private notes."""
+    snaps.take("run-1", "triage")
+    run_changes(vault)
+    snaps.finish("run-1")
+    snaps.apply_restore("run-1")
+    spans = otel.spans("tool snapshot.")
+    assert {s.name for s in spans} >= {"tool snapshot.take", "tool snapshot.finish", "tool snapshot.restore"}
+    take = next(s for s in spans if s.name == "tool snapshot.take")
+    assert (
+        take.attributes["pkpipe.snapshot.run_id"] == "run-1" and take.attributes["pkpipe.snapshot.files"] == 6
+    )
+    restore = next(s for s in spans if s.name == "tool snapshot.restore")
+    assert restore.attributes["pkpipe.snapshot.restored_files"] == 5
+    blob = " ".join(f"{s.name} {dict(s.attributes)}" for s in spans)
+    for private in ("Inbox-Triage", "a.md", "new1", "Tools", "0-INBOX", "note a", "project"):
+        assert private not in blob, private
