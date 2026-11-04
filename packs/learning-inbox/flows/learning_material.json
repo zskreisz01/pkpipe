@@ -2,10 +2,9 @@
   "id": "learning_material",
   "description": "URL check, then a notebook from the URL and the prompt template only, wait for the generation result (poll + deadline above the gateway timeout), fetch audio and link, update the list. A URL the gateway refuses (DNS, deny list) goes to handle_security_flag (log, deny-list, quarantine, alert); any other create error leaves the item released for the next run. No session runs and no derived text is written to the vault (only notebook id, link and audio path), so there is no output to guard.",
   "bpmn": "process-learning-material",
-  "start": "read",
   "nodes": [
     {
-      "id": "read",
+      "id": "fetch_note",
       "type": "tool",
       "bpmn_element": "URL check",
       "config": {
@@ -13,6 +12,14 @@
         "arguments": {
           "path": "${item.path}"
         }
+      }
+    },
+    {
+      "id": "read",
+      "type": "code",
+      "bpmn_element": "URL check",
+      "config": {
+        "function": "inbox.source_note"
       }
     },
     {
@@ -169,6 +176,23 @@
     }
   ],
   "edges": [
+    {
+      "from": "START",
+      "to": "fetch_note",
+      "when": {
+        "path": "item.path",
+        "exists": true
+      }
+    },
+    {
+      "from": "START",
+      "to": "read",
+      "default": true
+    },
+    {
+      "from": "fetch_note",
+      "to": "read"
+    },
     {
       "from": "read",
       "to": "prepare"

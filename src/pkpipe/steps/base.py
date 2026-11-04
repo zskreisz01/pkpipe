@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
+from pkpipe.domain.layout import VaultLayout, layout_from
 from pkpipe.engine.expr import MISSING, Resolver, render, resolve
 from pkpipe.ports import ClockPort, ModelPort, NotifyPort, StatePort, ToolPort, TracerPort
 
@@ -92,6 +93,12 @@ class StepPorts:
         return port
 
 
+def layout_of(ctx: Any) -> VaultLayout:
+    """The vault layout of a step context's pinned config (spec 020); the defaults when it names none."""
+    data = getattr(getattr(ctx, "snapshot", None), "data", None) or {}
+    return layout_from(data.get("layout"))
+
+
 @dataclass
 class StepContext:
     """Everything one step execution may see. ``inputs`` holds only the node's declared inputs (FR-002)."""
@@ -107,6 +114,11 @@ class StepContext:
     wait: dict[str, Any] | None = None
     run_subflow: Callable[[str, dict[str, Any] | None], dict[str, Any]] | None = None
     set_status: Callable[[str], None] = lambda status: None
+
+    @property
+    def layout(self) -> VaultLayout:
+        """The vault layout of the pinned config (spec 020); the defaults when it names none."""
+        return layout_of(self)
 
     def resolve(self, ref: str, *, required: bool = True) -> Any:
         value = resolve(self.resolver, ref, required=required)

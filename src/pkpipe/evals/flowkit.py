@@ -15,13 +15,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from pkpipe.domain.layout import DEFAULT_LAYOUT
 from pkpipe.domain.triage import item_id_for
 from pkpipe.obsidian.policy import VaultPolicy
 from pkpipe.obsidian.vault import Vault
 from pkpipe.ports import Delivery, ModelError, ModelUnavailable, SchemaError
 
-TRIAGE_FILE = "0-INBOX/Inbox-Triage.md"
-PROCESSING_LIST = "0-INBOX/Manual-Resource-Processing-List.md"
+TRIAGE_FILE = DEFAULT_LAYOUT.triage_file
+PROCESSING_LIST = DEFAULT_LAYOUT.processing_list
 _ID_REF = re.compile(r"\{id:([^}]+)\}")
 
 

@@ -30,7 +30,8 @@ REAL = {
     "resources_dir": "4-Resources",
     "context_review_dir": "3-Areas/Context-Review",
 }
-REAL_ALLOW = {"read_notes": ["1-Inbox", "2-Projects", "3-Areas", "4-Resources", "6-Archive", "DailyJournals"]}
+_PARA = ["1-Inbox", "2-Projects", "3-Areas", "4-Resources", "6-Archive", "DailyJournals"]
+REAL_ALLOW = {"read_notes": _PARA, "read_note": _PARA}
 
 
 def test_defaults_equal_the_pre_020_constants(tmp_path):

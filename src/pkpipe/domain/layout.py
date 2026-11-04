@@ -208,6 +208,7 @@ class VaultLayout(BaseModel):
             ("read_tool_candidates", "tool_candidates_file", self.tool_candidates_file),
             ("update_tool_candidates", "tool_candidates_file", self.tool_candidates_file),
             ("quarantine_note", "quarantine_dir", self.quarantine_dir),
+            ("read_note", "journal_pattern", self.journal_pattern),
             ("read_notes", "journal_pattern", self.journal_pattern),
         ]
         if self.inbox_list_file:

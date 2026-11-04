@@ -22,6 +22,9 @@ class ProcessingStatus(StrEnum):
     MANUAL = "manual"
 
 
+ROW_KINDS = ("note", "link", "image", "text_link", "text")
+
+
 class TriageRow(BaseModel):
     item_id: str
     resource: str
@@ -29,6 +32,26 @@ class TriageRow(BaseModel):
     confirm: bool = False
     override: str | None = None
     state: ItemState = ItemState.SUGGESTED
+    #: ``note`` or the entry kind of the list file (``link``, ``image``, ``text_link``, ``text``; spec 020)
+    kind: str = "note"
+    #: The category is the owner's decision (an image entry: the model reads no pixels)
+    needs_owner: bool = False
+
+    @field_validator("kind", mode="before")
+    @classmethod
+    def _kind(cls, v: object) -> object:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return "note"
+        if isinstance(v, str) and v.strip().lower() not in ROW_KINDS:
+            raise ValueError(f"unknown kind {v!r}")
+        return v.strip().lower() if isinstance(v, str) else v
+
+    @field_validator("needs_owner", mode="before")
+    @classmethod
+    def _needs_owner(cls, v: object) -> object:
+        if isinstance(v, str):
+            return v.strip().lower() in ("yes", "true", "x", "[x]", "1")
+        return v
 
     @field_validator("item_id", "resource", "ai_suggested_category")
     @classmethod
@@ -50,6 +73,8 @@ class TriageRow(BaseModel):
             "suggested": self.ai_suggested_category,
             "override": self.override or "",
             "state": self.state.value,
+            "kind": "" if self.kind == "note" else self.kind,
+            "needs_owner": "yes" if self.needs_owner else "",
         }
 
     @classmethod
@@ -64,6 +89,8 @@ class TriageRow(BaseModel):
             confirm=mark == "[x]",
             override=cells["override"],
             state=cells["state"].strip().lower() or ItemState.SUGGESTED,
+            kind=cells.get("kind", ""),
+            needs_owner=cells.get("needs_owner", ""),
         )
 
 

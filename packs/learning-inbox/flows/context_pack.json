@@ -144,7 +144,7 @@
         "function": "context.write",
         "args": {
           "pack": "${item.built}",
-          "review_folder": "2-Areas/Context-Review"
+          "review_folder": "${config.layout.context_review_dir}"
         }
       }
     },
