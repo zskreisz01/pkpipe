@@ -10,9 +10,11 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path, PurePosixPath
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from pkpipe.domain.layout import VaultLayout, layout_errors
 
 from .errors import PathRejected
 
@@ -31,25 +33,17 @@ TOOLS = (
     "read_tool_candidates",
     "update_tool_candidates",
     "quarantine_note",
+    "inbox_remove_entries",
 )
-PARA = ("0-INBOX", "1-Projects", "2-Areas", "3-Resources", "4-Archive")
-DEFAULT_ALLOW: dict[str, list[str]] = {
-    "list_folder": list(PARA),
-    "read_note": list(PARA),
-    "write_note": ["0-INBOX", "1-Projects", "2-Areas", "3-Resources"],
-    "append_note": ["0-INBOX", "1-Projects", "2-Areas", "3-Resources"],
-    "move_note": list(PARA),
-    "read_triage": ["0-INBOX"],
-    "update_triage": ["0-INBOX"],
-    "upsert_processing_list": ["0-INBOX"],
-    "read_notes": list(PARA),
-    "read_improvements": ["2-Areas"],
-    "update_improvements": ["2-Areas"],
-    "read_tool_candidates": ["2-Areas"],
-    "update_tool_candidates": ["2-Areas"],
-    # source notes that may be quarantined; the quarantine folder itself is fixed (``quarantine_dir``)
-    "quarantine_note": ["0-INBOX"],
-}
+#: Folder allowlists of the default layout (a layout derives its own: ``VaultLayout.default_allow``).
+DEFAULT_ALLOW: dict[str, list[str]] = VaultLayout().default_allow()
+LEGACY_LAYOUT_KEYS = (
+    "triage_file",
+    "processing_list",
+    "improvement_file",
+    "tool_candidates_file",
+    "quarantine_dir",
+)
 CONFLICT_RE = re.compile(r"\([^)]*conflict[^)]*\)|\.sync-conflict-", re.IGNORECASE)
 
 
@@ -60,15 +54,55 @@ def is_conflict_name(name: str) -> bool:
 
 class VaultPolicy(BaseModel):
     vault_dir: Path
-    allow: dict[str, list[str]] = Field(
-        default_factory=lambda: {k: list(v) for k, v in DEFAULT_ALLOW.items()}
-    )
-    triage_file: str = "0-INBOX/Inbox-Triage.md"
-    processing_list: str = "0-INBOX/Manual-Resource-Processing-List.md"
-    improvement_file: str = "2-Areas/Self-Improvement/Improvement-Backlog.md"
-    tool_candidates_file: str = "2-Areas/System/System-Tool-Candidates.md"
-    #: Only ``quarantine_note`` writes here (inert form) and only the owner's release moves a note out.
-    quarantine_dir: str = "0-INBOX/_quarantine"
+    allow: dict[str, list[str]] = Field(default_factory=dict)
+    #: Every folder and file the vault tools name (spec 020); defaults = the pre-020 constants.
+    layout: VaultLayout = Field(default_factory=VaultLayout)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _legacy_keys(cls, data: Any) -> Any:
+        """``triage_file`` & co. at the top level of a policy file are the pre-020 spelling of ``layout``."""
+        if not isinstance(data, dict) or not any(k in data for k in LEGACY_LAYOUT_KEYS):
+            return data
+        data = dict(data)
+        layout = data.get("layout")
+        layout = layout.model_dump() if isinstance(layout, VaultLayout) else dict(layout or {})
+        for key in LEGACY_LAYOUT_KEYS:
+            if key in data:
+                layout.setdefault(key, data.pop(key))
+        data["layout"] = layout
+        return data
+
+    @model_validator(mode="after")
+    def _derive_and_check_layout(self) -> VaultPolicy:
+        if "allow" not in self.model_fields_set:
+            self.allow = self.layout.default_allow()
+        errors = layout_errors(self.layout, {t: v for t, v in self.allow.items()})
+        # a tool without any allowlist entry is not configured (direct construction); skip its paths
+        errors = [e for e in errors if any(f"'{t}'" in e for t in self.allow)]
+        if errors:
+            raise ValueError("; ".join(errors))
+        return self
+
+    @property
+    def triage_file(self) -> str:
+        return self.layout.triage_file
+
+    @property
+    def processing_list(self) -> str:
+        return self.layout.processing_list
+
+    @property
+    def improvement_file(self) -> str:
+        return self.layout.improvement_file
+
+    @property
+    def tool_candidates_file(self) -> str:
+        return self.layout.tool_candidates_file
+
+    @property
+    def quarantine_dir(self) -> str:
+        return self.layout.quarantine_dir
 
     @field_validator("allow")
     @classmethod
@@ -90,19 +124,19 @@ class VaultPolicy(BaseModel):
             data["vault_dir"] = str(vault_dir)
         if "vault_dir" not in data:
             raise ValueError("vault_dir is required (config file or --vault)")
-        policy = cls(**data)
-        merged = {k: list(v) for k, v in DEFAULT_ALLOW.items()}
-        merged.update(policy.allow)
-        policy.allow = merged
-        return policy
+        data = _merge_allow(data)
+        return cls(**data)
 
     @property
     def root(self) -> Path:
         return self.vault_dir.resolve()
 
     @property
-    def managed_files(self) -> tuple[str, str, str, str]:
-        return (self.triage_file, self.processing_list, self.improvement_file, self.tool_candidates_file)
+    def managed_files(self) -> tuple[str, ...]:
+        files = [self.triage_file, self.processing_list, self.improvement_file, self.tool_candidates_file]
+        if self.layout.inbox_list_file:
+            files.append(self.layout.inbox_list_file)
+        return tuple(files)
 
     def prefixes(self, tool: str) -> list[tuple[str, ...]]:
         if tool not in TOOLS:
@@ -149,6 +183,14 @@ class VaultPolicy(BaseModel):
 
     def rel(self, absolute: Path) -> str:
         return absolute.resolve().relative_to(self.root).as_posix()
+
+
+def _merge_allow(data: dict) -> dict:
+    """Policy file data with the layout's default allowlists under the explicit ones (explicit wins)."""
+    layout = data.get("layout") or {}
+    merged = VaultLayout(**layout).default_allow()
+    merged.update({k: list(v) for k, v in (data.get("allow") or {}).items()})
+    return {**data, "allow": merged}
 
 
 def _lexical_parts(value: str, *, what: str) -> tuple[str, ...]:

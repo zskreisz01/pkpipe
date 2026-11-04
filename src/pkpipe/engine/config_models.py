@@ -470,6 +470,8 @@ class EvalsConfig(_Strict):
 
 
 # registry --------------------------------------------------------------------------------------------------
+from pkpipe.domain.layout import VaultLayout  # noqa: E402  (layout.json is validated by the domain model)
+
 #: config file stem -> model. Order is the order used by the CLI.
 CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "models": ModelsConfig,
@@ -478,6 +480,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "schedules": SchedulesConfig,
     "categories": CategoriesConfig,
     "security": SecurityConfig,
+    "layout": VaultLayout,
     "telemetry": TelemetrySettings,
     "evals": EvalsConfig,
 }

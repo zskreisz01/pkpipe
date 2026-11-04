@@ -8,9 +8,11 @@ import os
 import re
 import unicodedata
 from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 from typing import Any
 
+from pkpipe.domain.inbox_list import archive_text, remove_entries
 from pkpipe.security import quarantine
 from pkpipe.telemetry import set_span_attributes, tool_span
 
@@ -38,6 +40,7 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
                 "upsert_processing_list",
                 "update_improvements",
                 "update_tool_candidates",
+                "inbox_remove_entries",
             ) and isinstance(rows, list):
                 span.set_attribute("pkpipe.vault.rows", len(rows))
                 ids = [r.get("item_id") or r.get("id") for r in rows if isinstance(r, dict)]
@@ -49,12 +52,14 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
 
 
 MAX_NOTES = 60
+MAX_ENTRIES = 200
 ITEM_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 class Vault:
-    def __init__(self, policy: VaultPolicy):
+    def __init__(self, policy: VaultPolicy, *, today: Callable[[], date] = date.today):
         self.policy = policy
+        self._today = today
 
     # -- notes -----------------------------------------------------------------------------------------------
 
@@ -151,6 +156,46 @@ class Vault:
             note = parse_note(target.read_text(encoding="utf-8"))
             notes.append({"path": path, "front_matter": jsonable(note.front_matter), "body": note.body})
         return {"notes": notes, "missing": missing}
+
+    @_traced
+    def inbox_remove_entries(self, entries: list[str]) -> dict[str, Any]:
+        """Spec 020 FR-005: remove consumed entries from the declared list file and append them to the dated
+        archive file. The only new write path: it touches nothing but those two files; entries are matched by
+        their raw text (never by line number) and every other byte of the list stays."""
+        layout = self.policy.layout
+        if not layout.inbox_list_file:
+            raise PathRejected("no inbox_list_file is configured in the layout")
+        if not isinstance(entries, list) or not entries or len(entries) > MAX_ENTRIES:
+            raise PathRejected(f"give a list of 1 to {MAX_ENTRIES} raw entries")
+        if not all(isinstance(e, str) and e.strip() for e in entries):
+            raise PathRejected("every entry must be a non-empty string")
+        target = self.policy.resolve(layout.inbox_list_file, "inbox_remove_entries")
+        if not target.is_file():
+            raise NoteNotFound(f"inbox list not found: {layout.inbox_list_file}")
+        config = layout.inbox_list.to_config()
+        archive_rel = layout.inbox_archive_path(self._today())
+        archive = self.policy.resolve(archive_rel, "inbox_remove_entries")
+        if is_conflict_name(archive.name) or self.policy.in_quarantine(archive):
+            raise PathRejected("refusing to write the archive there")
+        # Archive first: an entry is never lost, at worst it is in both files (the snapshot is the net).
+        planned = remove_entries(target.read_text(encoding="utf-8"), entries, config)
+        if planned.removed:
+            update_text(archive, lambda existing: archive_text(existing, planned.removed, self._today()))
+        outcome: dict[str, Any] = {}
+
+        def transform(text: str | None) -> str:
+            result = remove_entries(text or "", entries, config)
+            outcome["result"] = result
+            return result.text
+
+        update_text(target, transform)
+        result = outcome["result"]
+        return {
+            "removed": result.removed,
+            "not_found": result.not_found,
+            "list": layout.inbox_list_file,
+            "archive": archive_rel if planned.removed else None,
+        }
 
     def _writable(self, path: str, tool: str) -> Path:
         target = self.policy.resolve(path, tool)

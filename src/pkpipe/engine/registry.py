@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from pkpipe.domain.layout import DEFAULT_LAYOUT
 from pkpipe.engine.config_models import CONFIG_MODELS, validate_effective
 
 MERGE_KEYS = ("id", "flow")
@@ -39,8 +40,10 @@ CORE_DEFAULTS: dict[str, Any] = {
     "security": {
         "canary": {"rotate": "per_run"},
         "url_filter": {"block_private_networks": True, "max_bytes": 2_000_000},
-        "quarantine_dir": "0-INBOX/_quarantine",
+        "quarantine_dir": DEFAULT_LAYOUT.quarantine_dir,
     },
+    #: spec 020: every vault folder and file the flows and steps use (``${config.layout.<name>}``)
+    "layout": DEFAULT_LAYOUT.model_dump(),
     "channels": {"channels": {}, "routes": {}},
     "telemetry": {"capture_content": {"flows": []}},
     # Code-only levels are all-or-nothing (docs/evaluation.md); LLM gates come from the pack.

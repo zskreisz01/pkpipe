@@ -24,6 +24,7 @@ TOOLS = {
     "read_tool_candidates",
     "update_tool_candidates",
     "quarantine_note",
+    "inbox_remove_entries",
 }
 
 TRAVERSAL = [
