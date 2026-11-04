@@ -44,7 +44,7 @@ flowchart LR
 
 - **What:** put anything you want handled into the INBOX: a link, a short text, an image, with an optional note on why it matters to you.
 - **When:** any time. Items captured after 20:00 are picked up the next evening.
-- **How:** create a note in `0-INBOX` (Obsidian, mobile share sheet, web clipper). One resource per note. A line of your own context ("for client onboarding", "compare with X") improves the category suggestion a lot.
+- **How:** create a note in `0-INBOX` (or, when your layout names an `inbox_list_file`, add a bullet to that list: a link, `![[image]]`, a title with its URL on the next line, or plain text; see [Configuration](configuration.md#the-inbox-list-file)) (Obsidian, mobile share sheet, web clipper). One resource per note. A line of your own context ("for client onboarding", "compare with X") improves the category suggestion a lot.
 
 ### Write the daily journal
 

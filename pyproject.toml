@@ -42,9 +42,11 @@ pkpipe = "pkpipe.cli:main"
 dev = [
     "httpx>=0.28.1",
     "jsonschema>=4.26.0",
+    "mypy>=2.4.1",
     "opentelemetry-sdk>=1.45.2",
     "playwright>=1.64.1",
     "pytest>=8",
+    "pytest-timeout>=2.4.0",
     "pytest-xdist>=3.8.0",
     "ruff>=0.6",
 ]
@@ -58,6 +60,8 @@ line-length = 110
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# a hung test (for example a live test against an unresponsive local service) fails after 15 minutes
+timeout = 900
 # --dist worksteal only matters with -n (pytest-xdist): `uv run pytest -n auto -m "not live"`, tests/README.md
 addopts = "-ra --strict-markers -p pytester --dist worksteal"
 markers = [
@@ -68,3 +72,16 @@ markers = [
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+# Type checking is introduced with spec 020: these modules are clean; widen the list as others are annotated.
+[tool.mypy]
+python_version = "3.12"
+files = [
+  "src/pkpipe/domain/layout.py",
+  "src/pkpipe/domain/inbox_list.py",
+  "src/pkpipe/obsidian/policy.py",
+  "src/pkpipe/obsidian/vault.py",
+  "src/pkpipe/steps/triage_code.py",
+]
+ignore_missing_imports = true
+follow_imports = "silent"

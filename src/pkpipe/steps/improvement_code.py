@@ -6,14 +6,11 @@ counts as evidence, which verdict is recorded and what is written back (constitu
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from pkpipe.domain import improvement as imp
-from pkpipe.steps.base import StepContext, StepError, StepResult, register_code
-
-DEFAULT_JOURNAL = "2-Areas/Journal"
-DEFAULT_PROPOSALS = "2-Areas/Self-Improvement/System-Changes"
+from pkpipe.steps.base import StepContext, StepError, StepResult, layout_of, register_code
 
 
 def _today(ctx: StepContext, value: Any = None) -> date:
@@ -27,12 +24,16 @@ def _today(ctx: StepContext, value: Any = None) -> date:
     return datetime.fromtimestamp(ctx.ports.clock.now()).date()
 
 
+def _journal_path(ctx: StepContext, day: date, folder: str | None = None) -> str:
+    """Path of a journal day: the layout's ``journal_pattern``, or ``<folder>/<yyyy-MM-dd>.md`` when a flow
+    names a ``folder`` explicitly (the pre-020 spelling)."""
+    return imp.journal_path(folder, day) if folder else layout_of(ctx).journal_path(day)
+
+
 @register_code("improvement.locate_journal")
-def locate_journal(
-    ctx: StepContext, folder: str = DEFAULT_JOURNAL, date: str | None = None
-) -> dict[str, Any]:
+def locate_journal(ctx: StepContext, folder: str | None = None, date: str | None = None) -> dict[str, Any]:
     day = _today(ctx, date)
-    return {"path": imp.journal_path(folder, day), "date": day.isoformat()}
+    return {"path": _journal_path(ctx, day, folder), "date": day.isoformat()}
 
 
 @register_code("improvement.section")
@@ -72,8 +73,8 @@ def new_rows(
 def select_review(
     ctx: StepContext,
     backlog: dict[str, Any],
-    journal_folder: str = DEFAULT_JOURNAL,
-    proposals_folder: str = DEFAULT_PROPOSALS,
+    journal_folder: str | None = None,
+    proposals_folder: str | None = None,
     max_days: int = 28,
     date: str | None = None,
 ) -> dict[str, Any]:
@@ -84,7 +85,7 @@ def select_review(
     proposals = [
         {
             "id": r["id"],
-            "path": imp.proposal_path(proposals_folder, r["id"]),
+            "path": imp.proposal_path(proposals_folder or layout_of(ctx).proposals_dir, r["id"]),
             "body": imp.proposal_note(r),
         }
         for r in rows
@@ -95,7 +96,7 @@ def select_review(
     return {
         "today": today.isoformat(),
         "items": chosen["items"],
-        "journal_paths": [imp.journal_path(journal_folder, d) for d in chosen["days"]],
+        "journal_paths": [_journal_path(ctx, d, journal_folder) for d in chosen["days"]],
         "proposals": proposals,
         "count": len(chosen["items"]),
     }
@@ -105,11 +106,17 @@ def select_review(
 def attach_journals(
     ctx: StepContext, items: list[dict[str, Any]], notes: dict[str, Any], today: str, max_days: int = 28
 ) -> dict[str, Any]:
+    day = imp.parse_date(today) or _today(ctx)
+    # the day of a journal note follows from the layout's pattern (a day's file name need not be its date)
+    days = {
+        layout_of(ctx).journal_path(day - timedelta(days=n)): (day - timedelta(days=n)).isoformat()
+        for n in range(max_days + 1)
+    }
     by_day = {}
     for n in (notes or {}).get("notes", []):
-        stem = str(n.get("path", "")).rsplit("/", 1)[-1].removesuffix(".md")
-        by_day[stem] = n.get("body", "")
-    day = imp.parse_date(today) or _today(ctx)
+        path = str(n.get("path", ""))
+        stem = path.rsplit("/", 1)[-1].removesuffix(".md")
+        by_day[days.get(path, stem)] = n.get("body", "")
     out = imp.attach_journals(items or [], by_day, day, max_days=max_days)
     return {"items": out, "count": len(out)}
 

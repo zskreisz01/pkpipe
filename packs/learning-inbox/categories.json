@@ -3,7 +3,7 @@
     "id": "learning-material",
     "label": "Learning material",
     "subflow": "learning_material",
-    "para_path": "3-Resources/Learning",
+    "para_path": "{resources_dir}/Learning",
     "triage_hint": "Video, podcast, article or course worth turning into a notebook.",
     "sessions": [
       {
@@ -23,7 +23,7 @@
     "id": "tool",
     "label": "Tools",
     "subflow": "other_resource",
-    "para_path": "3-Resources/Tools",
+    "para_path": "{resources_dir}/Tools",
     "triage_hint": "Software, library or service that could become part of my ecosystem.",
     "sessions": [
       {
@@ -99,7 +99,7 @@
     "id": "marketing",
     "label": "Marketing",
     "subflow": "other_resource",
-    "para_path": "3-Resources/Marketing",
+    "para_path": "{resources_dir}/Marketing",
     "triage_hint": "Catchy marketing idea, campaign or copy.",
     "sessions": [
       {
@@ -126,7 +126,7 @@
     "id": "misc",
     "label": "Misc",
     "subflow": "other_resource",
-    "para_path": "3-Resources/Misc",
+    "para_path": "{resources_dir}/Misc",
     "triage_hint": "Anything that fits nowhere else.",
     "sessions": [
       {

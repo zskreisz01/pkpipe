@@ -10,8 +10,7 @@
       "type": "code",
       "bpmn_element": "Extract improvement items (local session, no tools)",
       "config": {
-        "function": "improvement.locate_journal",
-        "args": {"folder": "2-Areas/Journal"}
+        "function": "improvement.locate_journal"
       }
     },
     {

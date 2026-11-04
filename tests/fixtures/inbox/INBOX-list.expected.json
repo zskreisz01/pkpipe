@@ -1,0 +1,11 @@
+[
+  {"kind": "link", "resource": "https://example.org/articles/alpha", "title": "", "line": 11, "entries": 2},
+  {"kind": "image", "resource": "IMG_20260101_0001.jpg", "title": "IMG_20260101_0001.jpg", "line": 12, "entries": 2},
+  {"kind": "text_link", "resource": "https://example.org/talks/local-first", "title": "A talk about local-first software", "line": 13, "entries": 1},
+  {"kind": "text", "resource": "remember to compare the two note taking approaches", "title": "remember to compare the two note taking approaches", "line": 17, "entries": 1},
+  {"kind": "link", "resource": "https://example.net/guide/setup-tips?ref=home", "title": "", "line": 18, "entries": 1},
+  {"kind": "image", "resource": "Screenshot 2026-01-02 at 10.00.00.png", "title": "Screenshot 2026-01-02 at 10.00.00.png", "line": 19, "entries": 1},
+  {"kind": "text", "resource": "Quick idea about weekly reviews that continues on a second line", "title": "Quick idea about weekly reviews that continues on a second line", "line": 21, "entries": 1},
+  {"kind": "text_link", "resource": "https://example.com/tool?version=2", "title": "Tool worth a look", "line": 23, "entries": 1},
+  {"kind": "text_link", "resource": "https://example.org/md-link", "title": "Markdown titled link", "line": 29, "entries": 1}
+]

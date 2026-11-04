@@ -22,6 +22,8 @@ from .policy import is_conflict_name
 from .tables import TableFile
 
 TRIAGE_COLUMNS = ("confirm", "item", "resource", "suggested", "override", "state")
+#: Added by spec 020; a triage file written before it is widened on its next write.
+TRIAGE_OPTIONAL = ("kind", "needs_owner")
 PROCESSING_COLUMNS = ("item", "category", "note", "nb_id", "link", "status")
 TRIAGE_PREAMBLE = (
     "# Inbox triage\n\n"
@@ -42,13 +44,13 @@ def find_conflicts(path: Path) -> list[str]:
     )
 
 
-def _load(path: Path, columns: tuple[str, ...], preamble: str) -> TableFile:
+def _load(path: Path, columns: tuple[str, ...], preamble: str, optional: tuple[str, ...] = ()) -> TableFile:
     text = path.read_text(encoding="utf-8") if path.exists() else None
-    return TableFile(text, columns, key="item", preamble=preamble)
+    return TableFile(text, columns, key="item", preamble=preamble, optional=optional)
 
 
 def read_triage(path: Path) -> dict[str, Any]:
-    table = _load(path, TRIAGE_COLUMNS, TRIAGE_PREAMBLE)
+    table = _load(path, TRIAGE_COLUMNS, TRIAGE_PREAMBLE, TRIAGE_OPTIONAL)
     rows: list[TriageRow] = []
     invalid = [{"line": n, "text": t} for n, t in table.invalid]
     for cells in table.rows():
@@ -64,6 +66,8 @@ def read_triage(path: Path) -> dict[str, Any]:
 
 
 OWNER_FIELDS = ("confirm", "override")
+#: Fixed when the row is created (spec 020): ``needs_owner`` is the human-in-the-loop marker of an image.
+CREATION_FIELDS = ("kind", "needs_owner")
 
 
 def _normalise_triage_update(update: dict[str, Any], existing: dict[str, str] | None) -> TriageRow:
@@ -88,12 +92,18 @@ def _normalise_triage_update(update: dict[str, Any], existing: dict[str, str] | 
         if "item_id" in data and str(data["item_id"]).strip() != expected:
             raise ValueError("item_id of a new row must be the hash of its resource")
         data["item_id"] = expected
-        return TriageRow(**data)
+        row = TriageRow(**data)
+        if row.needs_owner != (row.kind == "image"):
+            raise ValueError("needs_owner is set exactly for image items")
+        return row
     current = TriageRow.from_cells(existing)
     candidate = TriageRow(**{**current.model_dump(), **data})
     for field in OWNER_FIELDS:
         if field in data and getattr(candidate, field) != getattr(current, field):
             raise ValueError(f"{field} is set by the owner, not by the pipeline")
+    for field in CREATION_FIELDS:
+        if field in data and getattr(candidate, field) != getattr(current, field):
+            raise ValueError(f"{field} is fixed when the row is created")
     if "resource" in data and candidate.resource != current.resource:
         raise ValueError("the resource of an existing row cannot change (the item id is its hash)")
     reason = check_transition(
@@ -117,7 +127,9 @@ def update_triage(path: Path, updates: list[dict[str, Any]]) -> dict[str, Any]:
     result: dict[str, list[str]] = {}
 
     def transform(text: str | None) -> str:
-        table = TableFile(text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE)
+        table = TableFile(
+            text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE, optional=TRIAGE_OPTIONAL
+        )
         outcome: dict[str, list[str]] = {"inserted": [], "updated": [], "unchanged": []}
         errors: list[str] = []
         for i, update in enumerate(updates):
@@ -145,7 +157,9 @@ def _owner_edit(path: Path, item_id: str, change) -> dict[str, Any]:
     result: dict[str, Any] = {}
 
     def transform(text: str | None) -> str:
-        table = TableFile(text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE)
+        table = TableFile(
+            text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE, optional=TRIAGE_OPTIONAL
+        )
         existing = table.get(item_id)
         if existing is None:
             raise InvalidRows(f"unknown triage item '{item_id}'")

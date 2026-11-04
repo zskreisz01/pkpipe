@@ -17,7 +17,7 @@ from typing import Any
 
 from pkpipe.domain import context_pack as cp
 from pkpipe.security import heuristics, query_guard
-from pkpipe.steps.base import StepContext, StepError, StepResult, register_code
+from pkpipe.steps.base import StepContext, StepError, StepResult, layout_of, register_code
 
 DATA_CLASS = "context"
 STORE_PORT = "context_store"
@@ -26,7 +26,6 @@ ID_RE = re.compile(r"[a-z][a-z0-9_]*")
 PACK_RE = re.compile(r"[a-z][a-z0-9_-]*")
 #: The public system pack is maintained with the design and is never generated or overwritten.
 RESERVED_PACKS = frozenset({"system"})
-DEFAULT_REVIEW_FOLDER = "2-Areas/Context-Review"
 MAX_NOTES = 60  # what read_notes accepts
 #: Scopes run in parallel and share the query guard's terms file: its read-merge-write is serialized, or one
 #: scope's names would be lost (and its web queries no longer blocked).
@@ -259,7 +258,7 @@ def assemble(
 
 # -- writing -------------------------------------------------------------------------------------------------
 @register_code("context.write", data_class=DATA_CLASS)
-def write(ctx: StepContext, pack: dict[str, Any], review_folder: str = DEFAULT_REVIEW_FOLDER) -> StepResult:
+def write(ctx: StepContext, pack: dict[str, Any], review_folder: str | None = None) -> StepResult:
     """Store the pack in the overlay (the decision is made against the file as it is now): a new or unedited
     pack is replaced, a pack the owner edited is left alone and the new version goes to
     ``<pack>.md.proposed``; text below the manual marker is kept. The enterprise terms are appended to the
@@ -297,7 +296,7 @@ def write(ctx: StepContext, pack: dict[str, Any], review_folder: str = DEFAULT_R
         store.remove(proposed_path)
     review_path = review_body = None
     if result.changed:
-        review_path = f"{review_folder.rstrip('/')}/{name}.md"
+        review_path = f"{(review_folder or layout_of(ctx).context_review_dir).rstrip('/')}/{name}.md"
         review_body = cp.review_note(name, result.status, result.diff)
     slim = {
         "name": name,

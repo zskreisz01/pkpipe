@@ -86,6 +86,7 @@ def test_schema_command_writes_one_schema_per_config_file(tmp_path, capsys):
             "schedules",
             "categories",
             "security",
+            "layout",
             "telemetry",
             "evals",
             "flow",

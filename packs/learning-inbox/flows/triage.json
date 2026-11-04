@@ -1,6 +1,6 @@
 {
   "id": "triage",
-  "description": "20:00: read new INBOX items, suggest a category per item in an isolated session without tools, write the triage file and notify the owner.",
+  "description": "20:00: read new INBOX items (one note per item, or the entries of the INBOX list file when the layout names one), suggest a category per item in an isolated session without tools (images are the owner's call), write the triage file and notify the owner.",
   "bpmn": "process-inbox-items",
   "start": "list_inbox",
   "max_parallel": 2,
@@ -12,7 +12,7 @@
       "config": {
         "tool": "obsidian:list_folder",
         "arguments": {
-          "path": "0-INBOX"
+          "path": "${config.layout.inbox_dir}"
         }
       }
     },
@@ -25,6 +25,28 @@
       }
     },
     {
+      "id": "read_list",
+      "type": "tool",
+      "bpmn_element": "Parse INBOX list",
+      "config": {
+        "tool": "obsidian:read_note",
+        "arguments": {
+          "path": "${config.layout.inbox_list_file}"
+        }
+      }
+    },
+    {
+      "id": "parse_list",
+      "type": "code",
+      "bpmn_element": "Parse INBOX list",
+      "config": {
+        "function": "inbox.parse_list",
+        "args": {
+          "note": "${read_list}"
+        }
+      }
+    },
+    {
       "id": "select_new",
       "type": "code",
       "bpmn_element": "Read new INBOX items",
@@ -33,7 +55,7 @@
         "args": {
           "listing": "${list_inbox}",
           "triage": "${read_triage}",
-          "folder": "0-INBOX"
+          "folder": "${config.layout.inbox_dir}"
         }
       }
     },
@@ -54,7 +76,8 @@
       "config": {
         "function": "triage.suggested_rows",
         "args": {
-          "results": "${categorize}"
+          "results": "${categorize}",
+          "owner_items": "${select_new.owner_items}"
         }
       }
     },
@@ -104,6 +127,23 @@
     },
     {
       "from": "read_triage",
+      "to": "read_list",
+      "when": {
+        "path": "config.layout.inbox_list_file",
+        "truthy": true
+      }
+    },
+    {
+      "from": "read_triage",
+      "to": "select_new",
+      "default": true
+    },
+    {
+      "from": "read_list",
+      "to": "parse_list"
+    },
+    {
+      "from": "parse_list",
       "to": "select_new"
     },
     {

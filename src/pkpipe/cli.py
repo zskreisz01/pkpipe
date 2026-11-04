@@ -26,7 +26,8 @@ def _validate(args: argparse.Namespace) -> int:
     pack = Path(args.pack) if args.pack else None
     overlay = Path(args.overlay) if args.overlay else None
     try:
-        cfg = load_effective(pack, overlay)
+        policy = Path(args.vault_policy) if args.vault_policy else None
+        cfg = load_effective(pack, overlay, vault_policy=policy)
     except ConfigError as exc:
         if args.json:
             print(json.dumps({"ok": False, "errors": exc.errors}))
@@ -205,6 +206,9 @@ def build_parser() -> argparse.ArgumentParser:
     val = sub.add_parser("validate", help="validate the layered config (pack + overlay)")
     val.add_argument("--pack", help="pack directory (default: packs/learning-inbox or PKPIPE_PACK_DIR)")
     val.add_argument("--overlay", help="overlay directory (default: PKPIPE_OVERLAY_DIR)")
+    val.add_argument(
+        "--vault-policy", help="vault policy file to check the layout against (default: PKPIPE_VAULT_POLICY)"
+    )
     val.add_argument("--json", action="store_true", help="machine readable output")
     sch = sub.add_parser("schema", help="export JSON Schemas of all config files")
     sch.add_argument("--out", default="schemas/config")

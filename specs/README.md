@@ -23,6 +23,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [015-self-improvement-cycle](015-self-improvement-cycle/spec.md) | Self-improvement cycle (overlay) | Completed | data-model |
 | [016-system-tool-candidates](016-system-tool-candidates/spec.md) | System tool candidates | Completed | data-model |
 | [019-vault-snapshots](019-vault-snapshots/spec.md) | Vault snapshots and restore | Draft | data-model |
+| [020-vault-layout-and-inbox-list](020-vault-layout-and-inbox-list/spec.md) | Configurable vault layout and list-style INBOX | Partially completed (FR-009 pending spec 019) | data-model |
 
 ## Implementation order
 

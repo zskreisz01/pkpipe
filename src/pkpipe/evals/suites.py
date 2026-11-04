@@ -38,6 +38,7 @@ from typing import Any
 from pkpipe import telemetry
 from pkpipe.domain import context_pack as cp
 from pkpipe.domain import improvement as imp
+from pkpipe.domain.layout import DEFAULT_LAYOUT
 from pkpipe.domain.triage import ItemState, check_transition
 from pkpipe.engine.flow_models import FlowNode
 from pkpipe.engine.snapshot import ConfigSnapshot
@@ -296,7 +297,7 @@ class TriageSuite(Suite):
         front = {k: v for k, v in (("source", inp.get("url")), ("title", inp.get("title"))) if v}
         return {
             "menu.categories": menu,
-            "item.resource": inp.get("path") or f"0-INBOX/{case.id}.md",
+            "item.resource": inp.get("path") or f"{DEFAULT_LAYOUT.inbox_dir}/{case.id}.md",
             "read.front_matter": front or None,
             "read.body": inp.get("note", ""),
         }
@@ -900,7 +901,7 @@ class FlowsSuite(Suite):
         inp, exp = case.input, case.expected or {}
         with tempfile.TemporaryDirectory(prefix="pkpipe-eval-flow-") as tmp:
             vault = Path(tmp) / "vault"
-            for folder in ("0-INBOX", "3-Resources"):
+            for folder in (DEFAULT_LAYOUT.inbox_dir, DEFAULT_LAYOUT.resources_dir):
                 (vault / folder).mkdir(parents=True, exist_ok=True)
             for rel, text in (inp.get("vault") or {}).items():
                 (vault / rel).parent.mkdir(parents=True, exist_ok=True)
