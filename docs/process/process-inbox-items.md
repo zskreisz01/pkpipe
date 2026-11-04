@@ -28,6 +28,6 @@ flowchart LR
         cl -. security flag .-> hq[[Handle security flag]]
         co -. security flag .-> hq
     end
-    mi --> rm[Remove processed entry from INBOX list<br/>list file only: entry moves to the dated archive] --> sum[Notify: daily summary] --> e((Done))
+    mi --> rm[Remove processed entry from INBOX list<br/>entry moves to the dated archive; failed and quarantined items stay; a missing entry is reported as not_found] --> sum[Notify: daily summary] --> e((Done))
     sum --> wk[Owner: work through processing list] --> qr[Owner: review quarantine]
 ```

@@ -113,17 +113,28 @@
       }
     },
     {
+      "id": "list_report",
+      "type": "code",
+      "bpmn_element": "Remove processed entry from the INBOX list",
+      "config": {
+        "function": "inbox.report",
+        "args": {}
+      }
+    },
+    {
       "id": "summary",
       "type": "notify",
       "bpmn_element": "Notify: daily summary",
       "config": {
         "event": "daily_summary",
-        "message": "Processed ${finalize.processed}, quarantined ${finalize.quarantined}, failed ${finalize.failed}; ${release.count_pending} item(s) still pending.",
+        "message": "Processed ${finalize.processed}, quarantined ${finalize.quarantined}, failed ${finalize.failed}; ${release.count_pending} item(s) still pending.${list_report.note}",
         "payload": {
           "processed": "${finalize.processed}",
           "quarantined": "${finalize.quarantined}",
           "failed": "${finalize.failed}",
-          "pending": "${release.count_pending}"
+          "pending": "${release.count_pending}",
+          "list_not_found": "${list_report.count_not_found}",
+          "list_remove_failed": "${list_report.remove_failed}"
         }
       }
     }
@@ -164,7 +175,7 @@
     },
     {
       "from": "finalize",
-      "to": "summary",
+      "to": "list_report",
       "default": true
     },
     {
@@ -177,7 +188,7 @@
     },
     {
       "from": "write_states",
-      "to": "summary",
+      "to": "list_report",
       "default": true
     },
     {
@@ -190,7 +201,7 @@
     },
     {
       "from": "write_processing",
-      "to": "summary",
+      "to": "list_report",
       "default": true
     },
     {
@@ -207,17 +218,21 @@
     },
     {
       "from": "consume",
-      "to": "summary",
+      "to": "list_report",
       "default": true
     },
     {
       "from": "remove_entries",
-      "to": "summary"
+      "to": "list_report"
     },
     {
       "from": "remove_entries",
-      "to": "summary",
+      "to": "list_report",
       "on": "error"
+    },
+    {
+      "from": "list_report",
+      "to": "summary"
     }
   ]
 }

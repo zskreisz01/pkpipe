@@ -60,3 +60,34 @@ def test_unknown_kind_is_refused(tmp_path):
 
     with pytest.raises(InvalidRows, match="unknown kind"):
         lists.update_triage(tmp_path / "T.md", [_row("x", kind="video")])
+
+
+def test_kind_and_needs_owner_cannot_be_changed_after_the_row_exists(tmp_path):
+    """``needs_owner`` is the human-in-the-loop marker of an image: a session cannot clear it."""
+    import pytest
+
+    from pkpipe.obsidian.errors import InvalidRows
+
+    p = tmp_path / "T.md"
+    img = _row("IMG_1.jpg", ai_suggested_category="none", kind="image", needs_owner=True)
+    lists.update_triage(p, [img])
+    before = p.read_text()
+    item = item_id_for("IMG_1.jpg")
+    for change in ({"needs_owner": False}, {"kind": "link"}, {"kind": "text", "needs_owner": False}):
+        with pytest.raises(InvalidRows, match="fixed when the row is created"):
+            lists.update_triage(p, [{"item_id": item, **change}])
+    lists.update_triage(p, [{"item_id": item, "kind": "image", "needs_owner": True, "state": "pending"}])
+    assert lists.read_triage(p)["rows"][0]["needs_owner"] is True
+    assert before.count("| image |") == 1
+
+
+def test_a_new_row_cannot_claim_a_made_up_kind_marker(tmp_path):
+    import pytest
+
+    from pkpipe.obsidian.errors import InvalidRows
+
+    p = tmp_path / "T.md"
+    with pytest.raises(InvalidRows, match="needs_owner is set exactly for image"):
+        lists.update_triage(p, [_row("IMG_2.jpg", kind="image", needs_owner=False)])
+    with pytest.raises(InvalidRows, match="needs_owner is set exactly for image"):
+        lists.update_triage(p, [_row("https://example.org/x", kind="link", needs_owner=True)])

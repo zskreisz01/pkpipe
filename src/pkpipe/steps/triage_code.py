@@ -278,6 +278,7 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
     An override naming an unknown category is not released (the owner gets it back as pending).
     """
     cats = _categories(ctx)
+    layout = layout_of(ctx)
     items = [
         TriageItem(
             id=r["item_id"],
@@ -308,7 +309,7 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
             **({"path": i.resource} if i.kind == "note" else {"kind": i.kind, "source": "list"}),
             "category": i.effective_category,
             "subflow": cats[i.effective_category]["subflow"],
-            "para_path": cats[i.effective_category]["para_path"],
+            "para_path": layout.expand(cats[i.effective_category]["para_path"]),
         }
         for i in released
     ]
@@ -341,9 +342,11 @@ def finalize(ctx: StepContext, results: list[dict[str, Any]]) -> dict[str, Any]:
             continue
         triage_rows.append({"item_id": item["id"], "state": ItemState.PROCESSED.value})
         counts["processed"] += 1
-        if item.get("source") == "list":
-            consumed.append(item["id"])  # its entry leaves the list file (spec 020 FR-005)
         status = item.get("processing_status", "done")
+        if item.get("source") == "list" and status != "failed":
+            consumed.append(
+                item["id"]
+            )  # its entry leaves the list file (spec 020 FR-005); a failed one stays
         link = item.get("link")
         if status == "failed" and not link and item.get("failure_reason"):
             link = " ".join(str(item["failure_reason"]).split())[:200]  # the list has no reason column
@@ -403,6 +406,45 @@ def consume(ctx: StepContext, list_note: dict[str, Any], ids: list[str]) -> dict
     in ``ids`` and stay. The raw text is what ``inbox_remove_entries`` matches against the file."""
     wanted = set(ids or [])
     cfg = layout_of(ctx).inbox_list.to_config()
-    raws = [e.raw for e in parse_list((list_note or {}).get("body", ""), cfg) if e.item_id in wanted]
-    found = {e.item_id for e in parse_list((list_note or {}).get("body", ""), cfg)} & wanted
-    return {"entries": raws, "count": len(raws), "missing": sorted(wanted - found)}
+    entries = parse_list((list_note or {}).get("body", ""), cfg)
+    hit = [e for e in entries if e.item_id in wanted]
+    found = {e.item_id for e in hit}
+    return {
+        "entries": [e.raw for e in hit],
+        "entry_ids": [e.item_id for e in hit],
+        "count": len(hit),
+        "missing": sorted(wanted - found),
+    }
+
+
+@register_code("inbox.report")
+def report(ctx: StepContext) -> dict[str, Any]:
+    """What happened to the list entries of the processed items (spec 020 US3 scenario 3).
+
+    An item whose entry is no longer in the list (the owner removed or edited it meanwhile) is reported as
+    ``not_found`` instead of being dropped silently; so is a failed removal. Reads the outputs of
+    ``consume`` and ``remove_entries`` when those steps ran."""
+    consume_out = ctx.resolve("consume", required=False)
+    removed = ctx.resolve("remove_entries", required=False)
+    consume_out = consume_out if isinstance(consume_out, dict) else {}
+    ids = list(consume_out.get("missing") or [])
+    raws = list(consume_out.get("entries") or [])
+    entry_ids = list(consume_out.get("entry_ids") or [])
+    failed = False
+    if isinstance(removed, dict) and "not_found" in removed:
+        by_raw = dict(zip(raws, entry_ids, strict=False))
+        ids += [by_raw.get(r, r) for r in removed.get("not_found") or []]
+    elif raws:  # the removal step ran into an error: nothing is known to be consumed
+        failed = True
+    not_found = sorted(set(ids))
+    parts = []
+    if not_found:
+        parts.append(f"{len(not_found)} processed item(s) no longer in the INBOX list (not_found)")
+    if failed:
+        parts.append("removing the entries from the INBOX list failed; they stay in the list")
+    return {
+        "not_found": not_found,
+        "count_not_found": len(not_found),
+        "remove_failed": failed,
+        "note": (" " + "; ".join(parts) + ".") if parts else "",
+    }
