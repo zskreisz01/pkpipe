@@ -15,7 +15,7 @@ from typing import Any
 from pydantic import Field
 
 from pkpipe.domain.context_pack import strip_markers
-from pkpipe.domain.data_classes import is_private
+from pkpipe.domain.data_classes import content_free_errors, is_private
 from pkpipe.security import query_guard
 from pkpipe.security.canary import canary_notice, run_canary
 from pkpipe.steps.base import (
@@ -129,10 +129,11 @@ def with_canary(system: str, config: LlmConfig, ctx: StepContext) -> str:
 
 def complete(ctx: StepContext, config: LlmConfig, system: str, user: str, schema: dict[str, Any] | None):
     model = ctx.ports.require("model")
-    with ctx.ports.tracer.llm(config.profile) as span:
+    private = is_private(ctx.flow.data_classes)
+    with ctx.ports.tracer.llm(config.profile) as span, content_free_errors(private):
         span.set("pkpipe.model.profile", config.profile)
         reply = model.complete(system, user, schema, profile=config.profile)
-        if not is_private(ctx.flow.data_classes):
+        if not private:
             # a session of a private flow (journal, context, image) never offers its content for capture,
             # also when the flow runs as a subflow under one that has capture switched on (spec 021 SC-003)
             ctx.ports.tracer.capture(system=system, user=user, response=_text(reply))

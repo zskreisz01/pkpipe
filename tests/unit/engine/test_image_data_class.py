@@ -243,3 +243,15 @@ def test_a_vision_profile_timeout_above_the_image_timeout_is_a_warning():
         _flow(_vision()), assets=ASSETS, models={"vision": {**LOCAL_VISION, "timeout_s": 300}}, images={}
     )
     assert not any("per_image_timeout_s" in w for w in validate_config_flows(ok)[1])
+
+
+def _read_image_flow(data_classes):
+    tool = {"id": "rd", "type": "tool", "config": {"tool": "v:read_image", "arguments": {"name": "a.png"}}}
+    return {"id": "rdflow", "data_classes": list(data_classes), "start": "rd", "nodes": [tool], "edges": []}
+
+
+def test_a_flow_that_calls_read_image_must_declare_the_image_class():
+    servers = {"v": {"transport": "stdio", "command": "x", "allow": ["read_image"]}}
+    errors = _errors(_read_image_flow(()), servers=servers)
+    assert any("'v:read_image' reads an image" in e and "data class 'image'" in e for e in errors)
+    assert _errors(_read_image_flow(("image",)), servers=servers) == []

@@ -26,7 +26,7 @@ from langgraph.graph import StateGraph
 from langgraph.types import Command, Send
 from pydantic import ValidationError
 
-from pkpipe.domain.data_classes import PRIVATE_DATA_CLASSES
+from pkpipe.domain.data_classes import PRIVATE_DATA_CLASSES, is_private
 from pkpipe.engine.expr import MISSING, condition_paths, evaluate, lookup, references_in
 from pkpipe.engine.flow_models import END, START, Flow, FlowNode
 from pkpipe.engine.snapshot import ConfigSnapshot
@@ -48,9 +48,12 @@ class FlowError(Exception):
 class StepFailed(Exception):
     """A step raised and its node has no error edge: the run fails."""
 
-    def __init__(self, flow_id: str, node_id: str, cause: BaseException):
+    def __init__(self, flow_id: str, node_id: str, cause: BaseException, *, content_free: bool = False):
+        """``content_free``: a flow of a private data class (journal, context, image): the message names the
+        type of the cause only, since its text can quote the private content (spec 021 safety review)."""
         self.flow_id, self.node_id, self.cause = flow_id, node_id, cause
-        super().__init__(f"flow '{flow_id}' step '{node_id}' failed: {type(cause).__name__}: {cause}")
+        detail = type(cause).__name__ if content_free else f"{type(cause).__name__}: {cause}"
+        super().__init__(f"flow '{flow_id}' step '{node_id}' failed: {detail}")
 
 
 # -- state --------------------------------------------------------------------------------------------------
@@ -560,7 +563,13 @@ class FlowCompiler:
                 except GraphBubbleUp:
                     raise  # LangGraph control flow (interrupts, parent commands), not a step failure
                 except Exception as exc:  # noqa: BLE001 - routed or re-raised below
-                    failure = {"node": node.id, "type": type(exc).__name__, "message": str(exc)[:500]}
+                    private = is_private(flow.data_classes)
+                    failure = {
+                        "node": node.id,
+                        "type": type(exc).__name__,
+                        # a nested StepFailed is content-free already (its flow was private)
+                        "message": "" if private and not isinstance(exc, StepFailed) else str(exc)[:500],
+                    }
                     if node.for_each and node.on_item_error == "continue":
                         span.fail(type(exc).__name__)
                         entry = {"item": item, "status": "failed", "error": failure}
@@ -578,7 +587,7 @@ class FlowCompiler:
                         )
                     if isinstance(exc, StepFailed):
                         raise
-                    raise StepFailed(flow.id, node.id, exc) from exc
+                    raise StepFailed(flow.id, node.id, exc, content_free=private) from exc
                 if result.pending is not None:
                     return Command(update={"waits": {node.id: result.pending}}, goto=node.id)
                 new_item = {**(item or {}), **(result.item or {})} if (item or result.item) else None

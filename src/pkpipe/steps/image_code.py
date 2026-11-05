@@ -35,6 +35,7 @@ from typing import Any
 from pydantic import Field, ValidationError
 
 from pkpipe.domain import image_batch as batch
+from pkpipe.domain.data_classes import content_free_errors
 from pkpipe.domain.images import PREPARED_MEDIA_TYPE, ImageBuffer, ImageDescription
 from pkpipe.domain.text_safety import neutralize_text
 from pkpipe.engine.config_models import ImagesConfig
@@ -593,7 +594,7 @@ class VisionStep(StepExecutor):
         deadline = started + cfg.per_image_timeout_s
         attempts = 1 + cfg.retries
         last: Exception | None = None
-        with ctx.ports.tracer.llm(config.profile) as span:
+        with ctx.ports.tracer.llm(config.profile) as span, content_free_errors(True):
             span.set("pkpipe.model.profile", config.profile)
             span.set("pkpipe.image.bytes", len(prepared.data))
             reply: dict[str, Any] | None = None
@@ -615,7 +616,9 @@ class VisionStep(StepExecutor):
             if reply is None:
                 span.set("pkpipe.image.attempts", attempts)
                 if isinstance(last, SchemaError):
-                    raise last
+                    # the message and raw text of a schema error quote the model's answer, which quotes the
+                    # image: only the type and a fixed text go on
+                    raise SchemaError("the answer does not satisfy the schema") from None
                 raise DescriptionInvalid("the model's answer did not satisfy the schema") from None
         canary = _canary_of(ctx)
         out = desc.model_dump()
