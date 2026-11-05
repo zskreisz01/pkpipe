@@ -563,12 +563,13 @@ class FlowCompiler:
                 except GraphBubbleUp:
                     raise  # LangGraph control flow (interrupts, parent commands), not a step failure
                 except Exception as exc:  # noqa: BLE001 - routed or re-raised below
-                    private = is_private(flow.data_classes)
+                    # the error text of a model session can quote the private content (a schema violation
+                    # names the offending value); a tool or code error comes from our own code and stays
+                    private = is_private(flow.data_classes) and node.type in SESSION_TYPES
                     failure = {
                         "node": node.id,
                         "type": type(exc).__name__,
-                        # a nested StepFailed is content-free already (its flow was private)
-                        "message": "" if private and not isinstance(exc, StepFailed) else str(exc)[:500],
+                        "message": "" if private else str(exc)[:500],
                     }
                     if node.for_each and node.on_item_error == "continue":
                         span.fail(type(exc).__name__)
