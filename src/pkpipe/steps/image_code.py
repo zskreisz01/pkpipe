@@ -36,6 +36,7 @@ from pydantic import Field, ValidationError
 
 from pkpipe.domain import image_batch as batch
 from pkpipe.domain.images import PREPARED_MEDIA_TYPE, ImageBuffer, ImageDescription
+from pkpipe.domain.text_safety import neutralize_text
 from pkpipe.engine.config_models import ImagesConfig
 from pkpipe.engine.envref import resolve_chain
 from pkpipe.ports import ImageError, ImageInput, ImageStorePort, PreparedImage, SchemaError
@@ -366,7 +367,8 @@ def record(ctx: StepContext) -> StepResult:
 
 
 def _one_line(text: str, limit: int = 200) -> str:
-    return " ".join(str(text).split())[:limit]
+    """The topic as one safe line (no markdown, HTML or URL): it is written into the triage file."""
+    return neutralize_text(text, limit)
 
 
 @register_code("image.finish_batch", data_class=DATA_CLASS)
@@ -546,8 +548,9 @@ class VisionStep(StepExecutor):
             limit = images_cfg.max_tokens
             if int(profile.get("timeout_s", 120)) > images_cfg.per_image_timeout_s:
                 warnings.append(
-                    f"node '{node.id}': model profile '{config.profile}' timeout_s {profile.get('timeout_s', 120)} "
-                    f"exceeds images.per_image_timeout_s {images_cfg.per_image_timeout_s}: a timed-out image "
+                    f"node '{node.id}': model profile '{config.profile}' timeout_s "
+                    f"{profile.get('timeout_s', 120)} exceeds images.per_image_timeout_s "
+                    f"{images_cfg.per_image_timeout_s}: a timed-out image "
                     "keeps occupying the model server until the profile's own timeout"
                 )
             tokens = profile.get("max_tokens")

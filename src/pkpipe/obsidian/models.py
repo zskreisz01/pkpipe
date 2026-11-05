@@ -7,6 +7,7 @@ from enum import StrEnum
 from pydantic import BaseModel, field_validator
 
 from pkpipe.domain.improvement import ImprovementItem
+from pkpipe.domain.text_safety import neutralize_text
 from pkpipe.domain.tool_candidate import ToolCandidate
 from pkpipe.domain.triage import ItemState, item_id_for
 
@@ -62,7 +63,7 @@ class TriageRow(BaseModel):
     def _topic(cls, v: object) -> object:
         if v is None:
             return ""
-        return " ".join(v.split())[:TOPIC_CHARS] if isinstance(v, str) else v
+        return neutralize_text(v, TOPIC_CHARS) if isinstance(v, str) else v
 
     @field_validator("item_id", "resource", "ai_suggested_category")
     @classmethod

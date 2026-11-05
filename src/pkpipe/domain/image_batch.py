@@ -150,8 +150,8 @@ def describe_estimate(*, count: int, seed_s: float, budget_s: float, elapsed_s: 
     if elapsed_s >= 30:
         left = max(0.0, budget_s - elapsed_s)
         return text + (
-            f"time budget {_minutes(budget_s)} min, {_minutes(elapsed_s)} min already used by the text phase, "
-            f"{_minutes(left) if left else 0} min left."
+            f"time budget {_minutes(budget_s)} min, {_minutes(elapsed_s)} min already used by the text "
+            f"phase, {_minutes(left) if left else 0} min left."
         )
     return text + f"time budget {_minutes(budget_s)} min."
 
@@ -169,7 +169,8 @@ def describe_report(rep: dict[str, Any]) -> str:
         return (
             f"Images: all {rep['deferred']} image(s) deferred before the first image: the time budget of "
             f"{_minutes(rep['budget_s'])} min was already used up ({_minutes(rep['cycle_elapsed_s'])} min, "
-            "the text phase took the time). They stay in the INBOX list and are picked up first in the next run."
+            "the text phase took the time). They stay in the INBOX list and are picked up first in the "
+            "next run."
         )
     if rep["deferred"]:
         text += (

