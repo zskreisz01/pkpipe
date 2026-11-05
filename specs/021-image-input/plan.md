@@ -17,7 +17,7 @@ Extend `ModelPort` with optional images (adapter builds `image_url` parts), add 
 
 **Language/Version**: Python 3.12+ (`uv`); Pillow as optional extra `images`
 **Testing**: fake vision model scripted by digest; images rendered in test code; vault tool tests with a temp attachments folder, traversal and symlink cases; trace/log leak test; live eval case marked `live`
-**Operations**: one model in production (`gemma-4-12b`, loaded with the context the text sessions need, not the 8192 of a test load), so nothing switches at night; the judge model runs only in evals (documented in `docs/operations.md`); throughput measured at about 53 s per image
+**Operations**: two phases per run, each with one model (text on `qwen3.5-9b-mlx`, then images on `gemma-4-12b`, both loaded at context 32768 by `scripts/lmstudio-test-setup.sh`; the test load of 8192 is too small for the text sessions), one switch between them; the judge model runs only in evals (documented in `docs/operations.md`); throughput measured at about 53 s per image
 
 ## Constitution Check
 
@@ -47,7 +47,7 @@ Extend `ModelPort` with optional images (adapter builds `image_url` parts), add 
 ## Risks
 
 - Reasoning models spend the whole token budget; mitigated by `max_tokens`, one retry and an owner fallback; a non-reasoning vision model is the default
-- Throughput on a memory-starved machine: the time budget (default 2 hours) with a running estimate, the per-image timeout, the cache, and one model for the whole run (no switching)
+- Throughput on a memory-starved machine: the time budget (default 2 hours) with a running estimate, the per-image timeout, the cache, and two model phases with one switch (no interleaving)
 - Estimate error: the mean of the images done so far can be optimistic for a run of larger images; the per-image timeout bounds the overshoot to one image
 - Pillow decoding of hostile files: size and pixel limits (decompression bomb guard) before decoding
 - Text in images that looks like a URL or command: it is data; URLs go through the URL policy before any fetch

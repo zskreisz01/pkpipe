@@ -33,7 +33,7 @@ Format: `- [ ] T001 [USx] Description` · `[USx]` = user story
 ## Phase: User Story 4 (P2)
 
 - [ ] T011 [US4] Synthetic image generator and dataset; suite `images`: code checks against the known truth, a text judge (different family) only for `topic`; 20-item calibration first
-- [ ] T011a [US4] Validation: every step of the production flows uses one model profile (SC-005); eval runner supports record-then-judge passes so the judge never shares memory with the subject (check; else small task)
+- [ ] T011a [US4] Phase silo: the text phase and the image phase each use one profile and the run switches once (SC-005); unload hint for the text model between the phases; eval runner supports record-then-judge passes so the judge never shares memory with the subject (check; else small task)
 - [ ] T012 [US4] Live probe test (marked `live`): the SC-002 repeat on synthetic images
 
 ## Phase: Polish
