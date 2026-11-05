@@ -22,8 +22,9 @@ from .policy import is_conflict_name
 from .tables import TableFile
 
 TRIAGE_COLUMNS = ("confirm", "item", "resource", "suggested", "override", "state")
-#: Added by spec 020; a triage file written before it is widened on its next write.
-TRIAGE_OPTIONAL = ("kind", "needs_owner")
+#: Added by spec 020 (``kind``, ``needs_owner``) and spec 021 (``topic``); a triage file written before
+#: them is widened on its next write, and only when a row needs a column.
+TRIAGE_OPTIONAL = ("kind", "needs_owner", "topic")
 PROCESSING_COLUMNS = ("item", "category", "note", "nb_id", "link", "status")
 TRIAGE_PREAMBLE = (
     "# Inbox triage\n\n"
@@ -93,8 +94,8 @@ def _normalise_triage_update(update: dict[str, Any], existing: dict[str, str] | 
             raise ValueError("item_id of a new row must be the hash of its resource")
         data["item_id"] = expected
         row = TriageRow(**data)
-        if row.needs_owner != (row.kind == "image"):
-            raise ValueError("needs_owner is set exactly for image items")
+        if row.needs_owner and row.kind != "image":
+            raise ValueError("needs_owner is set for image items only")
         return row
     current = TriageRow.from_cells(existing)
     candidate = TriageRow(**{**current.model_dump(), **data})

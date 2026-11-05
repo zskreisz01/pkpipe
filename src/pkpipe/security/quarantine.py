@@ -26,6 +26,7 @@ SecurityFlagName = Literal[
     "classifier",
     "canary",
     "reader",
+    "viewer",
 ]
 EVIDENCE_CHARS = 200
 _PKPIPE_COMMENT = re.compile(r"\s*#\s*pkpipe:.*$")

@@ -26,6 +26,7 @@ from langgraph.graph import StateGraph
 from langgraph.types import Command, Send
 from pydantic import ValidationError
 
+from pkpipe.domain.data_classes import PRIVATE_DATA_CLASSES
 from pkpipe.engine.expr import MISSING, condition_paths, evaluate, lookup, references_in
 from pkpipe.engine.flow_models import END, START, Flow, FlowNode
 from pkpipe.engine.snapshot import ConfigSnapshot
@@ -198,7 +199,7 @@ def validate_flow(
 #: page, the sanitized text and the Reader output (which quotes page text as evidence). Sessions with tools
 #: take the secure-fetch verdict's ``extract`` (or ``item.extract``) instead.
 UNVALIDATED_OUTPUT_TYPES = frozenset(
-    {"tool", "wait", "llm_tools", "fetch", "sanitize", "reader", "subflow", "session_plan"}
+    {"tool", "wait", "llm_tools", "fetch", "sanitize", "reader", "subflow", "session_plan", "vision"}
 )
 
 
@@ -215,8 +216,13 @@ def _unvalidated_source(flow: Flow, ref: str, registry: StepRegistry) -> bool:
 
 
 #: Data classes whose flows stay on this machine: local model, no tool that sends data away (spec 015 FR-002
-#: for journals, spec 011 for the context packs: the enterprise notes are summarized by the local model only).
-LOCAL_ONLY_CLASSES = frozenset({"journal", "context"})
+#: for journals, spec 011 for the context packs: the enterprise notes are summarized by the local model only,
+#: spec 021 for images: screenshots of messages and profiles).
+LOCAL_ONLY_CLASSES = PRIVATE_DATA_CLASSES
+
+
+#: Step types that are one model session (in a local-only flow their profile and fallbacks must be loopback).
+SESSION_TYPES = ("llm", "llm_tools", "reader", "vision")
 
 
 def _is_loopback(url: str) -> bool:
@@ -303,7 +309,7 @@ def private_data_errors(
         found: list[tuple[str, dict[str, Any]]] = []
         for inner in flows[target].get("nodes") or []:
             inner_cfg = inner.get("config") or {}
-            if inner.get("type") in ("llm", "llm_tools", "reader"):
+            if inner.get("type") in SESSION_TYPES:
                 found.append((f"{target}.{inner.get('id')}", inner_cfg))
             sub = inner_cfg.get("flow")
             if inner.get("type") == "subflow" and isinstance(sub, str) and "${" not in sub:
@@ -312,7 +318,7 @@ def private_data_errors(
 
     for node in flow.nodes:
         cfg = node.config
-        if node.type in ("llm", "llm_tools", "reader"):
+        if node.type in SESSION_TYPES:
             profile_errors(node.id, str(cfg.get("profile", "default")))
         sub_target = cfg.get("flow")
         if (

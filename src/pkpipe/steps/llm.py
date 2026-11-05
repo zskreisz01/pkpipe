@@ -15,6 +15,7 @@ from typing import Any
 from pydantic import Field
 
 from pkpipe.domain.context_pack import strip_markers
+from pkpipe.domain.data_classes import is_private
 from pkpipe.security import query_guard
 from pkpipe.security.canary import canary_notice, run_canary
 from pkpipe.steps.base import (
@@ -31,8 +32,8 @@ from pkpipe.steps.base import (
 from pkpipe.steps.tool import call_tool, check_tool_allowed
 
 #: Step types that are one LLM session with an ``LlmConfig`` (every one needs an eval dataset, spec 013);
-#: ``reader`` is the secure-fetch Reader (spec 008).
-LLM_STEP_TYPES = ("llm", "llm_tools", "reader")
+#: ``reader`` is the secure-fetch Reader (spec 008), ``vision`` the image description session (spec 021).
+LLM_STEP_TYPES = ("llm", "llm_tools", "reader", "vision")
 
 
 class LlmConfig(StepConfig):
@@ -131,7 +132,10 @@ def complete(ctx: StepContext, config: LlmConfig, system: str, user: str, schema
     with ctx.ports.tracer.llm(config.profile) as span:
         span.set("pkpipe.model.profile", config.profile)
         reply = model.complete(system, user, schema, profile=config.profile)
-        ctx.ports.tracer.capture(system=system, user=user, response=_text(reply))
+        if not is_private(ctx.flow.data_classes):
+            # a session of a private flow (journal, context, image) never offers its content for capture,
+            # also when the flow runs as a subflow under one that has capture switched on (spec 021 SC-003)
+            ctx.ports.tracer.capture(system=system, user=user, response=_text(reply))
     return reply
 
 

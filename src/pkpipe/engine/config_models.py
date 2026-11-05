@@ -80,7 +80,7 @@ class McpServer(_Strict):
     egress: bool = Field(
         default=False,
         description="The server sends data off this machine (web search, fetch, hosted backends): flows that "
-        "handle journal data must not call it (spec 015 FR-002, constitution VII)",
+        "handle journal, context or image data must not call it (spec 015 FR-002, constitution VII)",
     )
 
     @model_validator(mode="after")

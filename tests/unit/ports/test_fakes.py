@@ -15,6 +15,7 @@ from tests.fakes import (
     FakeImageStore,
     FakeModel,
     FakeNotify,
+    FakePreparer,
     FakeSecurityLog,
     FakeSnapshots,
     FakeSystemProbe,
@@ -40,6 +41,7 @@ FAKES = {
     "SecurityLogPort": FakeSecurityLog(),
     "ContextStorePort": FakeContextStore(),
     "ImageStorePort": FakeImageStore(),
+    "ImagePreparePort": FakePreparer(),
     "SystemProbePort": FakeSystemProbe(),
     "SnapshotPort": FakeSnapshots(),
 }

@@ -7,6 +7,8 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
+from pkpipe.domain.data_classes import is_private
+
 _flow: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("fake_flow", default=None)
 _item: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("fake_item", default=None)
 
@@ -61,7 +63,14 @@ class RecordingTracer:
 
     @contextlib.contextmanager
     def flow(self, flow_id: str, *, trigger: str, config_version: str, data_classes: tuple[str, ...] = ()):
-        token = _flow.set({"flow_id": flow_id, "trigger": trigger, "config_version": config_version})
+        token = _flow.set(
+            {
+                "flow_id": flow_id,
+                "trigger": trigger,
+                "config_version": config_version,
+                "data_classes": data_classes,
+            }
+        )
         try:
             with self._record(RecordedSpan("flow", flow_id, self._ctx())) as span:
                 yield span
@@ -97,7 +106,7 @@ class RecordingTracer:
             yield span
 
     def capture(self, **content: str) -> bool:
-        if self.capture_enabled:
+        if self.capture_enabled and not is_private((_flow.get() or {}).get("data_classes")):
             self.captured.append(dict(content))
         return self.capture_enabled
 

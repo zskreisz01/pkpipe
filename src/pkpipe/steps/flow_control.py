@@ -99,6 +99,11 @@ class NotifyStep(StepExecutor):
 # -- subflow ------------------------------------------------------------------------------------------------
 class SubflowConfig(StepConfig):
     flow: str = Field(description="Flow id, or a ${ref} template such as ${item.subflow}")
+    item: dict[str, Any] | str | None = Field(
+        default=None,
+        description="Item of the subflow (spec 021): an object whose values may use ${ref} templates, or one "
+        "${ref} that names an object; default: the current item",
+    )
 
 
 @register_step
@@ -121,7 +126,10 @@ class SubflowStep(StepExecutor):
             raise StepError(f"subflow '{flow_id}' does not exist")
         if ctx.run_subflow is None:
             raise StepError("subflows are not available in this context")
-        final = ctx.run_subflow(flow_id, ctx.item)
+        given = ctx.render(config.item) if config.item is not None else ctx.item
+        if given is not None and not isinstance(given, dict):
+            raise StepError(f"subflow '{flow_id}': the item must be an object")
+        final = ctx.run_subflow(flow_id, given)
         item = final.get("item")
         return StepResult(
             output={"flow": flow_id, "outputs": final.get("outputs", {}), "item": item},

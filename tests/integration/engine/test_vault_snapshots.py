@@ -48,6 +48,8 @@ STRETCH = "Stretch for ten minutes every morning."
 WRITING_FLOWS = {
     "triage": "triage",
     "categorize_item": "triage",
+    "describe_images": "triage",  # spec 021: the image batch; a flagged image is quarantined
+    "describe_image_item": "triage",
     "handle_security_flag": "process_released",
     "process_released": "process_released",
     "process_item": "process_released",

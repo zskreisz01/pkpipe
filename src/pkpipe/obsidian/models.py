@@ -23,6 +23,7 @@ class ProcessingStatus(StrEnum):
 
 
 ROW_KINDS = ("note", "link", "image", "text_link", "text")
+TOPIC_CHARS = 200
 
 
 class TriageRow(BaseModel):
@@ -34,8 +35,11 @@ class TriageRow(BaseModel):
     state: ItemState = ItemState.SUGGESTED
     #: ``note`` or the entry kind of the list file (``link``, ``image``, ``text_link``, ``text``; spec 020)
     kind: str = "note"
-    #: The category is the owner's decision (an image entry: the model port has no image input yet, spec 021)
+    #: The category is the owner's decision: an image that could not be described or was flagged (spec 021)
     needs_owner: bool = False
+    #: One line about an image (spec 021): its topic, or why it was not described. The full description stays
+    #: in the app DB; the visible text of an image never lands in the vault.
+    topic: str = ""
 
     @field_validator("kind", mode="before")
     @classmethod
@@ -52,6 +56,13 @@ class TriageRow(BaseModel):
         if isinstance(v, str):
             return v.strip().lower() in ("yes", "true", "x", "[x]", "1")
         return v
+
+    @field_validator("topic", mode="before")
+    @classmethod
+    def _topic(cls, v: object) -> object:
+        if v is None:
+            return ""
+        return " ".join(v.split())[:TOPIC_CHARS] if isinstance(v, str) else v
 
     @field_validator("item_id", "resource", "ai_suggested_category")
     @classmethod
@@ -75,6 +86,7 @@ class TriageRow(BaseModel):
             "state": self.state.value,
             "kind": "" if self.kind == "note" else self.kind,
             "needs_owner": "yes" if self.needs_owner else "",
+            "topic": self.topic,
         }
 
     @classmethod
@@ -91,6 +103,7 @@ class TriageRow(BaseModel):
             state=cells["state"].strip().lower() or ItemState.SUGGESTED,
             kind=cells.get("kind", ""),
             needs_owner=cells.get("needs_owner", ""),
+            topic=cells.get("topic", ""),
         )
 
 

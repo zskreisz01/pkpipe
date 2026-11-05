@@ -1,10 +1,18 @@
 {
   "id": "triage",
-  "description": "20:00: read new INBOX items (one note per item, or the entries of the INBOX list file when the layout names one), suggest a category per item in an isolated session without tools (images are the owner's call), write the triage file and notify the owner.",
+  "description": "20:00: read new INBOX items (one note per item, or the entries of the INBOX list file when the layout names one), suggest a category per text item in an isolated session without tools, write the triage file, then describe the new image entries with the local vision model (phase two, bounded by the time budget, spec 021) and write their rows, and notify the owner.",
   "bpmn": "process-inbox-items",
-  "start": "list_inbox",
+  "start": "cycle",
   "max_parallel": 2,
   "nodes": [
+    {
+      "id": "cycle",
+      "type": "code",
+      "bpmn_element": "Read new INBOX items",
+      "config": {
+        "function": "triage.cycle_start"
+      }
+    },
     {
       "id": "list_inbox",
       "type": "tool",
@@ -93,6 +101,38 @@
       }
     },
     {
+      "id": "img_handoff",
+      "type": "code",
+      "bpmn_element": "Describe images",
+      "config": {
+        "function": "image.handoff",
+        "args": {
+          "images": "${select_new.image_items}",
+          "cycle_started": "${cycle.started}"
+        }
+      }
+    },
+    {
+      "id": "images",
+      "type": "subflow",
+      "bpmn_element": "Describe images",
+      "config": {
+        "flow": "describe_images",
+        "item": "${img_handoff.item}"
+      }
+    },
+    {
+      "id": "write_image_rows",
+      "type": "tool",
+      "bpmn_element": "Describe images",
+      "config": {
+        "tool": "obsidian:update_triage",
+        "arguments": {
+          "rows": "${images.outputs.finish.rows}"
+        }
+      }
+    },
+    {
       "id": "backlog",
       "type": "code",
       "bpmn_element": "Notify: triage ready",
@@ -121,6 +161,10 @@
     }
   ],
   "edges": [
+    {
+      "from": "cycle",
+      "to": "list_inbox"
+    },
     {
       "from": "list_inbox",
       "to": "read_triage"
@@ -164,11 +208,41 @@
     },
     {
       "from": "rows",
-      "to": "backlog",
+      "to": "img_handoff",
       "default": true
     },
     {
       "from": "write_triage",
+      "to": "img_handoff"
+    },
+    {
+      "from": "img_handoff",
+      "to": "images",
+      "when": {
+        "path": "img_handoff.count",
+        "gt": 0
+      }
+    },
+    {
+      "from": "img_handoff",
+      "to": "backlog",
+      "default": true
+    },
+    {
+      "from": "images",
+      "to": "write_image_rows",
+      "when": {
+        "path": "images.outputs.finish.count",
+        "gt": 0
+      }
+    },
+    {
+      "from": "images",
+      "to": "backlog",
+      "default": true
+    },
+    {
+      "from": "write_image_rows",
       "to": "backlog"
     },
     {

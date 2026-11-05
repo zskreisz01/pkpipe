@@ -51,6 +51,40 @@ class ImageInput:
         return f"ImageInput({self.media_type}, {len(self.data)} bytes)"
 
 
+class ImageError(Exception):
+    """An image cannot be prepared. ``code`` is stable: ``pillow_missing``, ``decode_failed``,
+    ``too_many_pixels``, ``empty``; the message never contains image content or a file name."""
+
+    def __init__(self, code: str, detail: str = ""):
+        self.code = code
+        super().__init__(f"{code}: {detail}" if detail else code)
+
+
+@dataclass(frozen=True)
+class PreparedImage:
+    """The JPEG a vision model gets. ``data`` is private content: never in ``repr``, logs or spans."""
+
+    data: bytes = field(repr=False)
+    sha256: str
+    width: int
+    height: int
+    source_format: str
+    source_bytes: int
+
+    def __repr__(self) -> str:
+        return f"PreparedImage({self.width}x{self.height}, {len(self.data)} bytes, sha256={self.sha256[:12]})"
+
+
+@runtime_checkable
+class ImagePreparePort(Protocol):
+    """Decodes an untrusted image and returns the metadata-free JPEG a vision model gets (spec 021 FR-005):
+    decoded under a pixel limit (a decompression bomb is refused from its header), EXIF orientation applied
+    and all metadata dropped, scaled so the longest side is at most ``max_side`` (never enlarged),
+    re-encoded; ``sha256`` is the digest of the prepared bytes. Raises :class:`ImageError`."""
+
+    def prepare(self, data: bytes, *, max_side: int, max_pixels: int) -> PreparedImage: ...
+
+
 @runtime_checkable
 class ModelPort(Protocol):
     """Structured completions. ``json_schema=None`` returns ``{"text": <reply>}``; otherwise the validated

@@ -19,11 +19,13 @@ from pkpipe.domain.triage import (
     release,
 )
 from pkpipe.steps.base import StepContext, StepResult, layout_of, register_code
+from pkpipe.steps.image_code import description_note
 
 #: Suggested category of a row whose triage output was flagged (not a category, so a released item is
 #: triaged again).
 FLAGGED_SUGGESTION = "none"
-#: Suggested category of a row that needs the owner (an image entry): not a category either.
+#: Suggested category of a row that needs the owner (an image that could not be described, or that was
+#: flagged): not a category either.
 NO_SUGGESTION = "none"
 
 
@@ -37,6 +39,13 @@ def _categories(ctx: StepContext) -> dict[str, dict[str, Any]]:
     return {c["id"]: c for c in ctx.snapshot.data.get("categories", []) if c.get("enabled", True)}
 
 
+@register_code("triage.cycle_start")
+def cycle_start(ctx: StepContext) -> dict[str, Any]:
+    """The start of the processing cycle on the clock port: the time budget of the image batch (spec 021)
+    counts from here, so the text phase has used its part of it."""
+    return {"started": ctx.ports.clock.now()}
+
+
 @register_code("item.set")
 def item_set(ctx: StepContext, **fields: Any) -> StepResult:
     """Set fields on the current item (for example ``state: quarantined``)."""
@@ -48,7 +57,8 @@ def parse_inbox_list(ctx: StepContext, note: dict[str, Any]) -> dict[str, Any]:
     """BPMN: Parse INBOX list. The entries of the list file as triage items (spec 020 FR-003, FR-004).
 
     One item per resource (the normalised URL, the embed target or the text); a duplicate adds its raw text
-    to the first item. Images are items too, but the owner decides their category (``needs_owner``).
+    to the first item. Images are items too: ``needs_owner`` marks them for ``inbox.select_new``, which sends
+    them to the image batch (spec 021), or to the owner when the config has no ``images`` section.
     """
     cfg = layout_of(ctx).inbox_list.to_config()
     entries = parse_list((note or {}).get("body", ""), cfg)
@@ -60,6 +70,13 @@ def parse_inbox_list(ctx: StepContext, note: dict[str, Any]) -> dict[str, Any]:
         items.append(d)
         by_kind[item.kind.value] = by_kind.get(item.kind.value, 0) + 1
     return {"items": items, "count": len(items), "entries": len(entries), "kinds": by_kind}
+
+
+def images_enabled(ctx: Any) -> bool:
+    """Whether the config has an ``images`` section (spec 021): images are described by a vision model.
+    Without it an image entry is the owner's call (spec 020)."""
+    data = getattr(getattr(ctx, "snapshot", None), "data", None) or {}
+    return data.get("images") is not None
 
 
 def _row_item(row: dict[str, Any], listed: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
@@ -84,7 +101,9 @@ def select_new(
     * list source: when the flow ran ``parse_list`` (the layout names an ``inbox_list_file``), the list
       entries are the items and the notes of the folder are ignored (``also_notes`` adds them).
 
-    ``owner_items`` are items whose category the owner decides (images): they get a row, no model call.
+    ``image_items`` are the new image entries, in list order (spec 021): the image batch describes them after
+    the text items. A config without an ``images`` section keeps spec 020's behaviour: ``owner_items`` are
+    images the owner categorizes, they get a row and no model call.
     """
     layout = layout_of(ctx)
     folder = folder or layout.inbox_dir
@@ -95,7 +114,9 @@ def select_new(
     parsed = resolve("parse_list", required=False) if resolve else None
     list_mode = isinstance(parsed, dict)
     listed = {i["id"]: i for i in parsed["items"]} if isinstance(parsed, dict) else {}
+    images_on = images_enabled(ctx)
     items: list[dict[str, Any]] = []
+    image_items: list[dict[str, Any]] = []
     owner_items: list[dict[str, Any]] = []
     seen: set[str] = set()
     if not list_mode or also_notes:
@@ -111,7 +132,10 @@ def select_new(
         if item["id"] in known or item["id"] in seen:
             continue
         seen.add(item["id"])
-        (owner_items if item["needs_owner"] else items).append(item)
+        if item["needs_owner"]:  # an image entry
+            (image_items if images_on else owner_items).append(item)
+        else:
+            items.append(item)
     # Re-triage: the suggested category was removed from the config while the item was still open.
     valid = frozenset(_categories(ctx))
     retriage = 0
@@ -130,12 +154,14 @@ def select_new(
             if item is None:
                 continue
             seen.add(r["item_id"])
-            items.append(item)
+            (image_items if images_on and r.get("kind") == "image" else items).append(item)
             retriage += 1
     return {
         "items": items,
+        "image_items": image_items,
         "owner_items": owner_items,
         "count": len(items),
+        "image_count": len(image_items),
         "retriage": retriage,
         "needs_owner": len(owner_items),
     }
@@ -222,6 +248,10 @@ def backlog(
     still wait for the owner: neither confirmed nor overridden, or decided on a category that is no longer
     configured (``invalid``: a removed category or an unknown override). Finished items do not count."""
     valid = frozenset(_categories(ctx))
+    images = ctx.resolve("images", required=False) if hasattr(ctx, "resolve") else None
+    finish = ((images or {}).get("outputs") or {}).get("finish") if isinstance(images, dict) else None
+    finish = finish if isinstance(finish, dict) else {}
+    new_rows = [*(new_rows or []), *(finish.get("rows") or [])]  # the rows of the image batch (spec 021)
     quarantined = {r["item_id"] for r in new_rows or [] if r.get("state") == ItemState.QUARANTINED.value}
     fresh = {r["item_id"] for r in new_rows or []} - quarantined
     older = invalid = 0
@@ -246,6 +276,10 @@ def backlog(
     owner_new = sum(1 for r in new_rows or [] if r.get("needs_owner") and r["item_id"] in fresh)
     if owner_new:
         message += f" {owner_new} image item(s) need a category from you (write it into override)."
+    report = finish.get("report") or {}
+    if report:
+        message += " " + str(finish.get("message") or "")
+    deferred = int(report.get("deferred") or 0)
     if older:
         message += f" {older} older item(s) still wait for your decision."
     if invalid:
@@ -266,7 +300,8 @@ def backlog(
         "message": message,
         # New suggestions or a decision that can never be released need the owner; an unchanged backlog of
         # unreviewed items alone does not send a mail every evening (it is in the 06:00 summary).
-        "notify": bool(new or invalid or quarantined),
+        "notify": bool(new or invalid or quarantined or deferred),
+        "images_deferred": deferred,
     }
 
 
@@ -382,6 +417,15 @@ def source_note(ctx: StepContext) -> dict[str, Any]:
     if isinstance(note, dict):
         return note
     item = ctx.item or {}
+    if isinstance(item.get("description"), dict):  # an image the vision session described (spec 021)
+        return {
+            "path": None,
+            "front_matter": {},
+            "front_matter_error": None,
+            "body": description_note(item["description"]),
+            "conflict": False,
+            "kind": "image",
+        }
     resource = str(item.get("resource", ""))
     title = str(item.get("title") or "")
     kind = item.get("kind") or "text"

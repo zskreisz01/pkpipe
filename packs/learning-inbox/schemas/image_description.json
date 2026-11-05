@@ -1,0 +1,61 @@
+{
+  "type": "object",
+  "required": [
+    "kind",
+    "topic",
+    "visible_text",
+    "urls",
+    "language",
+    "category_hint",
+    "injection_suspected",
+    "evidence"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "screenshot",
+        "photo",
+        "meme",
+        "diagram",
+        "document",
+        "other"
+      ]
+    },
+    "topic": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "visible_text": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "urls": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "language": {
+      "type": "string",
+      "maxLength": 20
+    },
+    "category_hint": {
+      "type": "string",
+      "maxLength": 60
+    },
+    "injection_suspected": {
+      "type": "boolean"
+    },
+    "evidence": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 1000
+    }
+  }
+}

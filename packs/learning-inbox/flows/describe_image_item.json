@@ -1,0 +1,197 @@
+{
+  "id": "describe_image_item",
+  "description": "One image entry (spec 021): read and prepare it (code), look it up in the description cache, otherwise describe it in a session without tools on the vision profile (datamarked prompt, run canary, JSON answer), check the answer with the output guard, validate it and apply the URL policy (code), then suggest a category from the description with the existing category session. A suspected injection or a guard flag quarantines only this image. A failure ends the flow: the batch records the image as failed and the owner decides its category.",
+  "bpmn": "describe-images",
+  "data_classes": [
+    "image"
+  ],
+  "start": "prepare",
+  "nodes": [
+    {
+      "id": "prepare",
+      "type": "code",
+      "bpmn_element": "Prepare, code",
+      "config": {
+        "function": "image.prepare",
+        "args": {
+          "session": "describe_image_item.describe"
+        }
+      }
+    },
+    {
+      "id": "describe",
+      "type": "vision",
+      "bpmn_element": "Describe",
+      "inputs": [],
+      "config": {
+        "system": "viewer",
+        "instruction": "images/describe.md",
+        "output_schema": "image_description",
+        "profile": "vision",
+        "canary": true,
+        "image": "prepare"
+      }
+    },
+    {
+      "id": "guard",
+      "type": "output_guard",
+      "bpmn_element": "Output guard + canary",
+      "config": {
+        "input": [
+          "describe"
+        ]
+      }
+    },
+    {
+      "id": "security_flag",
+      "type": "subflow",
+      "bpmn_element": "Handle security flag",
+      "config": {
+        "flow": "handle_security_flag"
+      }
+    },
+    {
+      "id": "finish",
+      "type": "code",
+      "bpmn_element": "Injection suspected / guard flag?",
+      "config": {
+        "function": "image.finish",
+        "args": {
+          "describe": "describe",
+          "prepare": "prepare"
+        }
+      }
+    },
+    {
+      "id": "read",
+      "type": "code",
+      "bpmn_element": "Pass the description to the category session",
+      "config": {
+        "function": "inbox.source_note"
+      }
+    },
+    {
+      "id": "menu",
+      "type": "code",
+      "bpmn_element": "Pass the description to the category session",
+      "config": {
+        "function": "triage.category_menu"
+      }
+    },
+    {
+      "id": "suggest",
+      "type": "llm",
+      "bpmn_element": "Pass the description to the category session",
+      "inputs": [
+        "menu.categories",
+        "read.body"
+      ],
+      "config": {
+        "system": "triage",
+        "instruction": "triage/categorize.md",
+        "output_schema": "triage_result",
+        "profile": "vision",
+        "canary": true
+      }
+    },
+    {
+      "id": "category_guard",
+      "type": "output_guard",
+      "bpmn_element": "Output guard",
+      "config": {
+        "input": [
+          "suggest"
+        ]
+      }
+    },
+    {
+      "id": "check",
+      "type": "code",
+      "bpmn_element": "Pass the description to the category session",
+      "config": {
+        "function": "triage.check_category",
+        "args": {
+          "suggestion": "${suggest}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "prepare",
+      "to": "END",
+      "when": {
+        "path": "prepare.ok",
+        "truthy": false
+      }
+    },
+    {
+      "from": "prepare",
+      "to": "finish",
+      "when": {
+        "path": "prepare.cached",
+        "truthy": true
+      }
+    },
+    {
+      "from": "prepare",
+      "to": "describe",
+      "default": true
+    },
+    {
+      "from": "describe",
+      "to": "guard"
+    },
+    {
+      "from": "guard",
+      "to": "security_flag",
+      "when": {
+        "path": "guard.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "guard",
+      "to": "finish",
+      "default": true
+    },
+    {
+      "from": "finish",
+      "to": "security_flag",
+      "when": {
+        "path": "finish.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "finish",
+      "to": "read",
+      "default": true
+    },
+    {
+      "from": "read",
+      "to": "menu"
+    },
+    {
+      "from": "menu",
+      "to": "suggest"
+    },
+    {
+      "from": "suggest",
+      "to": "category_guard"
+    },
+    {
+      "from": "category_guard",
+      "to": "security_flag",
+      "when": {
+        "path": "category_guard.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "category_guard",
+      "to": "check",
+      "default": true
+    }
+  ]
+}

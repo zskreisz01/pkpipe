@@ -40,8 +40,11 @@ def test_first_list_row_widens_header_and_rows_once(tmp_path):
     img = _row("IMG_1.jpg", ai_suggested_category="none", kind="image", needs_owner=True)
     lists.update_triage(p, [img])
     lines = p.read_text().splitlines()
-    assert "| confirm | item | resource | suggested | override | state | kind | needs_owner |" in lines
-    assert "| --- | --- | --- | --- | --- | --- | --- | --- |" in lines
+    # the optional columns (kind, needs_owner, and spec 021's topic) are added together, once
+    assert (
+        "| confirm | item | resource | suggested | override | state | kind | needs_owner | topic |" in lines
+    )
+    assert "| --- | --- | --- | --- | --- | --- | --- | --- | --- |" in lines
     rows = {r["item_id"]: r for r in lists.read_triage(p)["rows"]}
     assert rows["a1"]["confirm"] is True and rows["a1"]["kind"] == "note"  # the owner's tick survived
     assert rows[item_id_for("IMG_1.jpg")]["kind"] == "image" and rows[item_id_for("IMG_1.jpg")]["needs_owner"]
@@ -87,7 +90,9 @@ def test_a_new_row_cannot_claim_a_made_up_kind_marker(tmp_path):
     from pkpipe.obsidian.errors import InvalidRows
 
     p = tmp_path / "T.md"
-    with pytest.raises(InvalidRows, match="needs_owner is set exactly for image"):
-        lists.update_triage(p, [_row("IMG_2.jpg", kind="image", needs_owner=False)])
-    with pytest.raises(InvalidRows, match="needs_owner is set exactly for image"):
+    with pytest.raises(InvalidRows, match="needs_owner is set for image items only"):
         lists.update_triage(p, [_row("https://example.org/x", kind="link", needs_owner=True)])
+    # spec 021: a described image has a suggestion and no needs_owner
+    lists.update_triage(p, [_row("IMG_2.jpg", kind="image", needs_owner=False, topic="A synthetic page.")])
+    row = lists.read_triage(p)["rows"][0]
+    assert row["kind"] == "image" and row["needs_owner"] is False and row["topic"] == "A synthetic page."
