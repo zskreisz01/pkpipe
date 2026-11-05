@@ -21,7 +21,7 @@ def new_state(n=5, *, budget=600.0, seed=60.0, started=1000.0, uncached=None):
     )
 
 
-# -- the estimate ---------------------------------------------------------------------------------------------
+# -- the estimate --------------------------------------------------------------------------------------------
 
 
 def test_the_seed_is_the_median_of_the_recent_runs_else_the_default():
@@ -54,7 +54,7 @@ def test_a_cached_image_is_free_and_does_not_move_the_estimate():
 
 def test_it_stops_before_an_image_when_elapsed_plus_estimate_reaches_the_budget():
     s = new_state(n=10, budget=200, seed=60, started=0)
-    # elapsed 0 + 60 < 200: go; after 60 s of work elapsed 60 + 60 < 200: go; 120 + 60 < 200: go; 180 + 60 >= 200: stop
+    # 0 + 60 < 200: go; 60 + 60 < 200: go; 120 + 60 < 200: go; 180 + 60 >= 200: stop
     now = 0.0
     started = 0
     while True:
@@ -131,7 +131,7 @@ def test_the_estimate_message_before_the_batch():
     assert "7 image(s)" in msg and "7 min" in msg and "120 min" in msg
 
 
-# -- SC-004: the property over random durations ----------------------------------------------------------------
+# -- SC-004: the property over random durations --------------------------------------------------------------
 
 
 @pytest.mark.parametrize("seed", range(300))

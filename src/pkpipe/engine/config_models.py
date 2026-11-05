@@ -529,8 +529,8 @@ class ImagesConfig(_Strict):
     time_budget_s: int = Field(
         default=7200,
         gt=0,
-        description="The image batch of one cycle stops before an image whose expected end (elapsed + running "
-        "estimate) reaches this; the rest stays in the INBOX list untouched",
+        description="The image batch of one cycle stops before an image whose expected end (elapsed + "
+        "running estimate) reaches this; the rest stays in the INBOX list untouched",
     )
     estimate_s: float = Field(
         default=60.0, gt=0, description="Seconds per image before there is any measurement (first run)"
