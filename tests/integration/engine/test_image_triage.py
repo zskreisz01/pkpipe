@@ -2,10 +2,10 @@
 
 The vault is the synthetic list INBOX of spec 020 extended with image entries; the images are small synthetic
 byte strings (the fake preparer digests them as they are, so these tests need no Pillow; the Pillow
-adapter has its own tests). Covered: US1 (description, categories, cache, failure, time budget, per-image timeout), US2
-(injection, flagged image quarantined alone), SC-003 (no image byte or description text in spans, logs,
-notifications or the vault), SC-004 (budget stop with a fake clock, deferred images first next run) and SC-005
-(one model switch: text phase, then image phase).
+adapter has its own tests). Covered: US1 (description, categories, cache, failure, time budget, per-image
+timeout), US2 (injection, flagged image quarantined alone), SC-003 (no image byte or description text in
+spans, logs, notifications or the vault), SC-004 (budget stop with a fake clock, deferred images first next
+run) and SC-005 (one model switch: text phase, then image phase).
 """
 
 from __future__ import annotations
@@ -522,7 +522,8 @@ def test_the_flows_declare_the_image_data_class_and_the_pack_validates(world):
     assert "image" not in world.snap.flow("triage").data_classes
 
 
-# -- spec 019: the run that writes rows and quarantines an image can be restored --------------------------------
+# -- spec 019: the run that writes rows and quarantines an image can be restored
+# --------------------------------
 
 
 def test_a_triage_with_images_restores_byte_identical_and_never_snapshots_the_images(

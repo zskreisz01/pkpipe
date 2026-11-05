@@ -304,3 +304,20 @@ def test_a_text_request_keeps_its_key_after_the_images_change():
 
     assert request_key("s", "u", None, "p") == request_key("s", "u", None, "p", ())
     assert request_key("s", "u", None, "p", ["abc"]) != request_key("s", "u", None, "p")
+
+
+def test_an_image_with_a_ref_is_keyed_by_the_ref_not_by_its_bytes(tmp_path):
+    """A recipe-based identity: the same ref replays although another machine encodes other bytes."""
+    from pkpipe.evals.cassette import CassetteModel
+    from pkpipe.ports import ImageInput
+    from tests.fakes import FakeModel
+
+    path = tmp_path / "ref.json"
+    rec = CassetteModel(path, "record", inner=FakeModel([{"v": 1}]), identities={"vision": "http://x|m"})
+    assert rec.complete(
+        "s", "u", None, profile="vision", images=[ImageInput(b"bytes-a", ref="recipe-1")]
+    ) == {"v": 1}
+    rec.save()
+    play = CassetteModel(path, "replay", identities={"vision": "http://x|m"})
+    other_bytes = ImageInput(b"bytes-b-from-another-encoder", ref="recipe-1")
+    assert play.complete("s", "u", None, profile="vision", images=[other_bytes]) == {"v": 1}

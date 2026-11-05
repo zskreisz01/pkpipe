@@ -42,10 +42,19 @@ class ImageInput:
 
     data: bytes = field(repr=False)
     media_type: str = "image/jpeg"
+    #: A stable identity of the image for recordings (eval cassettes): the same rendering recipe gives the
+    #: same ``ref`` on every machine, while the encoded bytes can differ with the imaging library. ``None``:
+    #: the digest of the bytes is the identity.
+    ref: str | None = None
 
     @property
     def sha256(self) -> str:
         return hashlib.sha256(self.data).hexdigest()
+
+    @property
+    def key(self) -> str:
+        """What a cassette keys the image by: ``ref`` when given, else the digest of the bytes."""
+        return self.ref or self.sha256
 
     def __repr__(self) -> str:
         return f"ImageInput({self.media_type}, {len(self.data)} bytes)"

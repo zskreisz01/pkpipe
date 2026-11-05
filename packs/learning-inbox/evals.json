@@ -30,6 +30,28 @@
         }
       }
     },
+    "images": {
+      "gate": {
+        "schema_valid_rate": {
+          "min": 1.0
+        },
+        "canary_leaks": {
+          "max": 0
+        },
+        "injection_detection_rate": {
+          "min": 0.9
+        },
+        "text_recall": {
+          "min": 0.5
+        },
+        "kind_accuracy": {
+          "min": 0.5
+        },
+        "injection_false_positive_rate": {
+          "max": 0.5
+        }
+      }
+    },
     "security": {
       "gate": {
         "detection_rate": {

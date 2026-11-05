@@ -34,12 +34,17 @@ def evals_config(snapshot: ConfigSnapshot) -> EvalsConfig:
 
 
 def llm_profiles(snapshot: ConfigSnapshot) -> set[str]:
-    """Model profiles used by LLM steps (the models under test)."""
+    """Model profiles used by LLM steps (the models under test of the text suites). A vision profile
+    (``vision: true``, spec 021) is the subject of the ``images`` suite only: the text steps' judge may be
+    the same model (the validated pairing judges with gemma while gemma describes images)."""
+    models = snapshot.data.get("models") or {}
     used = set()
     for flow in snapshot.flows().values():
         for node in flow.nodes:
             if node.type in ("llm", "llm_tools"):
-                used.add(node.config.get("profile", "default"))
+                profile = node.config.get("profile", "default")
+                if not (models.get(profile) or {}).get("vision"):
+                    used.add(profile)
     return used
 
 
@@ -142,7 +147,12 @@ class EvalRunner:
         )
         return self.classifier_cassette, None
 
-    def judge_for(self, model: ModelPort | None) -> tuple[Judge | None, str | None]:
+    def judge_for(
+        self, model: ModelPort | None, subjects: set[str] | None = None
+    ) -> tuple[Judge | None, str | None]:
+        """The judge of a suite. ``subjects`` are the profiles under test (default: the profiles of the LLM
+        steps); a suite whose subject is another profile (the vision profile of the ``images`` suite) names
+        it, so the judge is never the model under test."""
         profile = self.config.judge_profile
         if model is None:
             return None, "no model"
@@ -151,9 +161,10 @@ class EvalRunner:
         identity = self.identities.get(profile)
         if identity is None:
             return None, f"judge profile '{profile}' cannot be resolved (environment)"
-        subjects = [self.identities[p] for p in llm_profiles(self.snapshot) if p in self.identities]
+        under_test = llm_profiles(self.snapshot) if subjects is None else subjects
+        identities = [self.identities[p] for p in under_test if p in self.identities]
         try:
-            return Judge(model, profile, identity=identity, subject_identities=subjects), None
+            return Judge(model, profile, identity=identity, subject_identities=identities), None
         except JudgeUnavailable as exc:
             return None, str(exc)
 
@@ -202,7 +213,8 @@ class EvalRunner:
             span.set_attribute(attrs.EVAL_LEVEL, int(suite.level))
             span.set_attribute(attrs.CONFIG_VERSION, self.snapshot.version)
             model = self.model_for(name) if (suite.uses_model or suite.uses_judge) else None
-            judge, judge_error = self.judge_for(model) if suite.uses_judge else (None, None)
+            subjects = suite.subject_profiles(self.snapshot) if hasattr(suite, "subject_profiles") else None
+            judge, judge_error = self.judge_for(model, subjects) if suite.uses_judge else (None, None)
             options = dict(self.options)
             if getattr(suite, "uses_classifier", False):
                 options["classifier"], note = self.classifier_for()

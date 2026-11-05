@@ -176,7 +176,7 @@ class CassetteModel:
         profile: str = "default",
         images: Sequence[ImageInput] | None = None,
     ) -> dict[str, Any]:
-        image_digests = [i.sha256 for i in images or ()]
+        image_digests = [i.key for i in images or ()]
         digest = request_key(system, user, json_schema, profile, image_digests)
         model = self.model_for(profile)
         key = cassette_key(digest, model)
