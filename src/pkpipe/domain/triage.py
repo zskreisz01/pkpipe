@@ -92,7 +92,8 @@ def needs_retriage(
 
     An item the owner already confirmed is never re-suggested: the confirm tick belongs to the old suggestion
     and would otherwise release a category the owner never saw (constitution VI). See :func:`needs_decision`.
-    An item that ``needs_owner`` (an image: no image input in the model port yet, spec 021) has no suggestion to redo.
+    An item that ``needs_owner`` (an image: no image input in the model port yet, spec 021) has no
+    suggestion to redo.
     """
     if state not in (ItemState.SUGGESTED, ItemState.PENDING) or confirm or override or needs_owner:
         return False
