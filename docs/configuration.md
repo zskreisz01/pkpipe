@@ -19,11 +19,12 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 
 | File | Describes |
 | --- | --- |
-| `models.json` | Model profiles: endpoint, model, temperature, context, fallback (`default`, `judge`) |
-| `mcp_servers.json` | MCP registration: transport, URL, allowed tools, backend, `egress` (the server sends data off this machine: web search, fetch, hosted backends; flows that handle journal data must not call it); for `learning` also `options` ([learning gateway](#learning-gateway)) |
+| `models.json` | Model profiles: endpoint, model, temperature, context, fallback, `vision` (`default`, `judge`, `vision`) |
+| `mcp_servers.json` | MCP registration: transport, URL, allowed tools, backend, `egress` (the server sends data off this machine: web search, fetch, hosted backends; flows that handle journal, context or image data must not call it); for `learning` also `options` ([learning gateway](#learning-gateway)) |
 | `channels.json` | Notification channels and routing per event type |
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
+| `images.json` | Image input: the time budget of the image batch, the per-image estimate and timeout, scaling and size limits ([Image input](#image-input)) |
 | `layout.json` | The vault layout: every folder and file the flows and steps name ([Vault layout](#vault-layout)) |
 | `snapshots.json` | Retention of the vault snapshots taken before writing runs: `retention_days` (14), `max_bytes` (1 GiB), `max_file_bytes` (5 MiB; a larger note is manifest-only) ([operations](operations.md#vault-snapshots-and-restore)) |
 | `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir ([Secure fetch](#secure-fetch)) |
@@ -53,7 +54,7 @@ Spec 020. Every folder or file of the vault that pkpipe names comes from one `la
 | `tool_candidates_file`, `improvement_file` | System tool candidates, improvement backlog | `2-Areas/System/System-Tool-Candidates.md`, `2-Areas/Self-Improvement/Improvement-Backlog.md` |
 | `quarantine_dir` | Quarantine folder (the single source: `security.json` `quarantine_dir` is deprecated and must equal it when still present) | `0-INBOX/_quarantine` |
 | `journal_pattern` | Journal day note; placeholders `{yyyy}`, `{MM}`, `{dd}`, `{yyyy-MM-dd}` | `2-Areas/Journal/{yyyy-MM-dd}.md` |
-| `attachments_dir` | Embedded images of list entries | `0-INBOX/attachments` |
+| `attachments_dir` | Embedded images of list entries. **Read only**: only the vault tool `read_image` reads it (its own allowlist entry); it is no write destination and no snapshot root | `0-INBOX/attachments` |
 | `projects_dir`, `areas_dir`, `resources_dir` | The PARA folders (project notes for the context refresh) | `1-Projects`, `2-Areas`, `3-Resources` |
 | `inbox_list` | How the list file is read: `bullet_markers`, `header_end` (regex of the line that ends the header), `strip_params` (tracking parameters, `*` wildcard), `comments_ignored` | `["-", "*"]`, `^---\s*$`, `utm_*`, `fbclid`, `gclid`, `igshid`, `mc_*`, `true` |
 
@@ -78,7 +79,7 @@ The category's PARA folder is `para_path` in `categories.json`. The pack writes 
 
 ### The INBOX list file
 
-With `inbox_list_file` set, triage reads that file instead of the notes of `inbox_dir`: the front matter, title and intro up to the `header_end` line are the header, and every bullet entry below is an item. A line that is not a bullet and not blank continues the entry above (so a title with its URL on the next line is one entry); `<!-- comments -->` are never entries. Kinds: `link`, `image` (`![[name.jpg]]`), `text_link` (title plus URL) and `text`. The item is identified by its normalised resource (the URL without tracking parameters, the embed target or the text), so the same link twice is one item. A row of the triage file gets the columns `kind` and `needs_owner`; they appear in a file the first time a list item needs them. Image entries are described by a local vision model (spec 021, below); an image that cannot be described has the suggestion `none` and `needs_owner`, and its category is your override.
+With `inbox_list_file` set, triage reads that file instead of the notes of `inbox_dir`: the front matter, title and intro up to the `header_end` line are the header, and every bullet entry below is an item. A line that is not a bullet and not blank continues the entry above (so a title with its URL on the next line is one entry); `<!-- comments -->` are never entries. Kinds: `link`, `image` (`![[name.jpg]]`), `text_link` (title plus URL) and `text`. The item is identified by its normalised resource (the URL without tracking parameters, the embed target or the text), so the same link twice is one item. A row of the triage file gets the columns `kind`, `needs_owner` and `topic`; they appear (together) in a file the first time a list item needs them. Image entries are described by a local vision model ([Image input](#image-input)): the row has the suggestion of the category session, `kind` `image` and the one-line `topic` of the description. `needs_owner` is set only for an image that failed (unreadable, invalid description, timeout) or was flagged as an injection (state `quarantined`); then the suggestion is `none`, `topic` names the reason code for a failed image (never the content of a flagged one), and the category is your override. An image that the time budget deferred has no row at all and stays in the list.
 
 After an item is processed, its entries (duplicates included) are removed from the list file by the vault tool `inbox_remove_entries` and appended to the dated archive file; entries are matched by their text, never by line number, and every other byte of the list stays. Quarantined and failed items stay in the list.
 
@@ -144,7 +145,7 @@ The `webfetch` entry of `mcp_servers.json` points at the web-fetch MCP server (`
 
 ## Model profiles
 
-Steps name a profile (`default`, `judge`), never an endpoint. The `judge` profile is used only by the eval judge and must be a different model than the one under test (spec 013): the public pack uses `env:PKPIPE_JUDGE_MODEL|google/gemma-4-12b` on `env:PKPIPE_JUDGE_BASE_URL|env:PKPIPE_MODEL_BASE_URL|...`, and `pkpipe validate` rejects an `evals.json` `judge_profile` that an LLM step uses. `models.json` maps profile names to settings:
+Steps name a profile (`default`, `judge`, `vision`), never an endpoint. The `judge` profile is used only by the eval judge and must be a different model than the one under test (spec 013): the public pack uses `env:PKPIPE_JUDGE_MODEL|google/gemma-4-12b` on `env:PKPIPE_JUDGE_BASE_URL|env:PKPIPE_MODEL_BASE_URL|...`, and `pkpipe validate` rejects an `evals.json` `judge_profile` that an LLM step uses. `models.json` maps profile names to settings:
 
 | Field | Meaning | Default |
 | --- | --- | --- |
@@ -159,10 +160,34 @@ Steps name a profile (`default`, `judge`), never an endpoint. The `judge` profil
 | `retry_backoff_s` | Wait before the first retry, doubled for each next one | 2 |
 | `api_key` | Optional bearer token, may be `env:NAME` | none |
 | `fallback` | Another profile used when the endpoint is down (connection, timeout, 5xx); recorded as a `model.fallback` span event. Cycles are rejected | none |
+| `vision` | The model reads images (spec 021). Only a profile with `vision: true` receives images; any other profile (a fallback included) refuses them with `ImagesNotSupported` and nothing is sent. The `vision` session needs it, a `max_tokens` and a loopback endpoint | `false` |
 
 `env:NAME` reads an environment variable and fails with a clear error when unset; `env:NAME|other` falls back to `other` (another `env:` reference or a literal). The public pack uses `env:PKPIPE_MODEL_BASE_URL|http://127.0.0.1:1234/v1` and `env:PKPIPE_MODEL_NAME|qwen3.5-9b-mlx`, so LM Studio works out of the box and Ollama is a `models.json` or environment change only.
 
 With a JSON schema the adapter sends `response_format: json_schema`, strips `<think>` blocks (and anything before a lone `</think>`), extracts the first JSON object and validates it locally. When `content` is empty (Qwen on LM Studio puts schema-constrained answers into `reasoning_content`), the reasoning is used only if it is exactly one JSON object; reasoning prose is never mined for drafts. Output cut by `max_tokens` is an error in both JSON and text mode. Every call emits a span (`llm.model_name`, token counts, latency).
+
+## Image input
+
+An image entry of the INBOX list (`![[name.jpg]]`) is described by a local vision model, in a second phase after the text items ([Describe Images](process/describe-images.md), spec 021). `images.json` (`ImagesConfig`) holds the numbers:
+
+| Field | Meaning | Default |
+| --- | --- | --- |
+| `time_budget_s` | The image batch stops before an image whose expected end (`elapsed + running estimate`) reaches this; `elapsed` runs from the start of the cycle, so the text phase has used its part. That image and the rest stay in the INBOX list untouched (no triage row, no removal) and come first in the next run | 7200 |
+| `estimate_s` | Seconds per image on a first run; later the seed is the median of the last 50 durations of the model (timing table of the app DB), and after every image the mean of this run's model calls | 60 |
+| `per_image_timeout_s` | Hard limit for the description of one image (all attempts); the image fails alone and goes to you (`needs_owner`), the batch goes on | 300 |
+| `max_side` | Longest side in pixels after scaling (never enlarged) | 1024 |
+| `max_tokens` | Upper limit of an answer: `pkpipe validate` refuses a vision profile whose `max_tokens` is larger or missing | 1200 |
+| `max_bytes` | Largest image file that is read (the vault tool has its own limit, 10 MiB) | 10485760 |
+| `retries` | Repeated description attempts after an invalid answer, then `needs_owner` | 1 |
+| `max_pixels` | Decoded pixel limit, checked from the image header before any pixel is decoded (decompression bomb guard) | 40000000 |
+
+The pack's `vision` profile is `env:PKPIPE_VISION_MODEL|google/gemma-4-12b` on the same base URL chain as `default`, `vision: true`, temperature 0, `max_tokens` 1200, `timeout_s` 300, `retries` 1 and `schema_retries` 0 (the step's own retry is the one retry; keep `timeout_s` at or below `per_image_timeout_s`). The text steps stay on `qwen3.5-9b-mlx` (research in the spec: `gemma-4-12b` is not usable for the text steps).
+
+**Data class `image`.** The flows that handle images (`describe_images`, `describe_image_item`, and `handle_security_flag` below them) declare it: validation and every run refuse a model profile (or fallback, or environment value) that is not on a loopback address, any `egress` tool, any session with tools, a subflow that is not an image flow, and a code function `image.*` or a `vision` session in a flow without the class. Their sessions never offer content for trace capture, also when the flow runs as a subflow under one that has capture on. The triage flow itself does not declare the class (its text items may use other models); it only hands the new image entries to `describe_images`.
+
+**Steps.** `vision` is a session with no tools, no context pack, a Reader-style system prompt (`prompts/system/viewer.md`), the instruction `instructions/images/describe.md`, the schema `schemas/image_description.json` (`kind`, `topic`, `visible_text` at most 400 characters, `urls`, `language`, `category_hint`, `injection_suspected`, `evidence`; no confidence field), a run canary and an `output_guard` behind it. The code functions `image.plan`, `image.next`, `image.prepare`, `image.finish`, `image.record` and `image.finish_batch` read the image (`read_image`), prepare it (decode with a pixel limit, EXIF and every other metadata removed, scaled to `max_side`, re-encoded as JPEG, sha256 of the prepared bytes), look it up in the description cache (key: hash, model, prompt version: a digest of the system prompt, instruction and schema), apply the URL policy to the `urls` of a description (scheme, credentials, private names and the deny-list, without a DNS lookup; only a deny-listed domain is a security flag) and keep the time guard.
+
+**Optional dependency.** Pillow is the optional extra `images` (`uv sync --extra images`); the dev group includes it, so CI runs the image tests. Without it an image fails with the reason `pillow_missing` (the owner decides its category) and the `images` eval suite skips.
 
 ## System preflight
 

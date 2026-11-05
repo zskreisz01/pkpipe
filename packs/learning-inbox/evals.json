@@ -41,14 +41,17 @@
         "injection_detection_rate": {
           "min": 0.9
         },
+        "injection_false_positive_rate": {
+          "max": 0.1
+        },
         "text_recall": {
-          "min": 0.5
+          "min": 0.8
         },
         "kind_accuracy": {
-          "min": 0.5
+          "min": 0.8
         },
-        "injection_false_positive_rate": {
-          "max": 0.5
+        "url_found_rate": {
+          "min": 0.5
         }
       }
     },

@@ -201,13 +201,23 @@ class EvalRunner:
         except JudgeUnavailable as exc:
             return None, str(exc)
 
+    def _subjects(self, names: list[str]) -> set[str]:
+        """The profiles under test of this run: those of the LLM steps, and the subject of a suite that has
+        another one (the vision profile of the ``images`` suite)."""
+        out = set(llm_profiles(self.snapshot))
+        for name in names:
+            suite = SUITES[name]
+            if hasattr(suite, "subject_profiles"):
+                out |= set(suite.subject_profiles(self.snapshot))
+        return out
+
     # -- running ---------------------------------------------------------------------------------------------
     def run(self, names: list[str], *, run_id: str | None = None) -> EvalRun:
         run = EvalRun(
             run_id=run_id or str(uuid.uuid4()),
             config_version=self.snapshot.version,
             mode=self.mode,
-            model=",".join(sorted({self.identities.get(p, p) for p in llm_profiles(self.snapshot)})) or None,
+            model=",".join(sorted({self.identities.get(p, p) for p in self._subjects(names)})) or None,
             judge=self.identities.get(self.config.judge_profile),
         )
         tracer = telemetry.get_telemetry().tracer

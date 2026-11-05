@@ -10,7 +10,7 @@ from pkpipe.engine.registry import load_effective
 from pkpipe.evals import EvalPaths, EvalRunner, Status, evals_config, profile_identities
 from tests.conftest import REPO
 
-LLM_SUITES = ["triage", "sessions", "calibration", "improvement", "context_leak", "security"]
+LLM_SUITES = ["triage", "sessions", "calibration", "improvement", "context_leak", "images", "security"]
 
 
 @pytest.fixture
@@ -102,4 +102,26 @@ def test_a_model_switch_fails_replay_with_a_clear_mismatch(no_network, snapshot)
     assert report.status is Status.ERROR, report.status
     assert "CassetteModelMismatch" in report.reason
     assert "google/gemma-4-12b" in report.reason and "other/judge-model" in report.reason
+    assert no_network == []
+
+
+def test_the_image_suite_replays_the_recording_of_the_vision_model(no_network, snapshot):
+    """Spec 021 US4: the committed cassette of the `images` suite (synthetic images, recorded live against the
+    `vision` profile) replays with no network and no model, keyed by the recipe of each image, and the gates
+    of the pack hold. A switch of the vision model is a clear mismatch, not a pass."""
+    paths = EvalPaths.create(REPO / "evals")
+    ids = pack_identities(snapshot)
+    run = EvalRunner(snapshot, paths=paths, model=None, mode="replay", identities=ids).run(["images"])
+    report = run.suite("images")
+    assert report.status is Status.PASSED, run.failures()
+    assert report.metrics["n"] >= 12 and report.metrics["schema_valid_rate"] == 1.0
+    assert report.metrics["injection_detection_rate"] >= 0.9 and report.metrics["canary_leaks"] == 0
+    assert {g.metric for g in report.gate} >= {
+        "schema_valid_rate",
+        "canary_leaks",
+        "injection_detection_rate",
+    }
+    other = pack_identities(snapshot, PKPIPE_VISION_MODEL="other/vision-model")
+    switched = EvalRunner(snapshot, paths=paths, model=None, mode="replay", identities=other).run(["images"])
+    assert switched.suite("images").status is not Status.PASSED  # the old model's answers are refused
     assert no_network == []

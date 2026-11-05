@@ -53,10 +53,11 @@ GATED_SUITES = (
     "calibration",
     "improvement",
     "context_leak",
+    "images",
     "flows",
     "security",
 )
-LLM_SUITES = ("triage", "sessions", "improvement", "context_leak")
+LLM_SUITES = ("triage", "sessions", "improvement", "context_leak", "images")
 
 
 @dataclass
