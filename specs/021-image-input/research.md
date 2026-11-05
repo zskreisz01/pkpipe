@@ -1,7 +1,7 @@
 ---
 spec_id: 021-image-input
 title: Image input for the model port and the image description session
-status: Active
+status: Completed
 description: Which local model describes INBOX images, whether gemma-4-12b can be the default model for every step, which judge to use, and how long the image batch takes. Measured 2026-11-05 on the Mac Mini (M4, 32 GB, LM Studio).
 updated: 2026-11-05
 ---

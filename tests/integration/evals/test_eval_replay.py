@@ -8,9 +8,13 @@ import pytest
 
 from pkpipe.engine.registry import load_effective
 from pkpipe.evals import EvalPaths, EvalRunner, Status, evals_config, profile_identities
+from pkpipe.evals.synthetic_images import pillow_available
 from tests.conftest import REPO
 
-LLM_SUITES = ["triage", "sessions", "calibration", "improvement", "context_leak", "images", "security"]
+LLM_SUITES = ["triage", "sessions", "calibration", "improvement", "context_leak", "security"]
+#: the ``images`` suite draws its images with Pillow (optional extra, spec 021): without it the suite skips
+if pillow_available():
+    LLM_SUITES.insert(-1, "images")
 
 
 @pytest.fixture
@@ -105,6 +109,7 @@ def test_a_model_switch_fails_replay_with_a_clear_mismatch(no_network, snapshot)
     assert no_network == []
 
 
+@pytest.mark.skipif(not pillow_available(), reason="optional extra 'images' (Pillow) missing")
 def test_the_image_suite_replays_the_recording_of_the_vision_model(no_network, snapshot):
     """Spec 021 US4: the committed cassette of the `images` suite (synthetic images, recorded live against the
     `vision` profile) replays with no network and no model, keyed by the recipe of each image, and the gates

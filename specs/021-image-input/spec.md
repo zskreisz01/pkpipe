@@ -1,8 +1,8 @@
 ---
 spec_id: 021-image-input
 title: Image input for the model port and the image description session
-status: Active
-status_reason: Gate 1 closed 2026-11-05 (owner: go ahead with the defaults); implementation under way
+status: Completed
+status_reason: Implemented 2026-11-05 on branch spec/021-image-input (T001-T015); the non-live suite, ruff and mypy are green, the images suite was recorded live on gemma-4-12b (cassette in CI), the live probe on synthetic images passed (12 of 12)
 description: The model port accepts images, the vault server can read an embedded image, and a tool-less local vision session turns an image INBOX entry into a validated description that the triage categorizes like any other item.
 relevant_when:
   - image
@@ -30,7 +30,7 @@ updated: 2026-11-05
 
 **Feature Branch**: `spec/021-image-input`
 **Created**: 2026-11-05
-**Status**: Active
+**Status**: Completed
 **Input**: Owner: image processing is an important element. Real INBOX: about half of the entries are `![[…jpg]]` (screenshots of posts and project pages, shared images). Spec 020 lists them as items that the owner must categorize; the model could read them.
 **Companions**: [data-model.md](data-model.md) · [research.md](research.md) (probe, two eval runs, decision)
 
@@ -56,6 +56,7 @@ updated: 2026-11-05
    - The run reports processed, cached, failed and deferred counts and the final estimate error. Text items are processed first; the images get the time that is left of the cycle budget.
 8. **Owner points agreed (2026-11-05):** model port extension, image reading, security, data protection.
 9. **Model silo and judge.** *Decided 2026-11-05 (owner: go ahead with these defaults).* A production run works in two phases, each with one model, and the model is switched once between them, never interleaved: first the text items on `qwen3.5-9b-mlx`, then the images on `gemma-4-12b` (after the text phase the text model may be unloaded to make room; the images need no text model, and the text phase needs no vision model). The judge is used only by the eval suites and the publish gate, never by a production run, so it does not compete for memory at night. The image eval does not need a vision judge: the synthetic images are rendered by code, so the truth (text, URL, kind) is known and the checks are code (verbatim overlap, JSON schema, injection flag); a text judge only rates the free-text `topic` against the known truth. The judge must not be the subject (and not its family): for the image eval it is `qwen3.5-9b-mlx` (reasoning is slow, which does not matter offline: `max_tokens` 8192 and a 600 s timeout in the eval overlay). The 2026-11-05 run shows that this judge is stricter and misreads a rubric that another judge reads correctly, so it only rates `topic` against the known truth, behind the code checks, and the 20-item manual calibration decides before it gates anything. Vision judges from the literature (Prometheus-Vision, LLaVA-Critic) are older and were tuned for chart and caption tasks; they are not needed here and are not planned.
+10. **Status: Completed (2026-11-05).** Gate 2: T001 to T015 done; the non-live suite, ruff and mypy are green; the `images` suite was recorded live on `gemma-4-12b` (13 synthetic images: schema 13/13, text recall 1.00, injection detection 2/2, false positives 0/11, canary leaks 0) and its cassette replays in CI; the live test on synthetic images passed (12 of 12 valid, 153 s); BPMN unchanged (the implementation did not force a change; the count step also reads and prepares the images, see the implementation notes at the end). Open for the owner: the 20-item calibration of the topic judge, and tightening the `images` gates after a second live run.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -118,3 +119,18 @@ updated: 2026-11-05
 - **SC-003**: no image byte, EXIF field or description text appears in any trace, log or notification (test)
 - **SC-004**: with a fake clock and scripted image durations the batch never starts an image whose expected end reaches the budget, defers exactly the rest, and the next run starts with the deferred images (property test over random durations)
 - **SC-005**: a production run never interleaves two models: the text phase uses one profile for all its steps, the image phase uses the vision profile, and the run switches once between the phases (test with a fake model recording the order of profiles)
+
+## Implementation notes (2026-11-05)
+
+Decisions the spec left open, taken while implementing (all reversible by configuration or a one-line change):
+
+- **Where Pillow lives.** The core may not import it, so image preparation is the port `ImagePreparePort` (adapter `pkpipe.adapters.image_pillow`, optional extra `images`, in the dev group so CI runs the tests); the cache and the timing table are `ImageStorePort` (implemented by `AppStore`). Both are in `StepPorts.extra` (`image_preparer`, `image_store`).
+- **Steps and flows.** The guard of FR-014 is the pure module `pkpipe.domain.image_batch`; the code functions `image.plan` (count and estimate), `image.budget` (the decision before every image), `image.record` (update estimate, timing table) and `image.finish_batch` (report, rows) wrap it. The loop is the flow `describe_images` (a cycle in the flow graph, state in the item), one image is the flow `describe_image_item`; the session is the new step type `vision` (node `describe`). `triage` calls `describe_images` through the subflow step, which therefore got an optional `item`.
+- **Prepare before the loop.** `image.plan` reads and prepares every image once, because the cache key is the hash of the prepared bytes and the start estimate must know which images are free. The drawn loop (read, prepare) finds the prepared image in an in-memory buffer; a restart finds it empty and reads again. The BPMN is unchanged.
+- **Budget clock.** `elapsed` runs from the start of the cycle (`triage.cycle_start`), so the text phase counts against `images.time_budget_s` ("the images get the time that is left of the cycle"). The guard applies to every image, cached ones included (literal reading of the rule; a cached image costs no model time and does not change the estimate). A failed or timed-out model call counts its seconds.
+- **Retry.** The vision profile has `schema_retries: 0` and `retries: 1` (transient failures); the step's `images.retries` (1) is the single repeat after an invalid answer, and the per-image timeout covers all attempts. A timed-out request keeps running in the server until its own timeout, so the profile's `timeout_s` should not exceed `per_image_timeout_s`.
+- **Category session on the vision profile.** The category session of an image runs in the image phase on the `vision` profile (same prompt, schema and instruction as the triage session), so the text model is not switched back in. The triage eval measured `gemma-4-12b` at accuracy 0.957 to 0.967 (research R-2). The `suggest` node of `describe_image_item` is covered by the triage dataset in the publish gate.
+- **Flags.** A suspected injection is the flag `viewer` (`injection_suspected`), a deny-listed URL `url_filter`; any other refused URL in an image (a screenshot of `http://localhost:3000`, an `ftp` address) is only dropped from `urls`, not a reason to quarantine. URLs are checked without a DNS lookup (nothing fetches them here; a fetch resolves them again). `category_hint` is stored, never passed on and never used.
+- **Rows.** `needs_owner` is set for a failed image (reason code in `topic`, for example `not described (not_found)`) and for a flagged one (state `quarantined`, empty `topic`); a described image has a suggestion and `topic`. A config without an `images` section keeps spec 020's behaviour (image entries are the owner's call). The triage file widens with `kind`, `needs_owner` and `topic` together.
+- **No capture in nested flows.** Content capture is decided per run by the top flow; a session of a flow with a private data class (`journal`, `context`, `image`) never offers its content for capture, also as a subflow under a flow that has capture on (`pkpipe.domain.data_classes`).
+- **Eval.** The suite `images` measures the first answer (no retry), is keyed in its cassette by the recipe of each image (`ImageInput.ref`, `GENERATOR_VERSION`), skips when Pillow is missing or a replay has no recording, and treats the vision profile as its subject: `llm_profiles` leaves `vision` profiles out, so the judge of the text suites may still be gemma. `pkpipe eval --judge off|only` records the subject first and judges from the recording (T011a). Gates follow one live run on 13 images and are to be tightened after a second one (docs/evaluation.md). **Not done:** the owner's 20-item calibration of the topic judge (needs the owner's scores); until then `judge_mean` is reported, never gated.

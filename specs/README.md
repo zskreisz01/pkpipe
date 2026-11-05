@@ -26,7 +26,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [018-discord-bot-channel](018-discord-bot-channel/spec.md) | Discord bot notification channel | Completed |  |
 | [019-vault-snapshots](019-vault-snapshots/spec.md) | Vault snapshots and restore | Completed | data-model |
 | [020-vault-layout-and-inbox-list](020-vault-layout-and-inbox-list/spec.md) | Configurable vault layout and list-style INBOX | Completed | data-model |
-| [021-image-input](021-image-input/spec.md) | Image input and the image description session | Active | research · data-model |
+| [021-image-input](021-image-input/spec.md) | Image input and the image description session | Completed | research · data-model |
 
 ## Implementation order
 

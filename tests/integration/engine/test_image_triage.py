@@ -532,3 +532,20 @@ def test_a_url_on_the_deny_list_in_an_image_is_a_security_flag(vault, pack_dir, 
     w.run()
     assert w.rows[rid("post.jpg")]["state"] == "quarantined"
     assert {"url_filter", "viewer"} & {f["detector"] for f in w.tracer.flags}
+
+
+def test_a_restart_between_prepare_and_describe_prepares_the_image_again(vault, pack_dir, overlay):
+    """The prepared images live in memory only: a resumed run finds the buffer empty and reads again."""
+    from pkpipe.domain.images import ImageBuffer
+
+    class Forgetful(ImageBuffer):
+        def get(self, key):
+            return None
+
+        def put(self, key, image):
+            pass
+
+    w = World(vault, pack_dir, overlay)
+    w.ports.extra["image_buffer"] = Forgetful()
+    w.run()
+    assert w.rows[rid("proj-page.png")]["needs_owner"] is False and w.rows[rid("proj-page.png")]["topic"]

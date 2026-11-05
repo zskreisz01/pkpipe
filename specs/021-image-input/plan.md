@@ -1,6 +1,6 @@
 ---
 spec_id: 021-image-input
-status: Active
+status: Completed
 description: Plan for image input and the image description session
 updated: 2026-11-05
 ---

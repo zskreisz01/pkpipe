@@ -555,10 +555,14 @@ class VisionStep(StepExecutor):
 
     def run(self, node, config: VisionConfig, ctx: StepContext) -> StepResult:
         cfg = images_config(ctx)
-        prep = ctx.resolve(config.image)
-        prepared = image_buffer(ctx).get(str((prep or {}).get("key")))
-        if prepared is None or prepared.sha256 != (prep or {}).get("sha256"):
-            raise StepError("the prepared image is not available (the process restarted?)")
+        prep = ctx.resolve(config.image) or {}
+        prepared = image_buffer(ctx).get(str(prep.get("key")))
+        if prepared is None:  # the process restarted after ``prepare``: read and prepare the image again
+            prepared, failure = load_prepared(ctx, cfg, ctx.item or {})
+            if prepared is None:
+                raise StepError(f"the image cannot be prepared again: {failure}")
+        if prepared.sha256 != prep.get("sha256"):
+            raise StepError("the image changed since it was prepared")
         system, user, schema = build_prompt(config, ctx)
         system = with_canary(system, config, ctx)
         model = ctx.ports.require("model")
