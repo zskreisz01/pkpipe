@@ -230,3 +230,16 @@ def test_the_shipped_pack_image_flows_are_local_and_validate(pack_dir):
         "max_bytes": 10485760,
         "retries": 1,
     }
+
+
+def test_a_vision_profile_timeout_above_the_image_timeout_is_a_warning():
+    snap = make_snapshot(
+        _flow(_vision()), assets=ASSETS, models={"vision": {**LOCAL_VISION, "timeout_s": 900}}, images={}
+    )
+    errors, warnings = validate_config_flows(snap)
+    assert errors == []
+    assert any("exceeds images.per_image_timeout_s 300" in w for w in warnings)
+    ok = make_snapshot(
+        _flow(_vision()), assets=ASSETS, models={"vision": {**LOCAL_VISION, "timeout_s": 300}}, images={}
+    )
+    assert not any("per_image_timeout_s" in w for w in validate_config_flows(ok)[1])

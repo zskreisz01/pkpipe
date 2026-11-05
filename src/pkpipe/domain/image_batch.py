@@ -130,6 +130,8 @@ def report(state: dict[str, Any], *, now: float) -> dict[str, Any]:
         "estimate_error_s": round(start_s - elapsed, 1),
         "per_image_estimate_s": round(per_image, 1),
         "elapsed_s": round(elapsed, 1),
+        "cycle_elapsed_s": round(max(0.0, now - state["started"]), 1),
+        "budget_s": round(state["budget_s"], 1),
         "stopped_by_budget": bool(state["stopped_by_budget"]),
     }
 
@@ -138,12 +140,20 @@ def _minutes(seconds: float) -> int:
     return max(1, round(seconds / 60)) if seconds > 0 else 0
 
 
-def describe_estimate(*, count: int, seed_s: float, budget_s: float) -> str:
-    """The message before the batch (log and notification): how many images need a model call and how long."""
-    return (
+def describe_estimate(*, count: int, seed_s: float, budget_s: float, elapsed_s: float = 0.0) -> str:
+    """The message before the batch (log and notification): how many images need a model call and how long.
+    ``elapsed_s`` is what the cycle has used already (the text phase): the budget shown is what is left."""
+    text = (
         f"Image batch: {count} image(s) need a model call, expected about {_minutes(count * seed_s)} min "
-        f"({round(seed_s)} s each); time budget {_minutes(budget_s)} min."
+        f"({round(seed_s)} s each); "
     )
+    if elapsed_s >= 30:
+        left = max(0.0, budget_s - elapsed_s)
+        return text + (
+            f"time budget {_minutes(budget_s)} min, {_minutes(elapsed_s)} min already used by the text phase, "
+            f"{_minutes(left) if left else 0} min left."
+        )
+    return text + f"time budget {_minutes(budget_s)} min."
 
 
 def describe_report(rep: dict[str, Any]) -> str:
@@ -154,6 +164,13 @@ def describe_report(rep: dict[str, Any]) -> str:
     if rep.get("quarantined"):
         parts.append(f"{rep['quarantined']} quarantined")
     text = f"Images: {', '.join(parts)} in {_minutes(rep['elapsed_s'])} min."
+    done = rep["described"] + rep["cached"] + rep["failed"] + rep["quarantined"]
+    if rep["deferred"] and rep["stopped_by_budget"] and not done:
+        return (
+            f"Images: all {rep['deferred']} image(s) deferred before the first image: the time budget of "
+            f"{_minutes(rep['budget_s'])} min was already used up ({_minutes(rep['cycle_elapsed_s'])} min, "
+            "the text phase took the time). They stay in the INBOX list and are picked up first in the next run."
+        )
     if rep["deferred"]:
         text += (
             f" {rep['deferred']} image(s) deferred: the time budget is reached; they stay in the INBOX list "

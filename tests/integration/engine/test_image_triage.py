@@ -608,3 +608,13 @@ def test_a_failure_before_any_model_call_costs_no_model_time(world):
     world.run()  # broken.png does not exist: no timing row for it, no model call
     assert len(world.store.timings) == len(world.model.image_calls)
     assert all(t["sha256"] != "" for t in world.store.timings)
+
+
+def test_when_the_budget_is_used_up_before_the_first_image_the_notification_says_so(vault, pack_dir, overlay):
+    w = World(vault, pack_dir, overlay, images_config={"time_budget_s": 30, "estimate_s": 60})
+    run = w.run()
+    rep = run.outputs["images"]["outputs"]["finish"]["report"]
+    assert rep["described"] == 0 and rep["deferred"] == 7 and rep["stopped_by_budget"] is True
+    assert w.model.image_calls == []
+    message = w.notify.sent[-1].message
+    assert "all 7 image(s) deferred before the first image" in message and "next run" in message

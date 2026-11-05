@@ -200,3 +200,101 @@ def test_the_next_run_starts_with_the_deferred_images_first_in_list_order(seed):
     done = set(queue) - set(deferred)
     again = [i for i in queue if i not in done]
     assert again == deferred
+
+
+# -- the messages say what is left of the budget when the text phase used part of it ---------------
+
+
+def test_the_estimate_message_shows_the_remaining_budget_and_what_the_text_phase_used():
+    msg = ib.describe_estimate(count=7, seed_s=60, budget_s=7200, elapsed_s=2700)
+    assert "7 image(s)" in msg and "7 min" in msg
+    assert "45 min already used" in msg and "75 min left" in msg and "120 min" in msg
+
+
+def test_the_estimate_message_without_a_text_phase_keeps_the_plain_budget():
+    msg = ib.describe_estimate(count=3, seed_s=60, budget_s=7200)
+    assert "time budget 120 min" in msg and "already used" not in msg
+
+
+def test_the_report_says_when_every_image_was_deferred_because_the_text_phase_used_the_budget():
+    s = ib.start_batch(
+        ["a", "b", "c"], started=0, batch_started=7150, budget_s=7200, seed_s=60, to_describe=3
+    )
+    s, d = ib.next_image(s, now=7150)
+    assert d == ib.STOP
+    rep = ib.report(s, now=7150)
+    assert rep["deferred"] == 3 and rep["described"] == 0 and rep["cycle_elapsed_s"] == 7150
+    msg = ib.describe_report(rep)
+    assert "all 3 image(s) deferred" in msg and "before the first image" in msg
+    assert "text phase" in msg and "119 min" in msg  # the 7150 s the cycle had used (rounded)
+
+
+def test_a_partial_stop_keeps_the_ordinary_deferred_text():
+    s = ib.start_batch(["a", "b"], started=0, batch_started=0, budget_s=100, seed_s=60, to_describe=2)
+    s, _ = ib.next_image(s, now=0)
+    s = ib.record_image(s, now=60, status="described", used_model=True)
+    s, d = ib.next_image(s, now=60)
+    assert d == ib.STOP
+    msg = ib.describe_report(ib.report(s, now=60))
+    assert "1 image(s) deferred" in msg and "all" not in msg
+
+
+def _reference_run(queue, outcomes, *, started, text_phase, budget, seed):
+    """An independent model of the rule, written from the spec text alone (no call into the module): which
+    images start, how many seconds the model calls took, and the running mean after each image."""
+    now, durations, begun, means = started + text_phase, [], [], []
+    for item, (_status, used, secs) in zip(queue, outcomes, strict=False):
+        estimate = sum(durations) / len(durations) if durations else seed
+        if (now - started) + estimate >= budget:
+            return begun, queue[len(begun) :], means
+        begun.append(item)
+        now += secs
+        if used:  # every call that reached the model counts, whatever its outcome
+            durations.append(secs)
+        means.append(sum(durations) / len(durations) if durations else seed)
+    return begun, [], means
+
+
+@pytest.mark.parametrize("seed", range(200))
+def test_failed_and_quarantined_images_count_like_described_ones_against_an_independent_model(seed):
+    rng = random.Random(1000 + seed)
+    n = rng.randint(1, 30)
+    queue = [f"i{k}" for k in range(n)]
+    budget = rng.choice([60, 200, 900, 3000])
+    seed_s = rng.choice([10, 60, 150])
+    text_phase = rng.choice([0, 20, budget // 3])
+    outcomes = []
+    for _ in range(n):
+        status = rng.choice(["described", "cached", "failed", "quarantined", "unread"])
+        # a read or decode failure ("unread") takes no model time; a failed model call takes up to the timeout
+        secs = {
+            "described": rng.uniform(5, 120),
+            "cached": 0.01,
+            "failed": rng.choice([300.0, rng.uniform(5, 60)]),
+            "quarantined": rng.uniform(5, 120),
+            "unread": 0.02,
+        }[status]
+        used = status in ("described", "failed", "quarantined")
+        outcomes.append(("failed" if status == "unread" else status, used, secs))
+    want_begun, want_deferred, want_means = _reference_run(
+        queue, outcomes, started=0.0, text_phase=text_phase, budget=budget, seed=seed_s
+    )
+    s = ib.start_batch(
+        queue, started=0.0, batch_started=float(text_phase), budget_s=budget, seed_s=seed_s, to_describe=n
+    )
+    now, begun, means = float(text_phase), [], []
+    while True:
+        s, decision = ib.next_image(s, now=now)
+        if decision != ib.CONTINUE:
+            break
+        status, used, secs = outcomes[len(begun)]
+        begun.append(s["current"])
+        now += secs
+        s = ib.record_image(s, now=now, status=status, used_model=used)
+        means.append(ib.running_estimate(s))
+    assert begun == want_begun and s["deferred"] == want_deferred
+    assert means == pytest.approx(want_means)
+    if any(u and sec > 0 for _, u, sec in outcomes[: len(begun)]):  # failures moved the estimate (finding 1)
+        assert s["durations"] and sum(s["durations"]) == pytest.approx(
+            sum(sec for _, u, sec in outcomes[: len(begun)] if u)
+        )

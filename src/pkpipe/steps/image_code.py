@@ -278,7 +278,12 @@ def plan(ctx: StepContext, session: str = DEFAULT_SESSION) -> StepResult:
     state["items"] = {str(i["id"]): i for i in images}
     state["scan"] = scans  # what the plan found per image: record needs it when the image's subflow failed
     state["model"] = model
-    message = batch.describe_estimate(count=to_describe, seed_s=seed, budget_s=cfg.time_budget_s)
+    message = batch.describe_estimate(
+        count=to_describe,
+        seed_s=seed,
+        budget_s=cfg.time_budget_s,
+        elapsed_s=max(0.0, now - state["started"]),
+    )
     profile = str(node.config.get("profile") or "default")
     hint = (
         f"Image phase: model profile '{profile}' ({model}) takes over from the text profile; the text model "
@@ -537,7 +542,14 @@ class VisionStep(StepExecutor):
                 errors.append(
                     f"node '{node.id}': model profile '{config.profile}' does not declare vision: true"
                 )
-            limit = ImagesConfig.model_validate(snapshot.data.get("images") or {}).max_tokens
+            images_cfg = ImagesConfig.model_validate(snapshot.data.get("images") or {})
+            limit = images_cfg.max_tokens
+            if int(profile.get("timeout_s", 120)) > images_cfg.per_image_timeout_s:
+                warnings.append(
+                    f"node '{node.id}': model profile '{config.profile}' timeout_s {profile.get('timeout_s', 120)} "
+                    f"exceeds images.per_image_timeout_s {images_cfg.per_image_timeout_s}: a timed-out image "
+                    "keeps occupying the model server until the profile's own timeout"
+                )
             tokens = profile.get("max_tokens")
             if not tokens:
                 errors.append(
