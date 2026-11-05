@@ -1,6 +1,6 @@
 ---
 spec_id: 021-image-input
-status: Draft
+status: Active
 description: Data model for image input
 updated: 2026-11-05
 ---

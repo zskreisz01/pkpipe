@@ -1,8 +1,8 @@
 ---
 spec_id: 021-image-input
 title: Image input for the model port and the image description session
-status: Draft
-status_reason: Gate 1 open; clarification 9 (judge model) needs the owner's decision
+status: Active
+status_reason: Gate 1 closed 2026-11-05 (owner: go ahead with the defaults); implementation under way
 description: The model port accepts images, the vault server can read an embedded image, and a tool-less local vision session turns an image INBOX entry into a validated description that the triage categorizes like any other item.
 relevant_when:
   - image
@@ -11,6 +11,18 @@ relevant_when:
   - attachments
   - image entry
 related: [002-model-port, 004-obsidian-vault-mcp, 007-triage-and-release, 008-secure-fetch, 009-output-guard-and-quarantine, 013-evaluation-framework, 020-vault-layout-and-inbox-list]
+research: research.md
+conclusion: >-
+  Vision profile gemma-4-12b (11 of 12 real images valid, median 53 s per image). gemma-4-12b is not usable for the text steps
+  (sessions fail in two runs with the same code-check failures, intermittent canary leak in the security gate), so qwen3.5-9b-mlx stays
+  the text model and gemma-4-12b the judge of the text suites. A run has two model phases (text, then images) with one switch; the image
+  batch is bounded by a time budget with a running estimate. The qwen3.5-9b judge is stricter and unstable between runs, so for the image eval
+  code checks come first and it only rates the topic after calibration.
+research_use: >-
+  Read before choosing or changing a text, vision or judge model, before estimating nightly time or memory, and when planning an eval of
+  a new model. A candidate must pass the code checks of the sessions suite and the zero-tolerance security gate in two consecutive live
+  runs; a judge mean alone decides nothing. Re-run the probe and the eval pair (research.md R-5) when the model, its quantization or
+  LM Studio changes, and store the new reports next to the old ones in research/. Never copy content of the owner's INBOX into the repository.
 updated: 2026-11-05
 ---
 
@@ -18,9 +30,9 @@ updated: 2026-11-05
 
 **Feature Branch**: `spec/021-image-input`
 **Created**: 2026-11-05
-**Status**: Draft
+**Status**: Active
 **Input**: Owner: image processing is an important element. Real INBOX: about half of the entries are `![[…jpg]]` (screenshots of posts and project pages, shared images). Spec 020 lists them as items that the owner must categorize; the model could read them.
-**Companions**: [data-model.md](data-model.md)
+**Companions**: [data-model.md](data-model.md) · [research.md](research.md) (probe, two eval runs, decision)
 
 ## Clarifications
 
@@ -43,7 +55,7 @@ updated: 2026-11-05
    - A single image has a hard timeout (`images.per_image_timeout_s`, default 300), so one stuck call cannot spend the budget; it counts as a failure for that image (clarification 6).
    - The run reports processed, cached, failed and deferred counts and the final estimate error. Text items are processed first; the images get the time that is left of the cycle budget.
 8. **Owner points agreed (2026-11-05):** model port extension, image reading, security, data protection.
-9. **Model silo and judge.** *Open: confirm.* A production run works in two phases, each with one model, and the model is switched once between them, never interleaved: first the text items on `qwen3.5-9b-mlx`, then the images on `gemma-4-12b` (after the text phase the text model may be unloaded to make room; the images need no text model, and the text phase needs no vision model). The judge is used only by the eval suites and the publish gate, never by a production run, so it does not compete for memory at night. The image eval does not need a vision judge: the synthetic images are rendered by code, so the truth (text, URL, kind) is known and the checks are code (verbatim overlap, JSON schema, injection flag); a text judge only rates the free-text `topic` against the known truth. The judge must not be the subject (and not its family): for the image eval it is `qwen3.5-9b-mlx` (reasoning is slow, which does not matter offline: `max_tokens` 8192 and a 600 s timeout in the eval overlay). The 2026-11-05 run shows that this judge is stricter and misreads a rubric that another judge reads correctly, so it only rates `topic` against the known truth, behind the code checks, and the 20-item manual calibration decides before it gates anything. Vision judges from the literature (Prometheus-Vision, LLaVA-Critic) are older and were tuned for chart and caption tasks; they are not needed here and are not planned.
+9. **Model silo and judge.** *Decided 2026-11-05 (owner: go ahead with these defaults).* A production run works in two phases, each with one model, and the model is switched once between them, never interleaved: first the text items on `qwen3.5-9b-mlx`, then the images on `gemma-4-12b` (after the text phase the text model may be unloaded to make room; the images need no text model, and the text phase needs no vision model). The judge is used only by the eval suites and the publish gate, never by a production run, so it does not compete for memory at night. The image eval does not need a vision judge: the synthetic images are rendered by code, so the truth (text, URL, kind) is known and the checks are code (verbatim overlap, JSON schema, injection flag); a text judge only rates the free-text `topic` against the known truth. The judge must not be the subject (and not its family): for the image eval it is `qwen3.5-9b-mlx` (reasoning is slow, which does not matter offline: `max_tokens` 8192 and a 600 s timeout in the eval overlay). The 2026-11-05 run shows that this judge is stricter and misreads a rubric that another judge reads correctly, so it only rates `topic` against the known truth, behind the code checks, and the 20-item manual calibration decides before it gates anything. Vision judges from the literature (Prometheus-Vision, LLaVA-Critic) are older and were tuned for chart and caption tasks; they are not needed here and are not planned.
 
 ## User Scenarios & Testing *(mandatory)*
 
