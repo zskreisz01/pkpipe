@@ -11,13 +11,13 @@ updated: 2026-11-05
 
 ## Summary
 
-Extend `ModelPort` with optional images (adapter builds `image_url` parts), add `read_image` to the obsidian-vault server, a code step `image.prepare` (Pillow, optional extra `images`), a tool-less `describe_image` session with its schema and Reader-style prompt, a description cache in the app DB, and the data class `image` with its validation. The triage flow gets an image branch before the category session.
+Extend `ModelPort` with optional images (adapter builds `image_url` parts), add `read_image` to the obsidian-vault server, a code step `image.prepare` (Pillow, optional extra `images`), a tool-less `describe_image` session with its schema and Reader-style prompt, a description cache and a timing table in the app DB, a time guard step `image.budget`, and the data class `image` with its validation. The triage flow gets an image branch before the category session.
 
 ## Technical Context
 
 **Language/Version**: Python 3.12+ (`uv`); Pillow as optional extra `images`
 **Testing**: fake vision model scripted by digest; images rendered in test code; vault tool tests with a temp attachments folder, traversal and symlink cases; trace/log leak test; live eval case marked `live`
-**Operations**: the vision profile is a separate model from the text model; with 32 GB the two share memory, so the image batch runs as its own step with the text model idle (documented in `docs/operations.md`); throughput measured at about 53 s per image
+**Operations**: one model in production (`gemma-4-12b`, loaded with the context the text sessions need, not the 8192 of a test load), so nothing switches at night; the judge model runs only in evals (documented in `docs/operations.md`); throughput measured at about 53 s per image
 
 ## Constitution Check
 
@@ -32,7 +32,7 @@ Extend `ModelPort` with optional images (adapter builds `image_url` parts), add 
 | VII. Public / private separation | Yes | Synthetic images only; the owner's images never enter a repository |
 | IX. Measured change | Yes | Eval suite `images` with a different judge model |
 | X. Observable by default | Yes | Spans with counts, bytes and cache hits; no content |
-| XI. Design as diagram and as code | Yes | BPMN: triage gets "Describe image" (sub-process: read, prepare, describe, guard) (drawio, PNG, Mermaid) |
+| XI. Design as diagram and as code | Yes | BPMN: triage gets the sub-process "Describe images": count and estimate, then a loop (gateway "expected end < budget?" -> read, prepare, describe, guard, update estimate; else leave the rest in the INBOX and report), with a timer boundary event per image (drawio, PNG, Mermaid, all three together) |
 | Others | n/a | |
 
 ## Structure
@@ -47,6 +47,7 @@ Extend `ModelPort` with optional images (adapter builds `image_url` parts), add 
 ## Risks
 
 - Reasoning models spend the whole token budget; mitigated by `max_tokens`, one retry and an owner fallback; a non-reasoning vision model is the default
-- Throughput on a memory-starved machine: cap per run, cache, batch step
+- Throughput on a memory-starved machine: the time budget (default 2 hours) with a running estimate, the per-image timeout, the cache, and one model for the whole run (no switching)
+- Estimate error: the mean of the images done so far can be optimistic for a run of larger images; the per-image timeout bounds the overshoot to one image
 - Pillow decoding of hostile files: size and pixel limits (decompression bomb guard) before decoding
 - Text in images that looks like a URL or command: it is data; URLs go through the URL policy before any fetch

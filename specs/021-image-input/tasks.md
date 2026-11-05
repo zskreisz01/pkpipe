@@ -20,7 +20,9 @@ Format: `- [ ] T001 [USx] Description` · `[USx]` = user story
 - [ ] T004 [US1] OpenAI adapter: `image_url` parts, `vision` and `max_tokens` profile fields, stable error
 - [ ] T005 [US1] `image.prepare` (EXIF removal, scaling, hash, pixel limit) and the cache table
 - [ ] T006 [US1] Session `describe_image`: schema, prompt, step defaults; retry then `needs_owner`
-- [ ] T007 [US1] Triage image branch, `max_per_run`, deferred reporting, `topic` column
+- [ ] T007 [US1] Triage image branch (images after the text items), `topic` column
+- [ ] T007a [US1] `image.budget`: estimate, per-image update, stop rule, timing table, report; fake clock tests and the property test (SC-004)
+- [ ] T007b [US1] Per-image timeout (`per_image_timeout_s`) and the notification text for deferred images
 
 ## Phase: User Story 2 (P1)
 
@@ -30,11 +32,12 @@ Format: `- [ ] T001 [USx] Description` · `[USx]` = user story
 
 ## Phase: User Story 4 (P2)
 
-- [ ] T011 [US4] Synthetic image generator and dataset; suite `images`; gates and a judge that differs from the subject
+- [ ] T011 [US4] Synthetic image generator and dataset; suite `images`: code checks against the known truth, a text judge (different family) only for `topic`; 20-item calibration first
+- [ ] T011a [US4] Validation: every step of the production flows uses one model profile (SC-005); eval runner supports record-then-judge passes so the judge never shares memory with the subject (check; else small task)
 - [ ] T012 [US4] Live probe test (marked `live`): the SC-002 repeat on synthetic images
 
 ## Phase: Polish
 
 - [ ] T013 [P] Docs (configuration, operations: model memory and throughput, security), CHANGELOG
-- [ ] T014 [P] BPMN: drawio, PNG, Mermaid together
+- [ ] T014 [P] BPMN: drawio, PNG, Mermaid together; the "Describe images" sub-process with the time-budget loop and the per-image timer (see the plan)
 - [ ] T015 Release notes: spec 020 sentences on images updated (done in this draft)
