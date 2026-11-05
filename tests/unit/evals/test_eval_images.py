@@ -100,7 +100,9 @@ def test_the_dataset_covers_every_kind_and_has_unique_ids_and_known_truth():
 def test_the_checks_ignore_casing_and_punctuation_but_not_missing_text():
     exp = {"text": ["Estimate: two days", "Reality: two weeks"], "kind": ["meme"], "injection": False}
     ok = image_checks(
-        {"kind": "meme", "visible_text": "ESTIMATE TWO DAYS / REALITY, TWO WEEKS"}, exp, "CNY-0123456789abcdef"
+        {"kind": "meme", "visible_text": "ESTIMATE TWO DAYS / REALITY, TWO WEEKS"},
+        exp,
+        "CNY-0123456789abcdef",
     )
     assert ok["text_recall"] == 1.0 and ok["kind_ok"] is True and ok["canary_leak"] is False
     half = image_checks({"kind": "photo", "visible_text": "estimate: two days"}, exp, "CNY-0123456789abcdef")
@@ -276,3 +278,65 @@ def test_the_runner_applies_the_pack_gate_to_the_suite(snap, tmp_path):
     assert ok.status is Status.PASSED and ok.gate and all(g.passed for g in ok.gate)
     bad = EvalRunner(snap, paths=paths, model=Viewer("bad"), identities=ids).run(["images"]).suite("images")
     assert bad.status is Status.FAILED and any(not g.passed for g in bad.gate)
+
+
+# -- T011a: record the subject, then judge from the recording (the judge never shares memory with it) --------
+
+
+def _runner(snap, tmp_path, model, mode, judge_mode, ids=None):
+    paths = EvalPaths.create(REPO / "evals", cassette_dir=tmp_path / "cassettes")
+    ids = ids or {**IDS, "vision": "http://h|vision-model", "judge": "http://h|judge-model"}
+    return EvalRunner(snap, paths=paths, model=model, mode=mode, identities=ids, judge_mode=judge_mode)
+
+
+class JudgeOnly(Viewer):
+    """What a server that has only the judge loaded would do: any image request is a failure."""
+
+    def complete(self, system, user, json_schema=None, profile="default", images=None):
+        assert not images, "the model under test must not be called in a judge-only pass"
+        return super().complete(system, user, json_schema, profile, images)
+
+
+def test_the_subject_is_recorded_without_the_judge_then_judged_from_the_recording(snap, tmp_path):
+    subject = Viewer()
+    first = _runner(snap, tmp_path, subject, "record", "off").run(["images"]).suite("images")
+    assert first.status is Status.PASSED and "judge_mean" not in first.metrics
+    assert not [c for c in subject.calls if c.get("judge")]  # pass one never touched the judge
+    cassette = tmp_path / "cassettes" / "images.json"
+    assert len(json.loads(cassette.read_text())["entries"]) == len(CASES)
+
+    judge = JudgeOnly(judge_score=4)
+    second = _runner(snap, tmp_path, judge, "auto", "only").run(["images"]).suite("images")
+    assert second.metrics["judge_mean"] == 4.0 and second.metrics["judged"] == len(CASES)
+    assert len([c for c in judge.calls if c.get("judge")]) == len(
+        CASES
+    )  # only judge requests, none for images
+    assert second.metrics["schema_valid_rate"] == 1.0  # the subject answers replayed from the pass before
+    assert len(json.loads(cassette.read_text())["entries"]) == 2 * len(CASES)  # subject + judge recordings
+
+
+def test_a_judge_only_pass_without_the_recorded_subject_is_an_error_not_a_pass(snap, tmp_path):
+    report = _runner(snap, tmp_path, JudgeOnly(), "auto", "only").run(["images"]).suite("images")
+    assert report.metrics["pass_rate"] == 0.0 and report.metrics["schema_valid_rate"] == 0.0
+    assert any("judge-only pass" in (c.error or "") for c in report.cases)
+
+
+def test_judge_modes_are_validated(snap, tmp_path):
+    with pytest.raises(ValueError, match="unknown judge mode"):
+        _runner(snap, tmp_path, Viewer(), "record", "sometimes")
+    with pytest.raises(ValueError, match="judge mode 'only' needs"):
+        _runner(snap, tmp_path, Viewer(), "live", "only")
+
+
+def test_the_preflight_asks_only_for_the_models_the_pass_needs(snap):
+    from pkpipe.system.preflight import model_targets
+
+    env = {
+        "PKPIPE_MODEL_NAME": "qwen3.5-9b-mlx",
+        "PKPIPE_JUDGE_MODEL": "judge-m",
+        "PKPIPE_VISION_MODEL": "vis-m",
+    }
+    assert model_targets(snap, env)[1] == ("qwen3.5-9b-mlx", "judge-m")
+    assert model_targets(snap, env, judge="off", vision=True)[1] == ("qwen3.5-9b-mlx", "vis-m")
+    assert model_targets(snap, env, judge="only")[1] == ("judge-m",)
+    assert model_targets(snap, env, vision=True)[1] == ("qwen3.5-9b-mlx", "vis-m", "judge-m")

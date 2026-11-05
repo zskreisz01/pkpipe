@@ -19,27 +19,14 @@ from pathlib import Path
 import pytest
 
 from pkpipe.domain.triage import item_id_for
-from pkpipe.engine.registry import load_effective
-from pkpipe.obsidian import lists
 from pkpipe.obsidian.policy import VaultPolicy
 from pkpipe.ports import ModelUnavailable, SchemaError
 from tests.fakes import (
     FakeClock,
     FakeImageStore,
-    FakePreparer,
-    FakeVisionModel,
-    RecordingTracer,
 )
-from tests.fakes.notify import FakeNotify
 from tests.fakes.vision import valid_description
-from tests.support.flows import make_ports, make_service
-from tests.support.pack_runtime import (
-    PACK_ROUTES,
-    FakeLearning,
-    fake_model_reply,
-    synthetic_web,
-    vault_tools,
-)
+from tests.support.image_world import World as BaseWorld
 
 FIXTURE = Path(__file__).resolve().parents[2] / "fixtures" / "inbox" / "INBOX-list.md"
 ATT = "0-INBOX/attachments"
@@ -123,67 +110,12 @@ def vault(tmp_path):
     return root
 
 
-class World:
-    def __init__(
-        self,
-        vault: Path,
-        pack_dir: Path,
-        overlay: Path,
-        *,
-        images_config: dict | None = None,
-        vision_script: dict | None = None,
-        default_reply=None,
-        clock: FakeClock | None = None,
-        per_call_s: float = 0.0,
-        store: FakeImageStore | None = None,
-        tracer: RecordingTracer | None = None,
-        snapshots=None,
-    ):
-        self.vault = vault
-        self.clock = clock or FakeClock()
-        self.store = store or FakeImageStore()
-        self.tracer = tracer or RecordingTracer()
-        if images_config is not None:
-            (overlay / "images.json").write_text(json.dumps(images_config))
-        self.snap = load_effective(pack_dir, overlay).snapshot()
-        policy = VaultPolicy(vault_dir=vault)
-        text = fake_model_reply(
-            {"alpha": "learning-material", "local-first": "learning-material", "compare": "misc"}
-        )
-        self.model = FakeVisionModel(
-            vision_script if vision_script is not None else script(),
-            default=default_reply,
-            text=text,
-            on_image_call=(lambda: self.clock.advance(per_call_s)) if per_call_s else None,
-        )
-        self.notify = FakeNotify(routes={**PACK_ROUTES, "images_estimate": ["discord_main"]})
-        self.preparer = FakePreparer()
-        learning = FakeLearning(polls_until_ready=0)
-        self.ports = make_ports(
-            tools=vault_tools(vault, learning, synthetic_web(), policy=policy),
-            resolver=synthetic_web().resolve,
-            model=self.model,
-            notify=self.notify,
-            tracer=self.tracer,
-            clock=self.clock,
-            image_store=self.store,
-            image_preparer=self.preparer,
-        )
-        self.svc = make_service(
-            lambda: self.snap, self.ports, snapshots_for=(lambda _s: snapshots) if snapshots else None
-        )
+class World(BaseWorld):
+    """The shared world with this module's scripted descriptions as the default."""
 
-    def run(self, flow: str = "triage"):
-        run = self.svc.start(flow)
-        assert run.ok, run.error
-        return run
-
-    @property
-    def rows(self) -> dict[str, dict]:
-        return {r["item_id"]: r for r in lists.read_triage(self.vault / "0-INBOX/Inbox-Triage.md")["rows"]}
-
-    def listfile(self) -> str:
-        return (self.vault / "0-INBOX/INBOX.md").read_text(encoding="utf-8")
+    def __init__(self, vault, pack_dir, overlay, *, vision_script=None, **kw):
+        script_ = script() if vision_script is None else vision_script
+        super().__init__(vault, pack_dir, overlay, vision_script=script_, **kw)
 
 
 def rid(resource: str) -> str:
@@ -552,3 +484,51 @@ def test_a_triage_with_images_restores_byte_identical_and_never_snapshots_the_im
     assert not plan.conflicts
     snaps.apply_restore(run.run.run_id)
     assert tree(vault) == before
+
+
+def test_the_image_phase_logs_the_switch_and_the_unload_hint(world, caplog):
+    """T011a: one model switch between the phases, with a hint that the text model may be unloaded."""
+    caplog.set_level(logging.INFO)
+    run = world.run()
+    hint = run.outputs["images"]["outputs"]["plan"]["phase_hint"]
+    assert "'vision'" in hint and "unloaded" in hint and "google/gemma-4-12b" in hint
+    assert hint in caplog.text
+
+
+def test_the_real_tracer_with_content_capture_on_never_exports_an_image_or_its_text(
+    vault, pack_dir, overlay, otel_factory
+):
+    """SC-003 with the real OpenTelemetry adapter: the triage flow is listed for content capture (the text
+    items are captured), yet nothing of an image run is: the nested image flows are private."""
+    from pkpipe.adapters.tracer_otel import OtelTracer
+    from pkpipe.telemetry import ContentPolicy
+
+    otel = otel_factory(ContentPolicy(frozenset({"triage"})))
+    w = World(vault, pack_dir, overlay, tracer=OtelTracer())
+    w.run()
+    dump = json.dumps(
+        [
+            {
+                "name": s.name,
+                "attributes": dict(s.attributes),
+                "events": [(e.name, dict(e.attributes)) for e in s.events],
+            }
+            for s in otel.spans()
+        ],
+        default=str,
+    )
+    assert "https://example.org/articles/alpha" in dump  # capture is really on for the text items
+    for secret in (TEXT_PROJECT, TEXT_INJECT, TOPIC_PROJECT, "synthetic project page", "Viewer"):
+        assert secret not in dump, secret
+    for data in IMAGES.values():
+        assert data.decode("latin-1") not in dump and data.hex() not in dump
+
+
+def test_a_url_on_the_deny_list_in_an_image_is_a_security_flag(vault, pack_dir, overlay):
+    s = script()
+    s[digest("post.jpg")] = valid_description(topic="A synthetic post.", urls=["https://evil.example/x"])
+    w = World(vault, pack_dir, overlay, vision_script=s)
+    w.ports.extra["security_log"].deny_domain("evil.example", day="2026-11-05")
+    w.run()
+    assert w.rows[rid("post.jpg")]["state"] == "quarantined"
+    assert {"url_filter", "viewer"} & {f["detector"] for f in w.tracer.flags}

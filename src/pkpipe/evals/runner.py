@@ -23,10 +23,32 @@ from pkpipe.evals.judge import Judge, JudgeUnavailable
 from pkpipe.evals.models import EvalRun, Level, Status, SuiteReport
 from pkpipe.evals.scoring import check_gate
 from pkpipe.evals.suites import SUITES, SuiteContext
-from pkpipe.ports import ModelPort
+from pkpipe.ports import ModelPort, ModelUnavailable
 from pkpipe.telemetry import attrs
 
 MODES = ("live", "replay", "record", "auto")
+#: ``on`` (default): subject and judge in one pass. ``off``: no judge (record the subject's outputs first).
+#: ``only``: the subject's outputs come from the cassette and only the judge is live, so a judge never has
+#: to share memory with the model under test (record the subject with ``off``, then judge with ``only``).
+JUDGE_MODES = ("on", "off", "only")
+
+
+class _OnlyProfiles:
+    """The real model for the named profiles only: any other profile is refused, so a judge-only pass can
+    never call the model under test (its answer must already be in the cassette)."""
+
+    def __init__(self, inner: ModelPort, profiles: set[str]):
+        self.inner, self.profiles = inner, profiles
+
+    def complete(self, system, user, json_schema=None, profile="default", images=None):
+        if profile not in self.profiles:
+            raise ModelUnavailable(
+                f"judge-only pass: the answer of profile '{profile}' is not in the cassette; record the "
+                "subject first (pkpipe eval --cassette record --judge off)"
+            )
+        if images:
+            return self.inner.complete(system, user, json_schema, profile=profile, images=images)
+        return self.inner.complete(system, user, json_schema, profile=profile)
 
 
 def evals_config(snapshot: ConfigSnapshot) -> EvalsConfig:
@@ -86,7 +108,13 @@ class EvalRunner:
         concurrency: int | None = None,
         limit: int | None = None,
         options: dict[str, Any] | None = None,
+        judge_mode: str = "on",
     ):
+        if judge_mode not in JUDGE_MODES:
+            raise ValueError(f"unknown judge mode '{judge_mode}' (use one of {', '.join(JUDGE_MODES)})")
+        if judge_mode == "only" and mode not in ("record", "auto"):
+            raise ValueError("judge mode 'only' needs --cassette record or auto (the subject replays)")
+        self.judge_mode = judge_mode
         if mode not in MODES:
             raise ValueError(f"unknown mode '{mode}' (use one of {', '.join(MODES)})")
         if mode in ("record", "auto") and model is None:
@@ -112,10 +140,13 @@ class EvalRunner:
         if self.mode == "live":
             return self.model
         if suite not in self.cassettes:
+            inner: ModelPort | None = None if self.mode == "replay" else self.model
+            if self.judge_mode == "only" and inner is not None:
+                inner = _OnlyProfiles(inner, {self.config.judge_profile})
             self.cassettes[suite] = CassetteModel(
                 self.paths.cassette(suite),
-                self.mode,  # type: ignore[arg-type]
-                None if self.mode == "replay" else self.model,
+                "auto" if self.judge_mode == "only" else self.mode,  # type: ignore[arg-type]
+                inner,
                 identities=self.identities,
             )
         return self.cassettes[suite]
@@ -154,6 +185,8 @@ class EvalRunner:
         steps); a suite whose subject is another profile (the vision profile of the ``images`` suite) names
         it, so the judge is never the model under test."""
         profile = self.config.judge_profile
+        if self.judge_mode == "off":
+            return None, "judge switched off (--judge off)"
         if model is None:
             return None, "no model"
         if profile not in (self.snapshot.data.get("models") or {}):

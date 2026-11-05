@@ -275,8 +275,21 @@ def plan(ctx: StepContext, session: str = DEFAULT_SESSION) -> StepResult:
     state["items"] = {str(i["id"]): i for i in images}
     state["model"] = model
     message = batch.describe_estimate(count=to_describe, seed_s=seed, budget_s=cfg.time_budget_s)
+    profile = str(node.config.get("profile") or "default")
+    hint = (
+        f"Image phase: model profile '{profile}' ({model}) takes over from the text profile; the text model "
+        "is not needed any more and may be unloaded now (the model is switched once, never interleaved)."
+    )
     log.info(message)
-    out = {"count": len(images), "to_describe": to_describe, "seed_s": seed, "message": message}
+    log.info(hint)
+    out = {
+        "count": len(images),
+        "to_describe": to_describe,
+        "seed_s": seed,
+        "message": message,
+        "phase_hint": hint,
+        "image_profile": profile,
+    }
     return StepResult(output=out, item={"batch": state})
 
 
