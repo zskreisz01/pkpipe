@@ -259,8 +259,10 @@ def plan(ctx: StepContext, session: str = DEFAULT_SESSION) -> StepResult:
     store = image_store(ctx)
     seed = batch.seed_estimate(store.recent_seconds(model, 50) if store else [], cfg.estimate_s)
     to_describe = 0
+    scans: dict[str, dict[str, Any]] = {}
     for entry in images:
         scan = _prepare_one(ctx, cfg, entry, session)
+        scans[str(entry["id"])] = {"ok": scan["ok"], "cached": scan["cached"], "sha": scan.get("sha256", "")}
         if scan["ok"] and not scan["cached"]:
             to_describe += 1
     now = ctx.ports.clock.now()
@@ -274,6 +276,7 @@ def plan(ctx: StepContext, session: str = DEFAULT_SESSION) -> StepResult:
         to_describe=to_describe,
     )
     state["items"] = {str(i["id"]): i for i in images}
+    state["scan"] = scans  # what the plan found per image: record needs it when the image's subflow failed
     state["model"] = model
     message = batch.describe_estimate(count=to_describe, seed_s=seed, budget_s=cfg.time_budget_s)
     profile = str(node.config.get("profile") or "default")
@@ -331,15 +334,19 @@ def record(ctx: StepContext) -> StepResult:
     failed or timed-out one) adds its seconds to the running estimate and to the timing table."""
     item = ctx.item or {}
     state = item["batch"]
-    sha = str(item.get("image_sha") or "")
-    cached = bool(item.get("image_cached"))
-    prepared_ok = item.get("image_ok") is True
+    # A failed image subflow (a timeout, an invalid answer) merges no item update: what happened before the
+    # failure is known from the plan's scan of the same image, so its model time still counts.
+    scan = (state.get("scan") or {}).get(str(item.get("id"))) or {}
+    prepared_ok = item["image_ok"] is True if item.get("image_ok") is not None else bool(scan.get("ok"))
+    cached = bool(item["image_cached"]) if item.get("image_cached") is not None else bool(scan.get("cached"))
+    sha = str(item.get("image_sha") or scan.get("sha") or "")
     if item.get("state") == "quarantined" or item.get("flagged"):
         status, used = batch.QUARANTINED, prepared_ok and not cached
     elif item.get("category") and prepared_ok:
         status, used = (batch.CACHED if cached else batch.DESCRIBED), not cached
     else:
-        status, used = batch.FAILED, prepared_ok and not cached  # a read or decode failure took no model time
+        # a read or decode failure took no model time; a failed or timed-out model call did, and counts
+        status, used = batch.FAILED, prepared_ok and not cached
     result: dict[str, Any] = {"resource": item.get("resource"), "kind": "image"}
     if status in (batch.DESCRIBED, batch.CACHED):
         result.update(category=item["category"], topic=_one_line(item.get("topic") or ""))

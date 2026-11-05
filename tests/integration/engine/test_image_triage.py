@@ -549,3 +549,62 @@ def test_a_restart_between_prepare_and_describe_prepares_the_image_again(vault, 
     w.ports.extra["image_buffer"] = Forgetful()
     w.run()
     assert w.rows[rid("proj-page.png")]["needs_owner"] is False and w.rows[rid("proj-page.png")]["topic"]
+
+
+# -- failed and timed-out model calls take model time: they count ---------------------------------------
+
+
+def _timing_of(world, name):
+    return [t["seconds"] for t in world.store.timings if t["sha256"] == digest(name)]
+
+
+def test_an_invalid_answer_adds_its_seconds_to_the_timing_table_and_the_estimate(vault, pack_dir, overlay):
+    bad = {digest("proj-page.png"): SchemaError("not json")}
+    w = World(vault, pack_dir, overlay, vision_script={**script(), **bad}, per_call_s=7.0)
+    run = w.run()
+    assert _timing_of(w, "proj-page.png") == [
+        14.0
+    ]  # two attempts of 7 s: the call was made, it took that long
+    assert len(w.store.timings) == len(w.model.image_calls) - 1  # one row per image, the retry is inside it
+    assert w.rows[rid("proj-page.png")]["needs_owner"] is True
+    rep = run.outputs["images"]["outputs"]["finish"]["report"]
+    assert rep["failed"] == 2 and rep["per_image_estimate_s"] > 7.0  # proj-page and the missing file
+    #  # the 14 s are in the running mean
+
+
+def test_a_timed_out_call_adds_its_seconds_too_and_seeds_the_next_run(vault, pack_dir, overlay):
+    def slow(_digests):
+        time.sleep(3.0)
+        return valid_description()
+
+    import shutil
+
+    fresh_vault = vault.parent / "vault-next-day"
+    shutil.copytree(vault, fresh_vault)  # the same images, no triage rows yet
+    store = FakeImageStore()
+    w = World(
+        vault,
+        pack_dir,
+        overlay,
+        vision_script={**script(), digest("proj-page.png"): slow},
+        per_call_s=9.0,
+        store=store,
+    )
+    w.snap = _with_images(w.snap, per_image_timeout_s=1)
+    w.run()
+    assert w.rows[rid("proj-page.png")]["needs_owner"] is True
+    assert _timing_of(w, "proj-page.png") == [9.0]
+    # the next day: the seed is the median of all rows, the failed call included
+    seconds = [t["seconds"] for t in store.timings]
+    assert 9.0 in seconds
+    second = World(fresh_vault, pack_dir, overlay, store=store)
+    plan = second.run().outputs["images"]["outputs"]["plan"]
+    import statistics
+
+    assert plan["seed_s"] == statistics.median(seconds)
+
+
+def test_a_failure_before_any_model_call_costs_no_model_time(world):
+    world.run()  # broken.png does not exist: no timing row for it, no model call
+    assert len(world.store.timings) == len(world.model.image_calls)
+    assert all(t["sha256"] != "" for t in world.store.timings)
