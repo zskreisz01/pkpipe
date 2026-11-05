@@ -39,5 +39,5 @@ Format: `- [ ] T001 [USx] Description` · `[USx]` = user story
 ## Phase: Polish
 
 - [ ] T013 [P] Docs (configuration, operations: model memory and throughput, security), CHANGELOG
-- [ ] T014 [P] BPMN: drawio, PNG, Mermaid together; the "Describe images" sub-process with the time-budget loop and the per-image timer (see the plan)
+- [ ] T014 [P] BPMN: drawio, PNG, Mermaid together; the "Describe images" sub-process with the time-budget loop and the per-image timer (see the plan) (diagram drawn 2026-11-05)
 - [ ] T015 Release notes: spec 020 sentences on images updated (done in this draft)

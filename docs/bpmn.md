@@ -20,6 +20,7 @@ The process model is BPMN 2.0, drawn in draw.io: `docs/design/pkpipe-process-mod
 | 10 | [System Tool Candidates](process/system-tool-candidates.md) |
 | 11 | [Wait for Generation Result](process/wait-for-generation-result.md) |
 | 12 | [Restore Run](process/restore-run.md) |
+| 13 | [Describe Images](process/describe-images.md) |
 
 ## Notation
 
@@ -34,7 +35,7 @@ The process model is BPMN 2.0, drawn in draw.io: `docs/design/pkpipe-process-mod
 D=/Applications/draw.io.app/Contents/MacOS/draw.io   # draw.io desktop CLI
 cd docs
 i=1
-for n in global-process-overview process-inbox-items process-learning-material process-other-resource secure-fetch run-category-sessions handle-security-flag refresh-project-contexts self-improvement-cycle system-tool-candidates wait-for-generation-result restore-run; do
+for n in global-process-overview process-inbox-items process-learning-material process-other-resource secure-fetch run-category-sessions handle-security-flag refresh-project-contexts self-improvement-cycle system-tool-candidates wait-for-generation-result restore-run describe-images; do
   $D -x -f png -s 2 -b 10 -p $i -o img/bpmn/$n.png design/pkpipe-process-model.drawio
   i=$((i+1))
 done
