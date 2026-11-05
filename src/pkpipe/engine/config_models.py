@@ -41,6 +41,11 @@ class ModelProfile(_Strict):
     retry_backoff_s: float = Field(default=2.0, ge=0.0, le=60.0)
     api_key: str | None = None
     fallback: str | None = None
+    vision: bool = Field(
+        default=False,
+        description="The model reads images (spec 021): only a profile with vision: true receives images; "
+        "the others refuse them with a stable error",
+    )
 
 
 class ModelsConfig(RootModel[dict[str, ModelProfile]]):

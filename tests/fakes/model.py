@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
-from pkpipe.ports import ModelError
+from pkpipe.ports import ImageInput, ImagesNotSupported, ModelError
 
 
 class FakeModel:
@@ -12,15 +12,21 @@ class FakeModel:
     Script items (queue order, or one callable ``(system, user) -> dict``) may be a dict (returned) or an
     exception instance (raised, e.g. ``SchemaError("x")``). Pass ``schema_check=True`` to validate dict
     replies against the requested schema like the real adapter does.
+
+    Images (spec 021): ``calls`` records the sha256 digests under ``images`` (never the bytes). A call with
+    images to a profile outside ``vision_profiles`` raises :class:`ImagesNotSupported` like the adapter does
+    (``vision_profiles=None``: every profile may take images).
     """
 
     def __init__(
         self,
         replies: list[dict[str, Any] | Exception] | Callable[..., dict[str, Any]] | None = None,
         schema_check: bool = False,
+        vision_profiles: set[str] | None = None,
     ):
         self._replies = replies if replies is not None else []
         self.schema_check = schema_check
+        self.vision_profiles = vision_profiles
         self.calls: list[dict[str, Any]] = []
 
     def complete(
@@ -29,14 +35,30 @@ class FakeModel:
         user: str,
         json_schema: dict[str, Any] | None = None,
         profile: str = "default",
+        images: Sequence[ImageInput] | None = None,
     ) -> dict[str, Any]:
-        self.calls.append({"system": system, "user": user, "json_schema": json_schema, "profile": profile})
+        digests = [i.sha256 for i in images or ()]
+        self.calls.append(
+            {
+                "system": system,
+                "user": user,
+                "json_schema": json_schema,
+                "profile": profile,
+                "images": digests,
+            }
+        )
+        if digests and self.vision_profiles is not None and profile not in self.vision_profiles:
+            raise ImagesNotSupported(f"profile '{profile}' does not declare vision: true")
         if callable(self._replies):
-            # a callable that sets ``wants_schema`` also receives the requested JSON schema
+            # a callable that sets ``wants_schema`` also receives the requested JSON schema; one that sets
+            # ``wants_images`` also receives the digests of the attached images (keyword ``images``)
+            args: list[Any] = [system, user]
+            kwargs: dict[str, Any] = {}
             if getattr(self._replies, "wants_schema", False):
-                reply = self._replies(system, user, json_schema)
-            else:
-                reply = self._replies(system, user)
+                args.append(json_schema)
+            if getattr(self._replies, "wants_images", False):
+                kwargs["images"] = digests
+            reply = self._replies(*args, **kwargs)
         elif not self._replies:
             raise AssertionError("FakeModel has no scripted reply left")
         else:

@@ -7,11 +7,12 @@ OpenTelemetry span with OpenInference-style attributes (FR-004).
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,7 +22,14 @@ from opentelemetry import trace
 from opentelemetry.trace import Span, StatusCode
 
 from pkpipe.engine.config_models import ModelProfile, ModelsConfig
-from pkpipe.ports import ContextOverflow, ModelError, ModelUnavailable, SchemaError
+from pkpipe.ports import (
+    ContextOverflow,
+    ImageInput,
+    ImagesNotSupported,
+    ModelError,
+    ModelUnavailable,
+    SchemaError,
+)
 
 THINK = re.compile(r"<think>.*?(?:</think>|\Z)", re.DOTALL)
 # A prompt longer than this many characters per context token certainly overflows the context window, whatever
@@ -85,6 +93,7 @@ class ResolvedProfile:
     retry_backoff_s: float
     api_key: str | None
     fallback: str | None
+    vision: bool = False
 
 
 def resolve_value(value: str, environ: Mapping[str, str]) -> str:
@@ -117,6 +126,7 @@ def resolve_profile(name: str, models: ModelsConfig, environ: Mapping[str, str])
             retry_backoff_s=p.retry_backoff_s,
             api_key=resolve_value(p.api_key, environ) if p.api_key else None,
             fallback=p.fallback,
+            vision=p.vision,
         )
     except ProfileError as exc:
         raise ProfileError(f"model profile '{name}': {exc}") from exc
@@ -176,8 +186,9 @@ class OpenAIModel:
         user: str,
         json_schema: dict[str, Any] | None = None,
         profile: str = "default",
+        images: Sequence[ImageInput] | None = None,
     ) -> dict[str, Any]:
-        return self.complete_full(system, user, json_schema, profile).data
+        return self.complete_full(system, user, json_schema, profile, images).data
 
     def complete_full(
         self,
@@ -185,6 +196,7 @@ class OpenAIModel:
         user: str,
         json_schema: dict[str, Any] | None = None,
         profile: str = "default",
+        images: Sequence[ImageInput] | None = None,
     ) -> Completion:
         if json_schema is not None:
             jsonschema.Draft202012Validator.check_schema(json_schema)
@@ -196,7 +208,12 @@ class OpenAIModel:
             resolved = resolve_profile(current, self.models, self.environ)
             try:
                 result = self._call_profile(
-                    resolved, system, user, json_schema, fallback_from=seen[-2] if len(seen) > 1 else None
+                    resolved,
+                    system,
+                    user,
+                    json_schema,
+                    fallback_from=seen[-2] if len(seen) > 1 else None,
+                    images=tuple(images or ()),
                 )
             except ModelUnavailable as exc:
                 last_error = exc
@@ -229,7 +246,12 @@ class OpenAIModel:
         user: str,
         schema: dict[str, Any] | None,
         fallback_from: str | None,
+        images: tuple[ImageInput, ...] = (),
     ) -> Completion:
+        if images and not p.vision:
+            raise ImagesNotSupported(
+                f"model profile '{p.name}' does not declare vision: true; images are not sent to it"
+            )
         used_fallback = fallback_from is not None
         with self._tracer.start_as_current_span(f"model.complete {p.name}") as span:
             if fallback_from is not None:
@@ -241,10 +263,13 @@ class OpenAIModel:
             span.set_attribute("pkpipe.model.profile", p.name)
             span.set_attribute("pkpipe.model.timeout_s", self._timeout(p))
             span.set_attribute("pkpipe.model.used_fallback", used_fallback)
+            if images:  # counts and bytes only, never the image (spec 021 SC-003)
+                span.set_attribute("pkpipe.model.images", len(images))
+                span.set_attribute("pkpipe.model.image_bytes", sum(len(i.data) for i in images))
             started = time.monotonic()
             try:
                 self._check_context(p, system, user, schema)
-                result = self._attempts(p, system, user, schema, span, started, used_fallback)
+                result = self._attempts(p, system, user, schema, span, started, used_fallback, images)
             except ModelError as exc:
                 span.set_status(StatusCode.ERROR, str(exc))
                 span.set_attribute("pkpipe.model.error", type(exc).__name__)
@@ -280,10 +305,11 @@ class OpenAIModel:
         span: Span,
         started: float,
         used_fallback: bool,
+        images: tuple[ImageInput, ...] = (),
     ) -> Completion:
-        messages: list[dict[str, str]] = [
+        messages: list[dict[str, Any]] = [
             {"role": "system", "content": system},
-            {"role": "user", "content": user},
+            {"role": "user", "content": _user_content(user, images)},
         ]
         prompt_tokens = completion_tokens = 0
         have_usage = False
@@ -348,7 +374,7 @@ class OpenAIModel:
         return obj
 
     def _request_retrying(
-        self, p: ResolvedProfile, messages: list[dict[str, str]], schema: dict[str, Any] | None, span: Span
+        self, p: ResolvedProfile, messages: list[dict[str, Any]], schema: dict[str, Any] | None, span: Span
     ) -> tuple[str, dict[str, Any], str | None]:
         """:meth:`_request` with up to ``retries`` extra tries on a transient failure (connection, timeout,
         5xx, 408/429, "Model unloaded"; never a 404 for an unknown model), waiting ``retry_backoff_s`` * 2^n
@@ -366,7 +392,7 @@ class OpenAIModel:
         raise AssertionError("unreachable")  # pragma: no cover
 
     def _request(
-        self, p: ResolvedProfile, messages: list[dict[str, str]], schema: dict[str, Any] | None
+        self, p: ResolvedProfile, messages: list[dict[str, Any]], schema: dict[str, Any] | None
     ) -> tuple[str, dict[str, Any], str | None]:
         body: dict[str, Any] = {"model": p.model, "messages": messages, "temperature": p.temperature}
         if p.max_tokens:
@@ -415,6 +441,18 @@ class OpenAIModel:
             if schema is not None and _is_single_json_object(reasoning):
                 content = reasoning
         return content, payload.get("usage") or {}, finish
+
+
+def _user_content(user: str, images: tuple[ImageInput, ...]) -> str | list[dict[str, Any]]:
+    """The user message: the plain text, or (with images) the OpenAI content parts: the text, then every image
+    as an ``image_url`` data URL."""
+    if not images:
+        return user
+    parts: list[dict[str, Any]] = [{"type": "text", "text": user}]
+    for image in images:
+        encoded = base64.b64encode(image.data).decode("ascii")
+        parts.append({"type": "image_url", "image_url": {"url": f"data:{image.media_type};base64,{encoded}"}})
+    return parts
 
 
 def _is_single_json_object(text: str) -> bool:

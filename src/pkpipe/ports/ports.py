@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
@@ -28,10 +30,35 @@ class ContextOverflow(ModelError):
     """The prompt does not fit the model context window. Never truncated silently."""
 
 
+class ImagesNotSupported(ModelError):
+    """Images were sent to a model profile that does not declare ``vision: true`` (spec 021 FR-003). Stable
+    error: nothing was sent, and a fallback profile without ``vision`` is refused the same way."""
+
+
+@dataclass(frozen=True)
+class ImageInput:
+    """One image for a vision model (spec 021): the bytes (normally the JPEG made by ``image.prepare``) and
+    their media type. The bytes are private content: they are never part of ``repr``, a log line or a span."""
+
+    data: bytes = field(repr=False)
+    media_type: str = "image/jpeg"
+
+    @property
+    def sha256(self) -> str:
+        return hashlib.sha256(self.data).hexdigest()
+
+    def __repr__(self) -> str:
+        return f"ImageInput({self.media_type}, {len(self.data)} bytes)"
+
+
 @runtime_checkable
 class ModelPort(Protocol):
     """Structured completions. ``json_schema=None`` returns ``{"text": <reply>}``; otherwise the validated
-    JSON object. ``profile`` names an entry of models.json. Raises :class:`ModelError` subclasses."""
+    JSON object. ``profile`` names an entry of models.json. Raises :class:`ModelError` subclasses.
+
+    ``images`` (spec 021) are attached to the user message; the profile must declare ``vision: true``
+    (:class:`ImagesNotSupported` otherwise). Without images nothing changes: callers pass the argument only
+    when they have images, so a model that predates it keeps working."""
 
     def complete(
         self,
@@ -39,11 +66,32 @@ class ModelPort(Protocol):
         user: str,
         json_schema: dict[str, Any] | None = None,
         profile: str = "default",
+        images: Sequence[ImageInput] | None = None,
     ) -> dict[str, Any]: ...
 
 
 class ClassifierUnavailable(Exception):
     """The injection classifier (model files, runtime) is not usable; callers fail closed."""
+
+
+@runtime_checkable
+class ImageStorePort(Protocol):
+    """Description cache and timing table of image input (spec 021 FR-012, FR-014), in the app DB.
+
+    The cache key is ``(sha256 of the prepared bytes, model, prompt_version)``; the value is the validated
+    description (JSON). Timings are the seconds a model call took per image, the seed of the next run's
+    estimate: ``recent_seconds`` returns the last ``limit`` rows of the model, newest first. Neither holds
+    image bytes."""
+
+    def cache_get(self, sha256: str, model: str, prompt_version: str) -> dict[str, Any] | None: ...
+
+    def cache_put(
+        self, sha256: str, model: str, prompt_version: str, description: dict[str, Any]
+    ) -> None: ...
+
+    def record_timing(self, run_id: str, sha256: str, model: str, seconds: float) -> None: ...
+
+    def recent_seconds(self, model: str, limit: int = 50) -> list[float]: ...
 
 
 @runtime_checkable

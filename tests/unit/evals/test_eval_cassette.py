@@ -272,3 +272,35 @@ def test_migration_refuses_duplicate_requests(tmp_path):
     _v1(path, e, {**e, "response": {"a": 2}})
     with pytest.raises(MigrationError, match="two entries"):
         migrate_v1(path)
+
+
+# -- spec 021: images are part of the key (digests), never recorded as bytes ----------------------
+
+
+def test_the_image_digest_is_part_of_the_cassette_key_and_no_bytes_are_stored(tmp_path):
+    from pkpipe.evals.cassette import CassetteMiss, CassetteModel
+    from pkpipe.ports import ImageInput
+    from tests.fakes import FakeModel
+
+    path = tmp_path / "images.json"
+    a, b = ImageInput(b"image-a"), ImageInput(b"image-b")
+    inner = FakeModel([{"v": "a"}])
+    rec = CassetteModel(path, "record", inner=inner, identities={"vision": "http://x|m"})
+    assert rec.complete("s", "u", None, profile="vision", images=[a]) == {"v": "a"}
+    assert inner.calls[0]["images"] == [a.sha256]
+    rec.save()
+    text = path.read_text(encoding="utf-8")
+    assert a.sha256 in text and "image-a" not in text
+    play = CassetteModel(path, "replay", identities={"vision": "http://x|m"})
+    assert play.complete("s", "u", None, profile="vision", images=[a]) == {"v": "a"}
+    with pytest.raises(CassetteMiss):  # another image, same prompt: a miss, never another image's answer
+        play.complete("s", "u", None, profile="vision", images=[b])
+    with pytest.raises(CassetteMiss):  # the same prompt without the image is another request
+        play.complete("s", "u", None, profile="vision")
+
+
+def test_a_text_request_keeps_its_key_after_the_images_change():
+    from pkpipe.evals.cassette import request_key
+
+    assert request_key("s", "u", None, "p") == request_key("s", "u", None, "p", ())
+    assert request_key("s", "u", None, "p", ["abc"]) != request_key("s", "u", None, "p")

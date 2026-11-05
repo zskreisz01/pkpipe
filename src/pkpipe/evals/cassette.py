@@ -32,6 +32,7 @@ import hashlib
 import json
 import re
 import threading
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Literal
 
@@ -39,6 +40,7 @@ from pkpipe.ports import (
     ClassifierPort,
     ClassifierUnavailable,
     ContextOverflow,
+    ImageInput,
     ModelError,
     ModelPort,
     ModelUnavailable,
@@ -97,18 +99,25 @@ def normalise(text: str) -> str:
     return _CANARY.sub("CANARY", text)
 
 
-def request_key(system: str, user: str, json_schema: dict[str, Any] | None, profile: str) -> str:
-    """The model-independent request digest (the whole key of a format 1 cassette)."""
+def request_key(
+    system: str,
+    user: str,
+    json_schema: dict[str, Any] | None,
+    profile: str,
+    images: Sequence[str] = (),
+) -> str:
+    """The model-independent request digest (the whole key of a format 1 cassette). ``images`` are the sha256
+    digests of the attached images (spec 021): part of the digest only when there are some, so a text request
+    keeps its key. The image bytes themselves are never recorded."""
     # the system prompt's datamark notice names the token of the user prompt: normalise both together
     tokens = set(_TOKEN.findall(user)) | set(_TOKEN.findall(system))
     for token in tokens:
         system, user = system.replace(token, "TOKEN"), user.replace(token, "TOKEN")
     system, user = _CANARY.sub("CANARY", system), _CANARY.sub("CANARY", user)
-    canonical = json.dumps(
-        {"system": system, "user": user, "schema": json_schema, "profile": profile},
-        sort_keys=True,
-        ensure_ascii=False,
-    )
+    payload: dict[str, Any] = {"system": system, "user": user, "schema": json_schema, "profile": profile}
+    if images:
+        payload["images"] = list(images)
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -165,8 +174,10 @@ class CassetteModel:
         user: str,
         json_schema: dict[str, Any] | None = None,
         profile: str = "default",
+        images: Sequence[ImageInput] | None = None,
     ) -> dict[str, Any]:
-        digest = request_key(system, user, json_schema, profile)
+        image_digests = [i.sha256 for i in images or ()]
+        digest = request_key(system, user, json_schema, profile, image_digests)
         model = self.model_for(profile)
         key = cassette_key(digest, model)
         with self._lock:
@@ -200,8 +211,13 @@ class CassetteModel:
             "server": server_of(identity),
             "request": {"system": normalise(system), "user": normalise(user), "json_schema": json_schema},
         }
+        if image_digests:
+            entry["request"]["images"] = image_digests  # digests only, never the bytes
         try:
-            reply = self.inner.complete(system, user, json_schema, profile=profile)
+            if images:
+                reply = self.inner.complete(system, user, json_schema, profile=profile, images=images)
+            else:
+                reply = self.inner.complete(system, user, json_schema, profile=profile)
             entry["response"] = reply
         except ModelError as exc:
             if not isinstance(exc, SchemaError | ContextOverflow):

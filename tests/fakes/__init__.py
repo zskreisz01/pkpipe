@@ -4,6 +4,7 @@ from tests.fakes.classifier import FakeClassifier
 from tests.fakes.clock import FakeClock
 from tests.fakes.config import InMemoryConfig
 from tests.fakes.context_store import FakeContextStore
+from tests.fakes.image_store import FakeImageStore
 from tests.fakes.learning import FakeLearningBackend
 from tests.fakes.model import FakeModel
 from tests.fakes.notify import FakeNotify
@@ -14,12 +15,14 @@ from tests.fakes.state import InMemoryState
 from tests.fakes.system import FakeSystemProbe
 from tests.fakes.tools import FakeTools
 from tests.fakes.tracer import RecordedSpan, RecordingTracer
+from tests.fakes.vision import FakeVisionModel
 from tests.fakes.web import FakeSearch, FakeWeb
 
 __all__ = [
     "FakeClassifier",
     "FakeClock",
     "FakeContextStore",
+    "FakeImageStore",
     "FakeLearningBackend",
     "FakeModel",
     "FakeNotify",
@@ -28,6 +31,7 @@ __all__ = [
     "FakeSnapshots",
     "FakeSystemProbe",
     "FakeTools",
+    "FakeVisionModel",
     "FakeWeb",
     "InMemoryConfig",
     "InMemoryRunStore",

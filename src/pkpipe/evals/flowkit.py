@@ -204,7 +204,9 @@ class ScriptedModel:
             return False
         return True
 
-    def complete(self, system: str, user: str, json_schema=None, profile: str = "default") -> dict[str, Any]:
+    def complete(
+        self, system: str, user: str, json_schema=None, profile: str = "default", images=None
+    ) -> dict[str, Any]:
         self.calls += 1
         for rule in self.rules:
             if self._matches(rule, system, user, json_schema):

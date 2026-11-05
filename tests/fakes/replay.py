@@ -30,6 +30,7 @@ class ReplayModel:
         user: str,
         json_schema: dict[str, Any] | None = None,
         profile: str = "default",
+        images=None,
     ) -> dict[str, Any]:
         self.calls.append({"system": system, "user": user, "json_schema": json_schema, "profile": profile})
         for rec in self.recordings:
