@@ -34,7 +34,7 @@ class TriageRow(BaseModel):
     state: ItemState = ItemState.SUGGESTED
     #: ``note`` or the entry kind of the list file (``link``, ``image``, ``text_link``, ``text``; spec 020)
     kind: str = "note"
-    #: The category is the owner's decision (an image entry: the model reads no pixels)
+    #: The category is the owner's decision (an image entry: the model port has no image input yet, spec 021)
     needs_owner: bool = False
 
     @field_validator("kind", mode="before")
