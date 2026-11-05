@@ -25,6 +25,8 @@ from pkpipe.obsidian.policy import VaultPolicy
 from pkpipe.ports import (
     ClassifierPort,
     ContextStorePort,
+    ImagePreparePort,
+    ImageStorePort,
     ModelPort,
     NotifyPort,
     SecurityLogPort,
@@ -178,11 +180,30 @@ def make_context_store(overlay_dir: Path | None = None) -> ContextStorePort | No
     return FileContextStore(overlay) if overlay is not None else None
 
 
-def ports_for(snapshot: ConfigSnapshot, overlay_dir: Path | None = None) -> StepPorts:
+def make_image_preparer() -> ImagePreparePort:
+    """The Pillow adapter of image preparation (spec 021; the optional extra ``images``: without it an image
+    fails with the reason ``pillow_missing`` and the owner decides its category)."""
+    from pkpipe.adapters.image_pillow import PillowPreparer
+
+    return PillowPreparer()
+
+
+def make_image_store(db_path: Path | None = None) -> ImageStorePort:
+    """The description cache and the timing table of image input: tables of the app DB (spec 021)."""
+    from pkpipe.adapters.app_store_sqlite import AppStore
+
+    return AppStore(db_path or default_db_path())
+
+
+def ports_for(
+    snapshot: ConfigSnapshot, overlay_dir: Path | None = None, db_path: Path | None = None
+) -> StepPorts:
     """Adapters for one pinned config (model profiles and tool servers come from that version)."""
     extra: dict = {
         "classifier": make_classifier(snapshot),
         "security_log": make_security_log(snapshot, overlay_dir),
+        "image_preparer": make_image_preparer(),
+        "image_store": make_image_store(db_path),
     }
     store = make_context_store(overlay_dir)
     if store is not None:
@@ -210,7 +231,7 @@ def build_run_service(
         store=SqliteRunStore(db),
         checkpointer=open_checkpointer(db),
         config=lambda: load_effective(pack_dir, overlay_dir).snapshot(),
-        ports_for=ports or (lambda snapshot: ports_for(snapshot, overlay_dir)),
+        ports_for=ports or (lambda snapshot: ports_for(snapshot, overlay_dir, db)),
         snapshots_for=snapshots or (lambda snapshot: make_snapshots(snapshot, db)),
     )
 

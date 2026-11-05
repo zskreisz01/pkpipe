@@ -75,7 +75,7 @@ IMAGE_PREPARER_PORT = "image_preparer"
 _NO_DNS_ADDRESS = "93.184.216.34"
 _READ_CODES = ("not_found", "bad_name", "bad_type", "too_large")
 VIEWER_FLAG = "viewer"
-#: Item fields that belong to one image of the batch; ``image.next`` clears them before the next image.
+#: Item fields that belong to one image of the batch; ``image.budget`` clears them before the next image.
 _PER_IMAGE_FIELDS = (
     "description",
     "image_ok",
@@ -135,11 +135,12 @@ def prompt_version(ctx: StepContext, node) -> str:
     """Digest of what makes a description: the system prompt, the instruction and the schema of the session.
     A changed prompt or schema is a new cache key, so an old description is never served for it."""
     cfg = node.config
-    parts = [
-        ctx.snapshot.asset(f"prompts/system/{cfg.get('system')}.md") or "",
-        ctx.snapshot.asset(f"instructions/{cfg['instruction']}") if cfg.get("instruction") else "",
-        ctx.snapshot.asset(f"schemas/{cfg['output_schema']}.json") if cfg.get("output_schema") else "",
+    assets = [
+        ctx.snapshot.asset(f"prompts/system/{cfg.get('system')}.md"),
+        ctx.snapshot.asset(f"instructions/{cfg['instruction']}") if cfg.get("instruction") else None,
+        ctx.snapshot.asset(f"schemas/{cfg['output_schema']}.json") if cfg.get("output_schema") else None,
     ]
+    parts = [a or "" for a in assets]
     return hashlib.sha256("\x00".join(parts).encode("utf-8")).hexdigest()[:12]
 
 
@@ -293,11 +294,12 @@ def plan(ctx: StepContext, session: str = DEFAULT_SESSION) -> StepResult:
     return StepResult(output=out, item={"batch": state})
 
 
-@register_code("image.next", data_class=DATA_CLASS)
-def next_image(ctx: StepContext) -> StepResult:
-    """BPMN: Images left? / expected end < time budget?. Decides before every image: ``continue`` (the image
-    becomes the current item, the fields of the previous one are cleared), ``stop`` (the budget would be
-    reached: this image and the rest are deferred, untouched in the INBOX list) or ``done``."""
+@register_code("image.budget", data_class=DATA_CLASS)
+def budget(ctx: StepContext) -> StepResult:
+    """BPMN: Images left? / expected end < time budget? (FR-014, the time guard). Decides before every image:
+    ``continue`` (the image becomes the current item, the fields of the previous one are cleared), ``stop``
+    (the budget would be reached: this image and the rest are deferred, untouched in the INBOX list) or
+    ``done``."""
     state, decision = batch.next_image((ctx.item or {})["batch"], now=ctx.ports.clock.now())
     out = {
         "decision": decision,

@@ -90,6 +90,12 @@ files = [
   "src/pkpipe/obsidian/scope.py",
   "src/pkpipe/adapters/snapshot_files.py",
   "src/pkpipe/engine/restore.py",
+  # spec 021
+  "src/pkpipe/domain/images.py",
+  "src/pkpipe/domain/image_batch.py",
+  "src/pkpipe/domain/data_classes.py",
+  "src/pkpipe/steps/image_code.py",
+  "src/pkpipe/adapters/image_pillow.py",
 ]
 ignore_missing_imports = true
 follow_imports = "silent"

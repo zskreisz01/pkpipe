@@ -8,7 +8,7 @@ title: Operations
 
 | Trigger | Flow | Notes |
 | --- | --- | --- |
-| `0 20 * * *` | `triage` | Categorize new INBOX items, notify |
+| `0 20 * * *` | `triage` | Categorize new INBOX items (phase one, text model), describe new image entries (phase two, vision model, time-boxed), notify |
 | `0 6 * * *` | `process_released` | Process confirmed or overridden items |
 | `0 19 * * 0` | `context_refresh` | Rebuild context packs |
 | `30 21 * * *` | `improvement_extract` | Optional, enabled by an overlay `schedules.json` entry: journal extraction ([cycle](process/self-improvement-cycle.md)) |
@@ -73,6 +73,17 @@ The default backend is Open Notebook with Speaches (Kokoro voice): `cd deploy/op
 ## Web search
 
 `uv run python -m pkpipe.websearch.server` serves `websearch:search(query, max_results)` on `127.0.0.1:8702` (loopback only; `deploy/launchd/io.pkpipe.web-search.plist.example`). Backend: SearXNG at `--searxng-url` / `PKPIPE_SEARXNG_URL` (default `http://127.0.0.1:8080`; `deploy/docker-compose.yml` starts one with the JSON API enabled, `SEARXNG_SECRET` required) or `--backend brave` with `BRAVE_API_KEY`. Results are `{title, url, snippet}`; a result with a non-http(s) URL, credentials, a private host or a deny-listed domain is dropped, text is stripped of tags and invisible characters and capped, at most 10 results. A failing backend returns `{"results": [], "error": "<code>"}`. The server never logs queries; the query guard runs in the engine before the call.
+
+## Image input
+
+Image entries of the INBOX list are described by a local vision model ([Image input](configuration.md#image-input), [Describe Images](process/describe-images.md)). What to know to run it:
+
+- **Two model phases, one switch.** The `triage` run first categorizes the text items on the `default` profile (`qwen3.5-9b-mlx`), then describes the images and categorizes their descriptions on the `vision` profile (`google/gemma-4-12b`). The profiles are never interleaved: the text model is not needed after the first phase, and the run logs a hint (`Image phase: ... may be unloaded now`) when the second starts, so a setup that keeps one model in memory can unload the text model then. The judge model is used by the evals and the publish gate only, never by a production run, so it does not compete for memory at night. `gemma-4-12b` is not used for the text steps: in two live runs its text sessions failed the code checks of the `sessions` suite and the security gate once (research in `specs/021-image-input/research.md`).
+- **Model memory and context.** Load both models with a context of 32768 (`scripts/lmstudio-test-setup.sh` does it with 4 parallel predictions; a load at 8192 is too small for the text sessions). The `vision` profile sets `context: 32768`; a prompt that cannot fit is refused, never truncated. Qwen3.5 always reasons through LM Studio and spends its token budget before the answer, which is why it is not the vision model.
+- **Time budget.** `images.time_budget_s` (default 7200, two hours) bounds the image batch of a cycle, counted from the start of the cycle: before every image the guard stops when `elapsed + running estimate` reaches it. The images left stay in the INBOX list untouched (no triage row, no removal) and are first in line the next day. At the start the run counts the images that need a model call (cached ones are free) and reports `count x estimate` (the log, and the event `images_estimate` to the channels routed in `channels.json`); the estimate is seeded from the median of the last 50 durations (table `image_timing` of the app DB) or `images.estimate_s` (60) on the first run, and replaced by the mean of this run's calls after every image. The notification at the end says how many images were described, taken from the cache, failed, quarantined and deferred. Measured: about 53 s per image on the Mac Mini under memory pressure (median, slowest 197 s; 42 images about 40 minutes), about 13 s per image on an idle machine (12 synthetic images in 153 s). The estimate is the control, not these numbers.
+- **One stuck image cannot spend the budget.** A description that takes longer than `images.per_image_timeout_s` (300) fails alone; the image goes to the owner (`needs_owner`) and the batch goes on. The abandoned request keeps running in LM Studio until the profile's own `timeout_s` (300), so keep that at or below the image timeout.
+- **Cache and DB.** The app DB holds the description cache (`image_cache`: hash of the prepared bytes, model, prompt version, the validated description) and the timing table. The same image twice, or an image that comes back after a restart, costs no model call; a changed prompt, schema or model is a new key. A restart in the middle of the batch loses nothing but the model call in flight (the prepared images are held in memory and prepared again).
+- **Images are read only.** `attachments_dir` is not a write destination and not part of a vault snapshot; the vault tool `read_image` reads one file by name.
 
 ## Evals
 
@@ -167,7 +178,7 @@ Telemetry is configured only from standard `OTEL_*` variables and exports OTLP h
 No core change is needed (constitution I, X).
 
 **Content capture:** off by default. A flow opts in through
-`telemetry.json` (`{"capture_content": {"flows": ["<flow-id>"]}}`, validated by `pkpipe validate`); flows handling the `journal` or `context` data class are forced off.
+`telemetry.json` (`{"capture_content": {"flows": ["<flow-id>"]}}`, validated by `pkpipe validate`); flows handling the `journal`, `context` or `image` data class are forced off (also the nested flows of a flow that has capture on).
 A scrubbing exporter strips prompt/response attributes (OpenInference `input.*`, `output.*`, `llm.*_messages`, ...),
 exception messages and status descriptions from every span of a flow with capture off, so a backend never sees them.
 Security flags are recorded as `security.flag` span events with detector, action and reason code only.

@@ -36,7 +36,7 @@
       "type": "code",
       "bpmn_element": "Images left? expected end < time budget?",
       "config": {
-        "function": "image.next"
+        "function": "image.budget"
       }
     },
     {

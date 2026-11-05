@@ -38,18 +38,20 @@ flowchart LR
     de -. image + prompt .-> lm[/Local model server, loopback/]
 ```
 
-## Implementation (spec 021, planned)
+## Implementation (spec 021)
 
 | BPMN element | Code | Notes |
 | --- | --- | --- |
-| Count and estimate, Report the estimate, budget gateway, Update estimate, Leave the rest untouched | Code step `image.budget` (FR-014) | Pure function with an injectable clock: counts uncached images, estimates, decides `continue` or `stop` before every image, records per-image seconds; a deferred item gets no row and no removal |
-| Time budget, estimate seed, timeout | `config/images.json`: `time_budget_s` (7200), `estimate_s` (60), `per_image_timeout_s` (300) | The seed is the median of the last 50 timing rows of the model |
-| read_image | Vault tool `read_image` (FR-004) | Basename only, extensions `jpg jpeg png webp gif`, size limit; `attachments_dir` is read-only (FR-010) |
-| Prepare | Code step `image.prepare` (FR-005) | EXIF removal, scaling to `images.max_side`, JPEG re-encode; the hash of the prepared bytes is the cache key |
-| Cache hit? | Description cache table in the app DB (FR-012) | Key: hash, model, prompt version; the triage row shows `topic` only |
-| Describe | Session `describe_image` (FR-006), data class `image` (FR-009) | No tools, loopback model only, `max_tokens`, one retry, then `needs_owner` |
-| per-image timeout (300 s) | Per-image timeout around the model call | Counts as a failure of that image; the loop continues |
-| Output guard + canary | Output guard and canary rules of spec 009 (FR-007) | On `visible_text` and `topic`; URLs found in the image pass the URL policy first |
+| Count and estimate, Report the estimate | `image.plan` (flow `describe_images`) and the event `images_estimate` | Reads and prepares every image once, so the batch knows which are cached (free) and which fail without a model call; the seed of the estimate is the median of the last 50 timing rows of the model, else `images.estimate_s`. The read and the preparation of the diagram's loop are therefore already done here (the loop finds the prepared image in the buffer; if it is not there, it is read and prepared again), which keeps the count exact; the diagram stays as drawn |
+| Budget gateway, Leave the rest untouched | `image.budget` (FR-014) | The pure guard of `pkpipe.domain.image_batch` with the clock port as its only time source: stops before an image when `elapsed + running estimate` reaches `images.time_budget_s`; `elapsed` runs from the start of the cycle; the images left have no row and no removal |
+| Update estimate | `image.record` | The mean of this run's model calls replaces the estimate; every call also goes to the timing table of the app DB |
+| Time budget, estimate seed, timeout | `config/images.json`: `time_budget_s` (7200), `estimate_s` (60), `per_image_timeout_s` (300) | |
+| read_image | Vault tool `read_image` (FR-004) | Basename only, extensions `jpg jpeg png webp gif`, size limit, symlink refusal; `attachments_dir` is read-only (FR-010) |
+| Prepare | `image.prepare` over the port `ImagePreparePort` (Pillow adapter, FR-005) | EXIF removal, scaling to `images.max_side`, JPEG re-encode, pixel limit; the hash of the prepared bytes is the cache key |
+| Cache hit? | Description cache in the app DB (`ImageStorePort`, FR-012) | Key: hash, model, prompt version; the triage row shows `topic` only |
+| Describe | Session `describe` of `describe_image_item`, step type `vision` (FR-006), data class `image` (FR-009) | No tools, loopback model only, `max_tokens`, `images.retries` attempts, then `needs_owner` |
+| per-image timeout (300 s) | The `vision` step | Counts as a failure of that image; the loop continues |
+| Output guard + canary | `output_guard` behind `describe` (FR-007), then `image.finish` | On `visible_text`, `topic`, `urls`, `evidence`; the URL policy and the deny-list for `urls` |
 | Handle security flag | [Handle Security Flag](handle-security-flag.md) | Only that image is quarantined |
-| Pass the description to the category session | Triage image branch (FR-008) | The extract of an image item is its description; the categorizing session is the existing one |
-| Write batch report | `ImageBatchReport` (run output and notification) | `images_total`, `cached`, `described`, `failed`, `deferred`, `estimate_start_s`, `estimate_end_s`, `elapsed_s`, `stopped_by_budget` |
+| Pass the description to the category session | `inbox.source_note`, `triage.category_menu`, session `suggest` on the `vision` profile, `output_guard`, `triage.check_category` (FR-008) | The extract of an image item is its description (kind, topic, visible text, the URLs that passed); `category_hint` is not passed on |
+| Write batch report | `image.finish_batch` (`ImageBatchReport`) | Counts, estimates, elapsed; the rows go to the triage file, the message into the `triage_ready` notification |
