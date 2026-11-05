@@ -16,7 +16,8 @@
       "read_tool_candidates",
       "update_tool_candidates",
       "quarantine_note",
-      "inbox_remove_entries"
+      "inbox_remove_entries",
+      "read_image"
     ]
   },
   "websearch": {

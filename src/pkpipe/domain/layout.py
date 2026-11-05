@@ -209,9 +209,8 @@ class VaultLayout(BaseModel):
                 self.quarantine_dir,
                 self.agent_tasks_dir,
                 self.proposals_dir,
-                self.attachments_dir,
                 self.context_review_dir,
-            )
+            )  # attachments_dir is read only (spec 021 FR-010): never part of a snapshot
         ]
         top = {r.split("/")[0] for r in roots}
         return sorted(top)
@@ -264,6 +263,7 @@ class VaultLayout(BaseModel):
             "update_tool_candidates": [self.areas_dir],
             "quarantine_note": [self.inbox_dir],
             "inbox_remove_entries": [self.inbox_dir, self.archive_root],
+            "read_image": [self.attachments_dir],  # its own entry: no other tool reads or writes images
         }
 
     def tool_paths(self) -> list[tuple[str, str, str]]:
@@ -282,6 +282,7 @@ class VaultLayout(BaseModel):
             ("quarantine_note", "quarantine_dir", self.quarantine_dir),
             ("read_note", "journal_pattern", self.journal_pattern),
             ("read_notes", "journal_pattern", self.journal_pattern),
+            ("read_image", "attachments_dir", self.attachments_dir),
         ]
         if self.inbox_list_file:
             out += [
@@ -340,7 +341,8 @@ STRUCTURAL_FIELDS = (
 
 
 #: Folders flows write notes into; they must lie in the folders the write tools default to.
-WRITE_DESTINATION_FIELDS = ("agent_tasks_dir", "proposals_dir", "attachments_dir", "context_review_dir")
+#: ``attachments_dir`` is not one of them: the engine only reads it (``read_image``, spec 021 FR-010).
+WRITE_DESTINATION_FIELDS = ("agent_tasks_dir", "proposals_dir", "context_review_dir")
 
 
 def layout_structure_errors(layout: VaultLayout) -> list[str]:

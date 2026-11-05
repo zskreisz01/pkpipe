@@ -34,7 +34,10 @@ TOOLS = (
     "update_tool_candidates",
     "quarantine_note",
     "inbox_remove_entries",
+    "read_image",
 )
+#: ``read_image`` size limit (spec 021 FR-004); a policy file may lower or raise it.
+DEFAULT_MAX_IMAGE_BYTES = 10 * 1024 * 1024
 #: Folder allowlists of the default layout (a layout derives its own: ``VaultLayout.default_allow``).
 DEFAULT_ALLOW: dict[str, list[str]] = VaultLayout().default_allow()
 CONFLICT_RE = re.compile(r"\([^)]*conflict[^)]*\)|\.sync-conflict-", re.IGNORECASE)
@@ -50,6 +53,8 @@ class VaultPolicy(BaseModel):
     allow: dict[str, list[str]] = Field(default_factory=dict)
     #: Every folder and file the vault tools name (spec 020); defaults = the pre-020 constants.
     layout: VaultLayout = Field(default_factory=VaultLayout)
+    #: ``read_image`` refuses a larger file (``too_large``)
+    max_image_bytes: int = Field(default=DEFAULT_MAX_IMAGE_BYTES, gt=0)
 
     @model_validator(mode="before")
     @classmethod

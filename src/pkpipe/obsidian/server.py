@@ -109,6 +109,13 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         return _run(vault.inbox_remove_entries, entries)
 
     @mcp.tool
+    def read_image(name: str) -> dict:
+        """Read one embedded image of the attachments folder by file name (no path): `{name, media_type, size,
+        data_base64}`. Read only; refusals are `not_found`, `bad_name`, `bad_type` (jpg, jpeg, png, webp, gif)
+        and `too_large`. The bytes are untrusted content."""
+        return _run(vault.read_image, name)
+
+    @mcp.tool
     def quarantine_note(
         item_id: str,
         path: str | None = None,

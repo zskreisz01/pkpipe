@@ -25,6 +25,7 @@ TOOLS = {
     "update_tool_candidates",
     "quarantine_note",
     "inbox_remove_entries",
+    "read_image",  # spec 021
 }
 
 TRAVERSAL = [

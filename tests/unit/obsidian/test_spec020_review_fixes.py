@@ -169,7 +169,7 @@ def test_note_source_when_no_list_file_and_list_source_when_named():
 def test_every_write_destination_follows_the_layout(tmp_path, layout):
     assert layout_structure_errors(layout) == []
     vault = Vault(VaultPolicy(vault_dir=tmp_path, layout=layout.model_dump()))
-    dests = [layout.agent_tasks_dir, layout.proposals_dir, layout.attachments_dir, layout.context_review_dir]
+    dests = [layout.agent_tasks_dir, layout.proposals_dir, layout.context_review_dir]
     for d in dests:
         assert vault.write_note(f"{d}/n.md", "x")["path"] == f"{d}/n.md"
     other = "1-Inbox" if layout is DEFAULT_LAYOUT else "0-INBOX"
@@ -180,9 +180,7 @@ def test_every_write_destination_follows_the_layout(tmp_path, layout):
     assert layout.inbox_archive_pattern.split("/")[0] in roots
 
 
-@pytest.mark.parametrize(
-    "field", ["agent_tasks_dir", "proposals_dir", "attachments_dir", "context_review_dir"]
-)
+@pytest.mark.parametrize("field", ["agent_tasks_dir", "proposals_dir", "context_review_dir"])
 def test_a_half_moved_write_destination_fails_validation(field):
     layout = VaultLayout(**{field: "Elsewhere/x"})
     errors = layout_structure_errors(layout)

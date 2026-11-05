@@ -19,7 +19,7 @@ from pkpipe.telemetry import set_span_attributes, tool_span
 
 from . import improvements, lists, tool_candidates
 from .atomic import dir_lock, update_text
-from .errors import NoteExists, NoteNotFound, PathRejected, VaultError, WriteConflict
+from .errors import ImageRejected, NoteExists, NoteNotFound, PathRejected, VaultError, WriteConflict
 from .notes import append_text, dump_front_matter, jsonable, parse_note, render_note
 from .policy import VaultPolicy, is_conflict_name
 
@@ -52,6 +52,28 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+IMAGE_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
+
+
+def image_signature_ok(media_type: str, head: bytes) -> bool:
+    """The first bytes of a file say it is the image type its extension claims (no decoding here)."""
+    if media_type == "image/jpeg":
+        return head.startswith(b"\xff\xd8\xff")
+    if media_type == "image/png":
+        return head.startswith(b"\x89PNG\r\n\x1a\n")
+    if media_type == "image/gif":
+        return head.startswith((b"GIF87a", b"GIF89a"))
+    if media_type == "image/webp":
+        return head[:4] == b"RIFF" and head[8:12] == b"WEBP"
+    return False
+
+
 MAX_NOTES = 60
 MAX_ENTRIES = 200
 MAX_REPLANS = 3
@@ -68,6 +90,74 @@ class Vault:
     def __init__(self, policy: VaultPolicy, *, today: Callable[[], date] = date.today):
         self.policy = policy
         self._today = today
+
+    # -- images (spec 021) ---------------------------------------------------------------------------------
+
+    @_traced
+    def read_image(self, name: str) -> dict[str, Any]:
+        """Read one embedded image of ``attachments_dir`` (read only, own allowlist entry) by its basename.
+
+        Refusals have a stable code: ``bad_name`` (path segments, hidden or odd names, a symlink),
+        ``bad_type`` (extension not ``jpg jpeg png webp gif`` or content that is not that image type),
+        ``not_found`` and ``too_large`` (``max_image_bytes``). Returns ``{name, media_type, size,
+        data_base64}``; the bytes are untrusted content and never decoded here."""
+        import base64
+
+        if (
+            not isinstance(name, str)
+            or not name.strip()
+            or name != name.strip()
+            or any(c in name for c in ("/", "\\", "\x00", ":"))
+            or name.startswith((".", "~"))
+        ):
+            raise ImageRejected("bad_name", "give the file name only")
+        media_type = IMAGE_TYPES.get(Path(name).suffix.lower())
+        if media_type is None:
+            raise ImageRejected("bad_type", "allowed: " + ", ".join(sorted(IMAGE_TYPES)))
+        try:
+            folder = self.policy.resolve(self.policy.layout.attachments_dir, "read_image", kind="folder")
+        except PathRejected:
+            raise ImageRejected("not_found", "the attachments folder is not readable") from None
+        if not folder.is_dir():
+            raise ImageRejected("not_found", "no such image")
+        target = self._find_image(folder, name)
+        if target is None:
+            raise ImageRejected("not_found", "no such image")
+        if target.is_symlink():
+            raise ImageRejected("bad_name", "symbolic links are not read")
+        try:
+            inside = target.resolve().relative_to(folder.resolve())
+        except ValueError:
+            raise ImageRejected("bad_name", "the file lies outside the attachments folder") from None
+        if unicodedata.normalize("NFC", inside.name) != unicodedata.normalize("NFC", name):
+            raise ImageRejected("bad_name", "the file lies outside the attachments folder")
+        size = target.stat().st_size
+        if size > self.policy.max_image_bytes:
+            raise ImageRejected("too_large", f"limit {self.policy.max_image_bytes} bytes")
+        data = target.read_bytes()
+        if not image_signature_ok(media_type, data[:16]):
+            raise ImageRejected("bad_type", "the content is not the image type of the extension")
+        return {
+            "name": name,
+            "media_type": media_type,
+            "size": len(data),
+            "data_base64": base64.b64encode(data).decode("ascii"),
+        }
+
+    @staticmethod
+    def _find_image(folder: Path, name: str) -> Path | None:
+        """The file called ``name`` directly in ``folder``, else the first match (sorted) in a real subfolder;
+        symbolic links to folders are never followed."""
+        direct = folder / name
+        if direct.is_symlink() or direct.is_file():
+            return direct
+        want = unicodedata.normalize("NFC", name)  # macOS file names may be decomposed (NFD)
+        for root, dirs, files in os.walk(folder, followlinks=False):
+            dirs[:] = sorted(d for d in dirs if not d.startswith(".") and not (Path(root) / d).is_symlink())
+            for f in sorted(files):
+                if unicodedata.normalize("NFC", f) == want:
+                    return Path(root) / f
+        return None
 
     # -- notes -----------------------------------------------------------------------------------------------
 

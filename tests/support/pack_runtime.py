@@ -84,6 +84,7 @@ def vault_tools(
             "obsidian:update_tool_candidates": lambda rows: vault.update_tool_candidates(rows),
             "obsidian:quarantine_note": vault.quarantine_note,
             "obsidian:inbox_remove_entries": lambda entries: vault.inbox_remove_entries(entries),
+            "obsidian:read_image": lambda name: vault.read_image(name),
             "learning:create": learning.create,
             "learning:status": learning.status,
             "learning:link": learning.link,
