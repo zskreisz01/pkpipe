@@ -55,6 +55,9 @@ def prepare_image(
     except (UnidentifiedImageError, OSError, ValueError, SyntaxError) as exc:
         # SyntaxError: Pillow's PNG/TIFF parsers raise it for a corrupt file
         raise ImageError("decode_failed", type(exc).__name__) from None
+    # a new image from the pixels alone: convert() and thumbnail() keep ``info`` (JPEG and GIF comments, XMP,
+    # ICC), and the JPEG writer re-emits a comment found there
+    rgb = Image.frombytes("RGB", rgb.size, rgb.tobytes())
     if max(rgb.size) > max_side:
         rgb.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
     out = io.BytesIO()

@@ -139,3 +139,19 @@ def test_the_adapter_is_the_port():
     assert isinstance(PillowPreparer(), ImagePreparePort)
     out = PillowPreparer().prepare(images.solid((2000, 1000)), max_side=500, max_pixels=10_000_000)
     assert max(out.width, out.height) == 500
+
+
+def test_a_jpeg_comment_and_a_gif_comment_do_not_survive():
+    from PIL import Image
+
+    jpeg = io.BytesIO()
+    Image.new("RGB", (40, 30), "red").save(jpeg, format="JPEG", comment=b"owner-secret-jpeg-comment")
+    assert b"owner-secret-jpeg-comment" in jpeg.getvalue()
+    gif = io.BytesIO()
+    Image.new("RGB", (40, 30), "blue").save(gif, format="GIF", comment=b"owner-secret-gif-comment")
+    assert b"owner-secret-gif-comment" in gif.getvalue()
+    for raw in (jpeg.getvalue(), gif.getvalue()):
+        out = prepare_image(raw)
+        assert b"owner-secret" not in out.data
+        assert not reopen(out.data).info.get("comment")
+        assert set(reopen(out.data).info) <= {"jfif", "jfif_version", "jfif_unit", "jfif_density", "dpi"}
