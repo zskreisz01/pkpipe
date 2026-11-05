@@ -521,6 +521,41 @@ class SnapshotsConfig(_Strict):
     )
 
 
+# images.json -----------------------------------------------------------------------------------------------
+class ImagesConfig(_Strict):
+    """Image input (spec 021 FR-011, data-model.md ``images.json``): the time budget of the image batch, the
+    preparation of an image and the limits of one description call."""
+
+    time_budget_s: int = Field(
+        default=7200,
+        gt=0,
+        description="The image batch of one cycle stops before an image whose expected end (elapsed + running "
+        "estimate) reaches this; the rest stays in the INBOX list untouched",
+    )
+    estimate_s: float = Field(
+        default=60.0, gt=0, description="Seconds per image before there is any measurement (first run)"
+    )
+    per_image_timeout_s: int = Field(
+        default=300, gt=0, description="Hard limit for the description of one image; it fails alone"
+    )
+    max_side: int = Field(default=1024, ge=64, le=4096, description="Longest side after scaling, in pixels")
+    max_tokens: int = Field(
+        default=1200,
+        gt=0,
+        description="Upper limit of the answer tokens of a description: the vision profile's max_tokens must "
+        "not exceed it",
+    )
+    max_bytes: int = Field(default=10 * 1024 * 1024, gt=0, description="Largest image file that is read")
+    retries: int = Field(
+        default=1, ge=0, le=3, description="Repeated description attempts after an invalid answer"
+    )
+    max_pixels: int = Field(
+        default=40_000_000,
+        gt=0,
+        description="Decoded pixel limit (decompression bomb guard, from the header)",
+    )
+
+
 # registry --------------------------------------------------------------------------------------------------
 from pkpipe.domain.layout import VaultLayout  # noqa: E402  (layout.json is validated by the domain model)
 
@@ -534,6 +569,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "security": SecurityConfig,
     "layout": VaultLayout,
     "snapshots": SnapshotsConfig,
+    "images": ImagesConfig,
     "telemetry": TelemetrySettings,
     "evals": EvalsConfig,
 }

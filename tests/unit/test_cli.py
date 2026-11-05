@@ -88,6 +88,7 @@ def test_schema_command_writes_one_schema_per_config_file(tmp_path, capsys):
             "security",
             "layout",
             "snapshots",
+            "images",
             "telemetry",
             "evals",
             "flow",
