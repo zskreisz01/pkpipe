@@ -4,7 +4,13 @@ import pytest
 
 from pkpipe.obsidian.models import TriageRow
 
-BASE = {"item": "a1", "resource": "https://x.example", "suggested": "tool", "override": "", "state": "suggested"}
+BASE = {
+    "item": "a1",
+    "resource": "https://x.example",
+    "suggested": "tool",
+    "override": "",
+    "state": "suggested",
+}
 
 
 @pytest.mark.parametrize("mark", ["[x]", "[X]", "[ x]", "[x ]", " [ x ] ", "[  x ]"])
