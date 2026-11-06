@@ -71,7 +71,7 @@ def build_services(
     store = AppStore(db)
     workspace = ConfigWorkspace(pack, overlay)
     vault_path = vault_dir if vault_dir is not None else _env_path(VAULT_ENV)
-    vault = default_vault(vault_path)
+    vault = default_vault(vault_path, app.vault_policy_for(runs.config(), vault_path))
     if snapshots is None:  # the restore of spec 019: same vault policy as the runs' snapshots
         snapshots = app.make_snapshots(runs.config(), db, vault_path)
     return AppServices(
@@ -84,7 +84,15 @@ def build_services(
         gate_factory=gate_factory or default_gate_factory(overlay),
         candidates_dir=app.candidates_dir(overlay),
         snapshots=snapshots,
+        image_preparer=_image_preparer(app),
     )
+
+
+def _image_preparer(app):
+    """The Pillow preparer for UI thumbnails, or None without the optional extra ``images``."""
+    from pkpipe.adapters.image_pillow import pillow_available
+
+    return app.make_image_preparer() if pillow_available() else None
 
 
 def _env_path(name: str) -> Path | None:

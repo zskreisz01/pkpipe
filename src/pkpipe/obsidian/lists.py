@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -120,7 +122,9 @@ def _normalise_triage_update(update: dict[str, Any], existing: dict[str, str] | 
     return candidate
 
 
-def update_triage(path: Path, updates: list[dict[str, Any]]) -> dict[str, Any]:
+def update_triage(
+    path: Path, updates: list[dict[str, Any]], *, preamble: str = TRIAGE_PREAMBLE
+) -> dict[str, Any]:
     """Upsert rows by item id.
 
     Provided fields overwrite, omitted fields keep the file's current value. ``confirm`` and ``override``
@@ -132,12 +136,10 @@ def update_triage(path: Path, updates: list[dict[str, Any]]) -> dict[str, Any]:
     if (
         not updates
     ):  # the maintenance call (spec 022): the column migration only, nothing is written if current
-        return _maintain_triage(path)
+        return _maintain_triage(path, preamble)
 
     def transform(text: str | None) -> str:
-        table = TableFile(
-            text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE, optional=TRIAGE_OPTIONAL
-        )
+        table = TableFile(text, TRIAGE_COLUMNS, key="item", preamble=preamble, optional=TRIAGE_OPTIONAL)
         _prepare_table(table)
         outcome: dict[str, list[str]] = {"inserted": [], "updated": [], "unchanged": []}
         errors: list[str] = []
@@ -188,16 +190,14 @@ def _prepare_table(table: TableFile) -> None:
     table.widen()
 
 
-def _maintain_triage(path: Path) -> dict[str, Any]:
+def _maintain_triage(path: Path, preamble: str = TRIAGE_PREAMBLE) -> dict[str, Any]:
     """``update_triage([])``: migrate and widen the table of an existing file; write only when it changes."""
     empty: dict[str, list[str]] = {"inserted": [], "updated": [], "unchanged": []}
     if not path.exists():
         return {**empty, "conflicts": find_conflicts(path)}
 
     def transform(text: str | None) -> str:
-        table = TableFile(
-            text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE, optional=TRIAGE_OPTIONAL
-        )
+        table = TableFile(text, TRIAGE_COLUMNS, key="item", preamble=preamble, optional=TRIAGE_OPTIONAL)
         _prepare_table(table)
         return table.render()
 
@@ -214,14 +214,12 @@ def _plain_resource(value: object) -> str:
     return match.group(1).strip() if match else text
 
 
-def _owner_edit(path: Path, item_id: str, change) -> dict[str, Any]:
+def _owner_edit(path: Path, item_id: str, change, preamble: str = TRIAGE_PREAMBLE) -> dict[str, Any]:
     """Apply ``change(current_row) -> new_row`` to one existing triage row under the file lock."""
     result: dict[str, Any] = {}
 
     def transform(text: str | None) -> str:
-        table = TableFile(
-            text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE, optional=TRIAGE_OPTIONAL
-        )
+        table = TableFile(text, TRIAGE_COLUMNS, key="item", preamble=preamble, optional=TRIAGE_OPTIONAL)
         _prepare_table(table)
         existing = table.get(item_id)
         if existing is None:
@@ -248,7 +246,8 @@ def owner_decide(
     *,
     confirm: bool | None = None,
     override: str | None = None,
-    categories: set[str] | frozenset[str] | None = None,
+    categories: Mapping[str, Mapping[str, object]] | set[str] | frozenset[str] | None = None,
+    preamble: str = TRIAGE_PREAMBLE,
 ) -> dict[str, Any]:
     """The owner's confirm tick and/or override category for one item, written to the triage file.
 
@@ -258,25 +257,46 @@ def owner_decide(
     """
 
     def change(row: TriageRow) -> TriageRow:
-        check_owner_decision(row.state, confirm=confirm, override=override, categories=categories)
+        value = check_owner_decision(row.state, confirm=confirm, override=override, categories=categories)
         data = row.model_dump()
         if confirm is not None:
             data["confirm"] = confirm
         if override is not None:
-            data["override"] = override.strip() or None
+            data["override"] = value or None
         return TriageRow(**data)
 
-    return _owner_edit(path, item_id, change)
+    return _owner_edit(path, item_id, change, preamble)
 
 
-def release_quarantine(path: Path, item_id: str) -> dict[str, Any]:
+COMMENT_MAX_CHARS = 1000
+_COMMENT_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def clean_comment(value: object) -> str:
+    """The comment the owner typed, fit for one table cell: control characters dropped, line breaks and tabs
+    become blanks, at most :data:`COMMENT_MAX_CHARS` characters. Nothing else is changed (no neutralising:
+    it is the owner's own text, and a model gets it only as a datamarked, capped input)."""
+    text = str(value or "").replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    return _COMMENT_CONTROL.sub("", text).strip()[:COMMENT_MAX_CHARS]
+
+
+def owner_comment(path: Path, item_id: str, comment: str, preamble: str = TRIAGE_PREAMBLE) -> dict[str, Any]:
+    """The owner's comment of one row (owner channels only: the UI; the vault tools refuse a comment)."""
+
+    def change(row: TriageRow) -> TriageRow:
+        return row.model_copy(update={"comment": clean_comment(comment)})
+
+    return _owner_edit(path, item_id, change, preamble)
+
+
+def release_quarantine(path: Path, item_id: str, preamble: str = TRIAGE_PREAMBLE) -> dict[str, Any]:
     """Owner decision: a quarantined item is a false positive; it goes back to ``pending`` for triage."""
 
     def change(row: TriageRow) -> TriageRow:
         check_quarantine_release(row.state)
         return row.model_copy(update={"state": ItemState.PENDING})
 
-    return _owner_edit(path, item_id, change)
+    return _owner_edit(path, item_id, change, preamble)
 
 
 def upsert_processing_list(path: Path, rows: list[dict[str, Any]]) -> dict[str, Any]:

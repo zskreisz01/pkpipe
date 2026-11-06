@@ -160,3 +160,49 @@ def test_the_requested_name_reaches_the_model_only_as_a_slug(world):
     assert "'gyerek-programok'" in call["user"] and "Gyerek Programok" not in call["user"]
     assert (world.vault / PROPOSALS / f"new-category-gyerek-programok-{VIDEO}.md").exists()
     assert item_id_for("0-INBOX/example-video.md") == VIDEO
+
+
+# -- spec 023: the owner's comment is the declared input owner_note ---------------------------------------
+NOTE = "CANARY-NOTE this is for the kids, keep it short"
+
+
+def _everything_but_models(world):
+    return json.dumps(
+        {
+            "notify": [(s.event, s.payload) for s in world.notify.sent],
+            "spans": [(s.name, s.attributes, s.events) for s in world.tracer.spans],
+        },
+        default=str,
+    )
+
+
+def test_the_comment_reaches_the_proposal_evaluation_with_the_requested_name_and_nowhere_else(world):
+    assert world.svc.start("triage").ok
+    owner_decides(world.vault, override={TOOL: "children"})
+    lists.owner_comment(world.vault / TRIAGE_FILE, TOOL, NOTE)
+    run = world.svc.start("process_released")
+    assert run.ok, run.error
+    [call] = _evaluate_calls(world)
+    assert "'children'" in call["user"] and NOTE in call["user"] and "### item.owner_note" in call["user"]
+    assert NOTE not in call["system"]
+    others = [c for c in world.model.calls if c is not call]
+    assert all(NOTE not in c["user"] + c["system"] for c in others)
+    assert "CANARY-NOTE" not in _everything_but_models(world)
+    assert "CANARY-NOTE" not in "".join(p.read_text(encoding="utf-8") for p in _notes(world))  # not in the note
+    row = next(r for r in lists.read_triage(world.vault / TRIAGE_FILE)["rows"] if r["item_id"] == TOOL)
+    assert row["comment"] == NOTE  # still the owner's, untouched
+
+
+def test_the_comment_directs_the_release_session_of_the_category(world):
+    assert world.svc.start("triage").ok
+    owner_decides(world.vault, override={TOOL: "misc"})
+    lists.owner_comment(world.vault / TRIAGE_FILE, TOOL, NOTE)
+    other = VIDEO  # a second released item without a comment
+    owner_decides(world.vault, confirm=[other])
+    run = world.svc.start("process_released")
+    assert run.ok, run.error
+    with_note = [c for c in world.model.calls if NOTE in c["user"]]
+    assert len(with_note) == 1 and "### item.owner_note" in with_note[0]["user"]
+    assert "CANARY-NOTE" not in _everything_but_models(world)
+    assert next(r for r in run.outputs["release"]["released"] if r["id"] == TOOL)["owner_note"] == NOTE
+    assert "owner_note" not in next(r for r in run.outputs["release"]["released"] if r["id"] == other)

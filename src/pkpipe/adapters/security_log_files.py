@@ -83,3 +83,27 @@ def append_eval_candidate(path: Path, case: dict[str, Any]) -> bool:
 
     update_text(path, transform)
     return added
+
+
+def upsert_eval_candidate(path: Path, case: dict[str, Any]) -> str:
+    """Add an eval case candidate, or replace the one with the same id (spec 023: an override candidate
+    gets its reason when the owner writes the comment later). Returns ``added``, ``updated`` or ``unchanged``."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(case, ensure_ascii=False, sort_keys=True)
+    outcome = "added"
+
+    def transform(text: str | None) -> str:
+        nonlocal outcome
+        lines = [x for x in (text or "").splitlines() if x.strip()]
+        for i, existing in enumerate(lines):
+            if json.loads(existing).get("id") == case.get("id"):
+                outcome = "unchanged" if existing == line else "updated"
+                lines[i] = line
+                break
+        else:
+            outcome = "added"
+            lines.append(line)
+        return "\n".join(lines) + "\n"
+
+    update_text(path, transform)
+    return outcome

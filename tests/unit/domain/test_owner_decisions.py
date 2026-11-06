@@ -30,7 +30,12 @@ def test_final_or_quarantined_items_cannot_be_decided(state):
 
 def test_override_must_be_a_known_category_and_a_decision_is_required():
     with pytest.raises(OwnerDecisionError, match="unknown category"):
-        check_owner_decision(ItemState.PENDING, override="invented", categories=CATS)
+        check_owner_decision(ItemState.PENDING, override="<script>alert(1)</script>", categories=CATS)
+    with pytest.raises(OwnerDecisionError, match="unknown category"):
+        check_owner_decision(ItemState.PENDING, override="x", categories=CATS)  # a slug needs 2 characters
+    # spec 023: a valid new-category name is accepted and stored as its slug (the next release proposes it)
+    assert check_owner_decision(ItemState.PENDING, override="Children Books", categories=CATS) == "children-books"
+    assert check_owner_decision(ItemState.PENDING, override=" Tool ", categories=CATS) == "tool"
     with pytest.raises(OwnerDecisionError, match="nothing to decide"):
         check_owner_decision(ItemState.PENDING, categories=CATS)
     check_owner_decision(ItemState.PENDING, override="  ", confirm=False, categories=CATS)  # clears override

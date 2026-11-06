@@ -25,6 +25,7 @@ from pydantic import Field
 
 from pkpipe.domain import session_plan as plans
 from pkpipe.domain import tool_candidate as tcs
+from pkpipe.domain.data_classes import is_private
 from pkpipe.engine.config_models import Session
 from pkpipe.ports import ModelError
 from pkpipe.steps.base import (
@@ -102,6 +103,8 @@ def session_inputs(
         elif ref == plans.TEXT_REF:
             if note_text is not None:
                 out[ref] = note_text
+        elif ref == plans.OWNER_NOTE_REF and is_private(getattr(getattr(ctx, "flow", None), "data_classes", ())):
+            continue  # a flow of a private data class (journal, context, image) never receives the note
         else:
             field = ref.split(".", 1)[1]
             value = item.get(field)

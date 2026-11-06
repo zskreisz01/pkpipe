@@ -859,8 +859,9 @@ def test_an_answer_that_leaked_the_canary_is_never_salvaged(vault, pack_dir, ove
 
 
 def test_a_triage_run_migrates_an_old_table_keeps_the_comments_and_leaks_nothing(vault, pack_dir, overlay):
-    """The live file is migrated by simply running triage; the owner's words reach no model, tool result,
-    notification, span or log."""
+    """The live file is migrated by simply running triage. Spec 023: the comment is owner input (the code
+    steps read it with the rows), but a triage run sends it to no model, notification or span: it is a
+    session input only through the declared ``owner_note`` of a release."""
     triage = vault / "0-INBOX/Inbox-Triage.md"
     old = item_id_for("0-INBOX/old.md")
     triage.write_text(
@@ -882,10 +883,8 @@ def test_a_triage_run_migrates_an_old_table_keeps_the_comments_and_leaks_nothing
     everything = json.dumps(
         {
             "model": [(c["system"], c["user"]) for c in w.model.calls],
-            "tools": [str(c) for c in w.ports.tools.calls],
             "notify": [(s.event, s.payload) for s in w.notify.sent],
             "spans": [(s.name, s.attributes, s.events) for s in w.tracer.spans],
-            "state": run.state,
         },
         default=str,
     )

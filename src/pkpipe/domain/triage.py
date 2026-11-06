@@ -161,27 +161,55 @@ def check_owner_decision(
     *,
     confirm: bool | None = None,
     override: str | None = None,
-    categories: frozenset[str] | set[str] | None = None,
-) -> None:
+    categories: Mapping[str, Mapping[str, object]] | frozenset[str] | set[str] | None = None,
+) -> str | None:
     """Raise :class:`OwnerDecisionError` unless the owner may confirm or override an item in ``state``.
 
     Used by the owner channels (UI, app MCP; spec 014 FR-002). Quarantined and processed items cannot be
-    confirmed (a quarantined item first needs :func:`check_quarantine_release`), and an override must name
-    a configured category (constitution V: code decides what is valid).
+    confirmed (a quarantined item first needs :func:`check_quarantine_release`), and an override must be a
+    configured category (an exact id, or an obvious variant of an id or label, stored as the id) or, since
+    spec 023, a valid new-category name (stored as its slug: the next release proposes the category, spec
+    022). Code decides what is valid (constitution V). Returns the override to store, or ``None`` when none
+    was given. ``categories`` may be a set of ids (no labels) or a mapping id -> category.
     """
     if state not in DECIDABLE:
         raise OwnerDecisionError(f"an item in state '{state.value}' cannot be confirmed or overridden")
     if override is not None and override.strip():
-        if categories is not None and override.strip() not in categories:
-            raise OwnerDecisionError(f"unknown category '{override.strip()}'")
-    elif confirm is None:
+        value = override.strip()
+        if categories is None:
+            return value
+        known = categories if isinstance(categories, Mapping) else dict.fromkeys(categories, {})
+        kind, found = resolve_category(value, known)
+        if kind == "invalid" or found is None:
+            raise OwnerDecisionError(
+                f"unknown category '{value[:60]}': pick a configured category or write a new name "
+                "(letters, digits, hyphens)"
+            )
+        return found
+    if confirm is None:
         raise OwnerDecisionError("nothing to decide: give confirm or an override category")
+    return None
 
 
 def check_quarantine_release(state: ItemState) -> None:
     """Only a quarantined item can be released from quarantine (back to ``pending`` for a new decision)."""
     if state is not ItemState.QUARANTINED:
         raise OwnerDecisionError(f"item is '{state.value}', not quarantined")
+
+
+# -- the owner's note (spec 023) -------------------------------------------------------------------------
+OWNER_NOTE_MAX_CHARS = 1000
+
+
+def clean_owner_note(value: object) -> str:
+    """The owner's ``comment`` as the declared session input ``owner_note``: control and invisible
+    (format) characters dropped, white space collapsed to single blanks, at most
+    :data:`OWNER_NOTE_MAX_CHARS` characters. It is owner-authored, so it is trusted as intent, but it is
+    still only ever offered as marked data (datamarked, never in a system prompt)."""
+    text = "".join(
+        ch if (ch.isspace() or unicodedata.category(ch) not in ("Cc", "Cf")) else " " for ch in str(value or "")
+    )
+    return " ".join(text.split())[:OWNER_NOTE_MAX_CHARS]
 
 
 # -- the owner's override naming no configured category (spec 022) -------------------------------------------

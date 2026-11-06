@@ -264,7 +264,9 @@ def test_unreadable_rows_stay_byte_for_byte(tmp_path):
 # -- the comment leaves the vault nowhere --------------------------------------------------------------------
 
 
-def test_the_vault_tool_read_triage_leaves_the_comment_out_but_the_owner_channel_keeps_it(tmp_path):
+def test_the_vault_tool_read_triage_exposes_the_comment_to_the_code_steps_and_the_owner_channels(tmp_path):
+    """Spec 023 clarification 2 reverses spec 022: the comment is owner input. The code steps that route it
+    (and the UI) read it through ``read_triage``; a model gets it only as the declared ``owner_note``."""
     (tmp_path / "0-INBOX").mkdir()
     vault = Vault(VaultPolicy(vault_dir=tmp_path))
     vault.update_triage([note_row()])
@@ -280,10 +282,8 @@ def test_the_vault_tool_read_triage_leaves_the_comment_out_but_the_owner_channel
         encoding="utf-8",
     )
     tool_result = vault.read_triage()
-    assert "PRIVATE-OWNER-WORDS" not in repr(tool_result) and "comment" not in tool_result["rows"][0]
-    assert (
-        lists.read_triage(path)["rows"][0]["comment"] == "PRIVATE-OWNER-WORDS"
-    )  # the owner channels read it
+    assert tool_result["rows"][0]["comment"] == "PRIVATE-OWNER-WORDS"
+    assert lists.read_triage(path)["rows"][0]["comment"] == "PRIVATE-OWNER-WORDS"
 
 
 def test_the_row_model_round_trips_the_comment_and_the_schema_lists_it():

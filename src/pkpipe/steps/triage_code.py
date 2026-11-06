@@ -12,6 +12,7 @@ from pkpipe.domain.inbox_list import EntryKind, list_items, parse_list
 from pkpipe.domain.triage import (
     ItemState,
     TriageItem,
+    clean_owner_note,
     is_unreviewed,
     item_id_for,
     needs_decision,
@@ -358,6 +359,7 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
     items = []
     awaiting = 0
     originals: dict[str, ItemState] = {}
+    notes: dict[str, str] = {}  # the owner's comment as the declared input owner_note (spec 023)
     for r in (triage or {}).get("rows", []):
         state = ItemState(r.get("state", "suggested"))
         override = r.get("override") or None
@@ -368,6 +370,8 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
         else:
             kind = "none"
         originals[r["item_id"]] = state
+        if note := clean_owner_note(r.get("comment")):
+            notes[r["item_id"]] = note
         if state is ItemState.AWAITING_CATEGORY:
             if kind not in ("exact", "normalised"):
                 awaiting += 1  # still waits for the category: no second evaluation, no second note
@@ -397,6 +401,7 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
                     "resource": i.resource,
                     **({"path": i.resource} if i.kind == "note" else {"kind": i.kind, "source": "list"}),
                     "requested_category": slug,
+                    **({"owner_note": notes[i.id]} if i.id in notes else {}),
                 }
             )
             i.state = before[i.id]  # unchanged: the proposal flow writes ``awaiting_category``
@@ -417,6 +422,7 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
             "category": i.effective_category,
             "subflow": cats[i.effective_category]["subflow"],
             "para_path": layout.expand(cats[i.effective_category]["para_path"]),
+            **({"owner_note": notes[i.id]} if i.id in notes else {}),
         }
         for i in released
     ]

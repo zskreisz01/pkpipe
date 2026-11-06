@@ -28,12 +28,14 @@ def test_confirm_writes_the_triage_file_and_is_audited(stack):
     )
 
 
-def test_override_must_name_a_configured_category(stack):
+def test_override_must_name_a_configured_category_or_a_valid_new_name(stack):
     ids = seed_triage(stack, a="tool")
     client = api_client(stack)
-    bad = client.post(f"/api/triage/{ids['a']}/override", json={"category": "no-such-category"})
+    bad = client.post(f"/api/triage/{ids['a']}/override", json={"category": "<b>no such</b>"})
     assert bad.status_code == 409 and "unknown category" in bad.json()["error"]
     assert _rows(stack)[ids["a"]]["override"] is None
+    new = client.post(f"/api/triage/{ids['a']}/override", json={"category": "Children Books"})
+    assert new.status_code == 200 and _rows(stack)[ids["a"]]["override"] == "children-books"  # spec 023
     assert client.post(f"/api/triage/{ids['a']}/override", json={"category": ""}).status_code == 409
     ok = client.post(f"/api/triage/{ids['a']}/override", json={"category": "marketing"})
     assert ok.status_code == 200 and _rows(stack)[ids["a"]]["override"] == "marketing"

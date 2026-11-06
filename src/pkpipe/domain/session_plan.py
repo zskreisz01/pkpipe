@@ -35,6 +35,9 @@ from pkpipe.domain.text_safety import neutralize_text
 #: Inputs that are raw, unvalidated text: a session with tools must never receive them (constitution IV).
 RAW_INPUTS = frozenset({"*", "item", "item.text", "item.body", "item.content", "item.raw"})
 EXTRACT_REF = "item.extract"
+#: Spec 023: the owner's comment on the item, a declared input (never part of ``*`` or ``item``): owner
+#: authored, so trusted as intent, but offered as datamarked data like every input.
+OWNER_NOTE_REF = "item.owner_note"
 TEXT_REF = "item.text"
 ENTERPRISE = "enterprise"
 #: FR-003: an instruction is about this many tokens at most (estimated as a quarter of its characters).
@@ -276,6 +279,11 @@ _SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 PROPOSAL_STATE = "awaiting_category"
 
 
+def proposal_path(folder: str, requested: str, item_id: str) -> str:
+    """Where the proposal note of a new category for one item is written (below ``layout.proposals_dir``)."""
+    return f"{folder.rstrip('/')}/new-category-{requested}-{item_id}.md"
+
+
 def proposal_note(
     requested: str,
     output: Mapping[str, Any],
@@ -338,4 +346,4 @@ def proposal_note(
         "category_id": requested,
         "pkpipe_item": item_id,
     }
-    return f"{folder.rstrip('/')}/new-category-{requested}-{item_id}.md", body, front
+    return proposal_path(folder, requested, item_id), body, front

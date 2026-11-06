@@ -53,6 +53,12 @@ class VaultPolicy(BaseModel):
     allow: dict[str, list[str]] = Field(default_factory=dict)
     #: Every folder and file the vault tools name (spec 020); defaults = the pre-020 constants.
     layout: VaultLayout = Field(default_factory=VaultLayout)
+    #: Spec 023: where the triage table lives (mirrors ``triage.json`` ``surface``; ``pkpipe validate`` checks
+    #: both agree): ``vault`` = the triage file, ``web`` = ``layout.triage_data_file``.
+    triage_surface: Literal["vault", "web"] = "vault"
+    #: Spec 023: the address of the web UI, shown on the generated triage page (``web`` surface); mirrors
+    #: ``ui.json`` ``public_url``.
+    ui_public_url: str | None = None
     #: ``read_image`` refuses a larger file (``too_large``)
     max_image_bytes: int = Field(default=DEFAULT_MAX_IMAGE_BYTES, gt=0)
 
@@ -131,7 +137,13 @@ class VaultPolicy(BaseModel):
 
     @property
     def managed_files(self) -> tuple[str, ...]:
-        files = [self.triage_file, self.processing_list, self.improvement_file, self.tool_candidates_file]
+        files = [
+            self.triage_file,
+            self.layout.triage_data,
+            self.processing_list,
+            self.improvement_file,
+            self.tool_candidates_file,
+        ]
         if self.layout.inbox_list_file:
             files.append(self.layout.inbox_list_file)
         return tuple(files)
