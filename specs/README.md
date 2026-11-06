@@ -27,6 +27,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [019-vault-snapshots](019-vault-snapshots/spec.md) | Vault snapshots and restore | Completed | data-model |
 | [020-vault-layout-and-inbox-list](020-vault-layout-and-inbox-list/spec.md) | Configurable vault layout and list-style INBOX | Completed | data-model |
 | [021-image-input](021-image-input/spec.md) | Image input and the image description session | Completed | research · data-model |
+| [022-owner-comment-and-new-categories](022-owner-comment-and-new-categories/spec.md) | Owner comment column and proposals for new categories | Active | data-model |
 
 ## Implementation order
 
