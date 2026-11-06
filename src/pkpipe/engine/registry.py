@@ -45,7 +45,8 @@ CORE_DEFAULTS: dict[str, Any] = {
     "layout": DEFAULT_LAYOUT.model_dump(),
     #: spec 019: retention of the vault snapshots taken before a writing run
     "snapshots": {"retention_days": 14, "max_bytes": 1024**3, "max_file_bytes": 5 * 1024**2},
-    #: spec 023: where the triage decisions are made (``vault``: the table in the triage file) and how the UI is reached
+    #: spec 023: where the triage decisions are made (``vault``: the table in the triage file) and how the
+    #: UI is reached
     "triage": {"surface": "vault"},
     "ui": {"public_url": None, "allowed_hosts": []},
     "channels": {"channels": {}, "routes": {}},

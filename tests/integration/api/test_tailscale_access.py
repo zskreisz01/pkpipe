@@ -1,4 +1,5 @@
-"""Spec 023 US4: the UI over Tailscale. ``ui.json`` (public_url, allowed_hosts) extends the Host allowlist; the
+"""Spec 023 US4: the UI over Tailscale. ``ui.json`` (public_url, allowed_hosts) extends the Host
+allowlist; the
 owner token, the session CSRF token and the same-origin check stay exactly as they were."""
 
 from __future__ import annotations
@@ -18,7 +19,9 @@ UI = {"public_url": f"https://{MAGIC}", "allowed_hosts": [TS_IP]}
 @pytest.fixture
 def web(stack):
     hosts, public_url = ui_settings({"ui": UI})
-    return create_app(stack.services, stack.tokens, bind_host="127.0.0.1", extra_hosts=hosts, public_url=public_url)
+    return create_app(
+        stack.services, stack.tokens, bind_host="127.0.0.1", extra_hosts=hosts, public_url=public_url
+    )
 
 
 def client(web, host):
@@ -60,13 +63,23 @@ def test_login_cookie_is_secure_behind_tailscale_serve_and_csrf_and_origin_still
     c = client(web, MAGIC)
     resp = c.post("/login", data={"token": OWNER_TOKEN}, headers={"Origin": f"http://{MAGIC}"})
     assert resp.status_code == 303 and "secure" in resp.headers["set-cookie"].lower()  # public_url is https
-    assert "httponly" in resp.headers["set-cookie"].lower() and "samesite=strict" in resp.headers["set-cookie"].lower()
+    assert (
+        "httponly" in resp.headers["set-cookie"].lower()
+        and "samesite=strict" in resp.headers["set-cookie"].lower()
+    )
     sid = c.cookies["pkpipe_session"]
     csrf = web.state.sessions.csrf(sid)
     # the Secure cookie is not replayed by the test client over http (tailscale serve terminates TLS)
     base = {"Origin": f"http://{MAGIC}", "Cookie": f"pkpipe_session={sid}"}
     assert c.post("/ui/runs", data={"flow": "triage"}, headers=base).status_code == 403  # no CSRF header
-    assert c.post("/ui/runs", data={"flow": "triage"}, headers={**base, "X-CSRF-Token": csrf, "Origin": "https://evil.example"}).status_code == 403
+    assert (
+        c.post(
+            "/ui/runs",
+            data={"flow": "triage"},
+            headers={**base, "X-CSRF-Token": csrf, "Origin": "https://evil.example"},
+        ).status_code
+        == 403
+    )
     ok = c.post("/ui/runs", data={"flow": "no_such"}, headers={**base, "X-CSRF-Token": csrf})
     assert ok.status_code == 200 and "unknown flow" in ok.text  # same-origin + CSRF: the request is processed
 

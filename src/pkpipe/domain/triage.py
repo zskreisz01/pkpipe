@@ -207,7 +207,8 @@ def clean_owner_note(value: object) -> str:
     :data:`OWNER_NOTE_MAX_CHARS` characters. It is owner-authored, so it is trusted as intent, but it is
     still only ever offered as marked data (datamarked, never in a system prompt)."""
     text = "".join(
-        ch if (ch.isspace() or unicodedata.category(ch) not in ("Cc", "Cf")) else " " for ch in str(value or "")
+        ch if (ch.isspace() or unicodedata.category(ch) not in ("Cc", "Cf")) else " "
+        for ch in str(value or "")
     )
     return " ".join(text.split())[:OWNER_NOTE_MAX_CHARS]
 

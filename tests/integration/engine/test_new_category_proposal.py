@@ -188,7 +188,9 @@ def test_the_comment_reaches_the_proposal_evaluation_with_the_requested_name_and
     others = [c for c in world.model.calls if c is not call]
     assert all(NOTE not in c["user"] + c["system"] for c in others)
     assert "CANARY-NOTE" not in _everything_but_models(world)
-    assert "CANARY-NOTE" not in "".join(p.read_text(encoding="utf-8") for p in _notes(world))  # not in the note
+    assert "CANARY-NOTE" not in "".join(
+        p.read_text(encoding="utf-8") for p in _notes(world)
+    )  # not in the note
     row = next(r for r in lists.read_triage(world.vault / TRIAGE_FILE)["rows"] if r["item_id"] == TOOL)
     assert row["comment"] == NOTE  # still the owner's, untouched
 

@@ -242,6 +242,15 @@ def suggested_rows(
     return {"rows": rows, "count": len(rows), "failed": failed, "quarantined": quarantined}
 
 
+def _decide_where(ctx: StepContext) -> str:
+    """Where the owner decides, for the messages: the triage file or, on the ``web`` surface, the UI."""
+    data = ctx.snapshot.data
+    if (data.get("triage") or {}).get("surface") == "web":
+        url = (data.get("ui") or {}).get("public_url")
+        return f"the web UI ({url}/triage)" if url else "the web UI"
+    return layout_of(ctx).triage_file
+
+
 @register_code("triage.backlog")
 def backlog(
     ctx: StepContext, triage: dict[str, Any], new_rows: list[dict[str, Any]] | None = None
@@ -288,7 +297,7 @@ def backlog(
         elif needs_decision(state, r.get("ai_suggested_category", ""), confirm, override, valid):
             invalid += 1
     new = len(fresh)
-    triage_file = layout_of(ctx).triage_file
+    triage_file = _decide_where(ctx)
     if new:
         message = f"Triage ready: {new} new item(s) to confirm or override in {triage_file}."
     else:

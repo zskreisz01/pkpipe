@@ -872,7 +872,7 @@ def test_a_triage_run_migrates_an_old_table_keeps_the_comments_and_leaks_nothing
         encoding="utf-8",
     )
     w = World(vault, pack_dir, overlay)
-    run = w.run()
+    w.run()
     row = (
         lists.read_triage(triage)["rows"][0]
         if False

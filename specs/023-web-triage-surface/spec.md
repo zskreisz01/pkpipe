@@ -1,8 +1,8 @@
 ---
 spec_id: 023-web-triage-surface
 title: Web triage surface, owner note to the sessions, one place for the triage data
-status: In Progress
-status_reason: Implementation started 2026-11-06 on branch spec/023-web-triage-surface (from spec/022, unreleased)
+status: Completed
+status_reason: Implemented 2026-11-06 on branch spec/023-web-triage-surface (from spec/022, unreleased; T001-T009); suite, ruff and mypy green; awaiting the owner's approval to publish
 description: The web UI becomes the primary decision surface for triage (images, all fields, filters, bulk actions, new-category proposals, comment); the owner's `comment` is owner input and reaches the sessions as the declared input `owner_note`; `triage.surface` (`vault` default, `web`) decides where the machine-owned table lives, so the data is edited in one place only; the UI is reachable over Tailscale (public_url, allowed_hosts); an English user guide.
 relevant_when:
   - triage
@@ -20,7 +20,7 @@ updated: 2026-11-06
 
 **Feature Branch**: `spec/023-web-triage-surface` (from `spec/022-owner-comment-and-new-categories`, which is unreleased: this spec amends it where it contradicts)
 **Created**: 2026-11-06
-**Status**: In Progress
+**Status**: Completed
 **Input**: Owner decisions (translated): the web UI is the primary place to decide; the Obsidian file stays a readable fallback; the comment is the owner's input and the sessions may use it; the data lives in one place; the UI is reached over Tailscale; an end-user guide.
 **Companions**: [data-model.md](data-model.md)
 
@@ -81,3 +81,5 @@ updated: 2026-11-06
 - **SC-001**: Migration of a live-shaped table (about 54 confirmed rows, image embeds, stray blanks) in both directions loses no cell and is idempotent
 - **SC-002**: A canary string in a comment appears in no trace capture, log, notification or span, and in no session that does not declare `item.owner_note`
 - **SC-003**: A query copied from a comment with a blocked term never reaches a tool
+
+9. **Decisions taken while implementing (Completed 2026-11-06).** `layout.triage_data_file` is optional and derived from `inbox_dir` (a fixed default would break every layout with another inbox folder). The vault policy mirrors `triage_surface` and `ui_public_url` because the page is written by the vault server process. The migration runs on the pipeline's write path only (maintenance call, `update_triage`); the UI decides on the file that holds the table and never moves it, so a snapshot always precedes a move. The sessions of the public pack declare `item.owner_note` (tool: research, compare, synthesize; marketing: extract, synthesize; misc: evaluate); no instruction file changed (the heading of the input says what it is), so no recorded eval request changed; eval cases with a note are not recorded yet (they need the real model). An override of the UI/API/MCP is a configured id or a valid new-category slug (spec 022's strict UI form is replaced). The owner's evening message names the web UI instead of the file on the `web` surface. Override candidates are collected when the owner decides or comments through the UI, API or MCP; an override typed in Obsidian is collected at the next such action.

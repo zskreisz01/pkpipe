@@ -42,7 +42,11 @@ def test_the_public_plans_are_listed_as_llm_steps_next_to_the_flow_nodes(snap):
 
 def test_a_session_node_is_built_like_the_step_builds_it(snap):
     node = find_node(snap, "tool", "research")
-    assert node.type == "llm_tools" and node.inputs == ["item.extract", "item.owner_note"] and node.config["canary"] is True
+    assert (
+        node.type == "llm_tools"
+        and node.inputs == ["item.extract", "item.owner_note"]
+        and node.config["canary"] is True
+    )
     assert node.config["tools"] == ["websearch:search"] and node.bpmn_element == "Run category sessions"
     cfg = cs.llm_config(node)  # the tools key is not part of the session prompt
     assert cfg.system == "researcher" and cfg.output_schema == "tool_research" and cfg.canary

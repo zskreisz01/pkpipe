@@ -313,33 +313,67 @@ def test_the_proposal_list_in_the_message_is_short_plain_slugs_only():
 def test_release_hands_the_comment_on_as_a_cleaned_capped_owner_note_for_released_items_and_proposals():
     rows = [
         {
-            "item_id": "a1", "resource": "0-INBOX/a.md", "ai_suggested_category": "tool",
-            "confirm": True, "state": "suggested", "comment": "  focus on\nthe  licence \x00 ​ ",
+            "item_id": "a1",
+            "resource": "0-INBOX/a.md",
+            "ai_suggested_category": "tool",
+            "confirm": True,
+            "state": "suggested",
+            "comment": "  focus on\nthe  licence \x00 ​ ",
         },
         {
-            "item_id": "b2", "resource": "0-INBOX/b.md", "ai_suggested_category": "tool",
-            "override": "children", "state": "suggested", "comment": "for the kids " + "x" * 2000,
+            "item_id": "b2",
+            "resource": "0-INBOX/b.md",
+            "ai_suggested_category": "tool",
+            "override": "children",
+            "state": "suggested",
+            "comment": "for the kids " + "x" * 2000,
         },
-        {"item_id": "c3", "resource": "0-INBOX/c.md", "ai_suggested_category": "tool", "confirm": True,
-         "state": "suggested", "comment": "   "},
-        {"item_id": "d4", "resource": "0-INBOX/d.md", "ai_suggested_category": "tool",
-         "state": "suggested", "comment": "waiting rows are not released: no note anywhere"},
+        {
+            "item_id": "c3",
+            "resource": "0-INBOX/c.md",
+            "ai_suggested_category": "tool",
+            "confirm": True,
+            "state": "suggested",
+            "comment": "   ",
+        },
+        {
+            "item_id": "d4",
+            "resource": "0-INBOX/d.md",
+            "ai_suggested_category": "tool",
+            "state": "suggested",
+            "comment": "waiting rows are not released: no note anywhere",
+        },
     ]
     out = CODE["triage.release"](_ctx(), triage={"rows": rows})
     released = {r["id"]: r for r in out["released"]}
     assert released["a1"]["owner_note"] == "focus on the licence"
     assert "owner_note" not in released["c3"]  # a blank comment is no note
     [proposal] = out["proposals"]
-    assert proposal["id"] == "b2" and proposal["owner_note"].startswith("for the kids x") and len(proposal["owner_note"]) == 1000
+    assert (
+        proposal["id"] == "b2"
+        and proposal["owner_note"].startswith("for the kids x")
+        and len(proposal["owner_note"]) == 1000
+    )
     assert "waiting rows" not in repr(out)  # only released items and proposals carry a note
 
 
 def test_the_notifications_never_quote_a_comment():
     rows = [
-        {"item_id": "a1", "resource": "0-INBOX/a.md", "ai_suggested_category": "tool", "state": "suggested",
-         "comment": "CANARY-NOTE"},
-        {"item_id": "b2", "resource": "0-INBOX/b.md", "ai_suggested_category": "tool", "state": "suggested",
-         "override": "children", "comment": "CANARY-NOTE"},
+        {
+            "item_id": "a1",
+            "resource": "0-INBOX/a.md",
+            "ai_suggested_category": "tool",
+            "state": "suggested",
+            "comment": "CANARY-NOTE",
+        },
+        {
+            "item_id": "b2",
+            "resource": "0-INBOX/b.md",
+            "ai_suggested_category": "tool",
+            "state": "suggested",
+            "override": "children",
+            "comment": "CANARY-NOTE",
+        },
     ]
     out = CODE["triage.backlog"](_ctx(), triage={"rows": rows}, new_rows=[])
     assert "CANARY-NOTE" not in repr(out)

@@ -191,7 +191,12 @@ def test_the_thumbnail_drops_metadata_and_never_fetches_a_url(stack, ui):
     exif = Image.open(BytesIO(got.content)).getexif()
     assert not dict(exif)  # EXIF with the invented GPS and device is gone
     assert ui.get(f"/ui/triage/{item_id_for('https://example.invalid/x.png')}/image").status_code == 404
-    assert "<img" not in ui.get("/triage").text.split('id="row-' + item_id_for("https://example.invalid/x.png"))[1].split("</tr>")[0]
+    assert (
+        "<img"
+        not in ui.get("/triage")
+        .text.split('id="row-' + item_id_for("https://example.invalid/x.png"))[1]
+        .split("</tr>")[0]
+    )
 
 
 def test_a_missing_or_oversized_or_fake_image_is_a_404_not_a_crash(stack, ui):
@@ -225,7 +230,9 @@ def test_overrides_become_private_eval_candidates_with_the_comment_as_the_reason
     before = path.read_text(encoding="utf-8")
     stack.services.collect_override_candidates()  # idempotent: one line per item, the first day kept
     assert path.read_text(encoding="utf-8") == before
-    assert stack.overlay.joinpath(".git").exists() and "evals/candidates" not in str(stack.pack)  # private only
+    assert stack.overlay.joinpath(".git").exists() and "evals/candidates" not in str(
+        stack.pack
+    )  # private only
 
 
 def test_the_surface_banner_and_the_web_surface_page(tmp_path, synthetic_vault, pack_dir):
@@ -251,12 +258,17 @@ def test_the_surface_banner_and_the_web_surface_page(tmp_path, synthetic_vault, 
     assert lists.read_triage(web.vault / "0-INBOX/_pkpipe/triage-data.md")["rows"][0]["confirm"] is True
 
 
-def test_a_switched_surface_shows_the_pending_move_and_never_an_empty_table(tmp_path, synthetic_vault, pack_dir):
+def test_a_switched_surface_shows_the_pending_move_and_never_an_empty_table(
+    tmp_path, synthetic_vault, pack_dir
+):
     web = make_stack(
         tmp_path,
         synthetic_vault,
         pack_dir,
-        {"triage.json": '{"surface": "web"}\n', "ui.json": '{"public_url": "https://mini.tail1234.ts.net"}\n'},
+        {
+            "triage.json": '{"surface": "web"}\n',
+            "ui.json": '{"public_url": "https://mini.tail1234.ts.net"}\n',
+        },
     )
     # the table is still in the page: the owner switched the config but no triage run moved it yet
     lists.update_triage(

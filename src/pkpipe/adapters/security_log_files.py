@@ -87,7 +87,8 @@ def append_eval_candidate(path: Path, case: dict[str, Any]) -> bool:
 
 def upsert_eval_candidate(path: Path, case: dict[str, Any]) -> str:
     """Add an eval case candidate, or replace the one with the same id (spec 023: an override candidate
-    gets its reason when the owner writes the comment later). Returns ``added``, ``updated`` or ``unchanged``."""
+    gets its reason when the owner writes the comment later). Returns ``added``, ``updated`` or
+    ``unchanged``."""
     path.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(case, ensure_ascii=False, sort_keys=True)
     outcome = "added"

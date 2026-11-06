@@ -422,9 +422,7 @@ def create_app(
         )
 
     @app.post("/ui/triage/{item_id}/override", response_class=HTMLResponse)
-    def ui_override(
-        request: Request, item_id: str, category: str = Form(""), new_category: str = Form("")
-    ):
+    def ui_override(request: Request, item_id: str, category: str = Form(""), new_category: str = Form("")):
         # a name typed into "propose a new category" wins over the dropdown; the server checks both alike
         value = new_category.strip() or category
         return triage_action(

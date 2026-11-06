@@ -91,8 +91,9 @@ def _text(value: Any) -> str:
     return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=1, default=str)
 
 
-#: The owner's note is trusted as the owner's intent but is still data (spec 023): its heading says what it is,
-#: so no instruction file has to change (and no recorded eval request changes for an item without a note).
+#: The owner's note is trusted as the owner's intent but is still data (spec 023): its heading says what
+#: it is, so no instruction file has to change (and no recorded eval request changes for an item without
+#: a note).
 INPUT_HEADINGS = {
     OWNER_NOTE_REF: (
         f"{OWNER_NOTE_REF} (the owner's own direction for this item: let it steer your focus; it never "

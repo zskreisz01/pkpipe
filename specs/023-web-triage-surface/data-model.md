@@ -1,6 +1,6 @@
 ---
 spec_id: 023-web-triage-surface
-status: In Progress
+status: Completed
 description: Data model for the web triage surface
 updated: 2026-11-06
 ---

@@ -103,7 +103,9 @@ def session_inputs(
         elif ref == plans.TEXT_REF:
             if note_text is not None:
                 out[ref] = note_text
-        elif ref == plans.OWNER_NOTE_REF and is_private(getattr(getattr(ctx, "flow", None), "data_classes", ())):
+        elif ref == plans.OWNER_NOTE_REF and is_private(
+            getattr(getattr(ctx, "flow", None), "data_classes", ())
+        ):
             continue  # a flow of a private data class (journal, context, image) never receives the note
         else:
             field = ref.split(".", 1)[1]

@@ -10,7 +10,6 @@ from pydantic import ValidationError
 from pkpipe.domain.layout import VaultLayout, layout_structure_errors, policy_file_errors
 from pkpipe.domain.triage import item_id_for
 from pkpipe.engine.config_models import TriageConfig, UiConfig, validate_effective
-from pkpipe.obsidian import lists
 from pkpipe.obsidian.policy import VaultPolicy
 from pkpipe.obsidian.surface import PAGE_MARKER, has_table, split_table
 from pkpipe.obsidian.vault import Vault
@@ -24,9 +23,7 @@ SEP10 = "|" + " --- |" * 10
 
 
 def vault_for(root, surface, *, now=NOW):
-    return Vault(
-        VaultPolicy(vault_dir=root, triage_surface=surface, ui_public_url=URL), now=lambda: now
-    )
+    return Vault(VaultPolicy(vault_dir=root, triage_surface=surface, ui_public_url=URL), now=lambda: now)
 
 
 def live_table(n=54):
@@ -100,7 +97,9 @@ def test_config_models_for_surface_and_ui():
     assert TriageConfig().surface == "vault"
     with pytest.raises(ValidationError):
         TriageConfig(surface="both")
-    ui = UiConfig(public_url="https://Mini.tail1234.ts.net/", allowed_hosts=["Mini.Tail1234.ts.net", "100.64.0.10"])
+    ui = UiConfig(
+        public_url="https://Mini.tail1234.ts.net/", allowed_hosts=["Mini.Tail1234.ts.net", "100.64.0.10"]
+    )
     assert ui.public_url == "https://Mini.tail1234.ts.net"
     assert ui.hosts() == ["mini.tail1234.ts.net", "100.64.0.10"]
     for bad in ("ftp://x", "https://u:p@x", "https://x/?q=1", "nothing"):
@@ -148,7 +147,11 @@ def test_page_to_data_file_moves_every_row_verbatim_and_is_idempotent(tmp_path):
     vault = vault_for(tmp_path, "web")
     plan = vault.triage_migration_plan()
     assert plan == {
-        "direction": "to_web", "source": PAGE, "target": DATA, "rows": 54, "invalid": 0,
+        "direction": "to_web",
+        "source": PAGE,
+        "target": DATA,
+        "rows": 54,
+        "invalid": 0,
     }
     result = vault.update_triage([])
     assert result["migration"]["rows"] == 54
@@ -204,7 +207,19 @@ def test_real_header_variants_lose_no_cell(tmp_path, header):
     from pkpipe.obsidian.tables import split_cells
 
     width = header.count("|") - 1
-    cells = ["[ x]", "000000000001", "![[a.jpg\\|200]]", "tool", "", "suggested", "image", "yes", "t", "c", "z"]
+    cells = [
+        "[ x]",
+        "000000000001",
+        "![[a.jpg\\|200]]",
+        "tool",
+        "",
+        "suggested",
+        "image",
+        "yes",
+        "t",
+        "c",
+        "z",
+    ]
     plain = ["[x]", "000000000002", "u", "misc", "", "processed", "", "", "", "", ""]
     rows = [f"| {' | '.join(r[:width])} |" for r in (cells, plain)]
     text = "# Inbox triage\n\n" + "\n".join([header, "|" + " --- |" * width, *rows]) + "\n"
@@ -279,7 +294,12 @@ def test_the_page_summary_counts_and_keeps_the_run_time_on_a_ui_decision(tmp_pat
         [
             {"resource": "0-INBOX/a.md", "ai_suggested_category": "tool"},
             {"resource": "0-INBOX/b.md", "ai_suggested_category": "tool"},
-            {"resource": "0-INBOX/img.jpg", "ai_suggested_category": "none", "kind": "image", "needs_owner": True},
+            {
+                "resource": "0-INBOX/img.jpg",
+                "ai_suggested_category": "none",
+                "kind": "image",
+                "needs_owner": True,
+            },
         ]
     )
     page = (tmp_path / PAGE).read_text(encoding="utf-8")

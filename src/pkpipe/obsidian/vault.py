@@ -18,11 +18,11 @@ from pkpipe.security import quarantine
 from pkpipe.telemetry import set_span_attributes, tool_span
 
 from . import improvements, lists, tool_candidates
-from .surface import DATA_PREAMBLE, TriageSurface
 from .atomic import dir_lock, update_text
 from .errors import ImageRejected, NoteExists, NoteNotFound, PathRejected, VaultError, WriteConflict
 from .notes import append_text, dump_front_matter, jsonable, parse_note, render_note
 from .policy import VaultPolicy, is_conflict_name
+from .surface import DATA_PREAMBLE, TriageSurface
 
 
 def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:

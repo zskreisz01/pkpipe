@@ -28,7 +28,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [020-vault-layout-and-inbox-list](020-vault-layout-and-inbox-list/spec.md) | Configurable vault layout and list-style INBOX | Completed | data-model |
 | [021-image-input](021-image-input/spec.md) | Image input and the image description session | Completed | research · data-model |
 | [022-owner-comment-and-new-categories](022-owner-comment-and-new-categories/spec.md) | Owner comment column and proposals for new categories | Completed | data-model |
-| [023-web-triage-surface](023-web-triage-surface/spec.md) | Web triage surface, owner note to the sessions, one place for the triage data | In Progress | data-model |
+| [023-web-triage-surface](023-web-triage-surface/spec.md) | Web triage surface, owner note to the sessions, one place for the triage data | Completed | data-model |
 
 ## Implementation order
 

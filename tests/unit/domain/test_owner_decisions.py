@@ -34,7 +34,10 @@ def test_override_must_be_a_known_category_and_a_decision_is_required():
     with pytest.raises(OwnerDecisionError, match="unknown category"):
         check_owner_decision(ItemState.PENDING, override="x", categories=CATS)  # a slug needs 2 characters
     # spec 023: a valid new-category name is accepted and stored as its slug (the next release proposes it)
-    assert check_owner_decision(ItemState.PENDING, override="Children Books", categories=CATS) == "children-books"
+    assert (
+        check_owner_decision(ItemState.PENDING, override="Children Books", categories=CATS)
+        == "children-books"
+    )
     assert check_owner_decision(ItemState.PENDING, override=" Tool ", categories=CATS) == "tool"
     with pytest.raises(OwnerDecisionError, match="nothing to decide"):
         check_owner_decision(ItemState.PENDING, categories=CATS)
@@ -54,4 +57,6 @@ def test_clean_owner_note_drops_control_and_invisible_characters_collapses_blank
     assert clean_owner_note("  a\n\tb \x00c ​d‮e ") == "a b c d e"
     assert clean_owner_note(None) == "" and clean_owner_note("   ") == ""
     assert len(clean_owner_note("x" * 5000)) == OWNER_NOTE_MAX_CHARS == 1000
-    assert clean_owner_note("ünï 😀 <b>[[x]]</b>") == "ünï 😀 <b>[[x]]</b>"  # the owner's own text, not neutralised
+    assert (
+        clean_owner_note("ünï 😀 <b>[[x]]</b>") == "ünï 😀 <b>[[x]]</b>"
+    )  # the owner's own text, not neutralised

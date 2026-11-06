@@ -9,6 +9,8 @@ At 20:00 the agent reads the new INBOX items through the vault port (the `obsidi
 
 An override that names no configured category is not a dead end (spec 022): a variant of a configured id or label (`Misc`) is read as that category; a plain new name (`children`) makes the item a new-category proposal: the misc evaluation session reads it with the requested name (behind the output guard), a proposal note with the evaluation and a ready-to-paste `categories.json` entry is written below `layout.proposals_dir`, and the row becomes `awaiting_category`. Nothing is filed and the pipeline never edits the configuration: the owner adds the category through a config draft (validate, eval, publish), after which the next 06:00 run releases the item. Anything that is no plain name stays the old dead end (pending, "name a category that is no longer configured").
 
+The owner decides in the web UI (spec 023), the primary surface: image thumbnails, every field, filters, "confirm all suggested", a category list or a new-category name, and a comment. With `triage.surface: vault` (default) the Obsidian triage file is the table and stays a readable fallback; with `web` the table lives in a machine-owned data file and the triage file is a generated summary page with a link, so nothing is edited in two places. The owner's comment reaches the release sessions of the category and the proposal evaluation only as the declared, datamarked input `owner_note`.
+
 With an `inbox_list_file` in the layout the INBOX is one list: Parse INBOX list turns every bullet entry (link, image embed, text with a link, plain text) into one item, identified by its normalised resource; image entries are described by Describe Images (spec 021) and then categorized like text items. After the item is processed, Remove processed entry from INBOX list moves its entries into the dated archive file and leaves the rest of the list as it was.
 
 ![Process Inbox Items](../img/bpmn/process-inbox-items.png)
@@ -20,12 +22,12 @@ flowchart LR
     cat -. security flag .-> tq[[Handle security flag]] --> tqe((Quarantined))
     par --> tm((06:00)) --> sel[Select confirmed /<br/>overridden items]
     sel -- unknown override --> pn[Propose new category<br/>misc evaluation, proposal note with<br/>categories.json draft] --> pe((Awaiting category,<br/>nothing filed))
-    par --> rev[Owner: confirm or override] --> rd((Reviewed))
+    par --> rev[Owner: decide in the web UI<br/>confirm, override, new category, comment] --> rd((Reviewed))
     rev -. "06:00 boundary" .-> rc((Window closed,<br/>items stay pending))
-    cat -.-> tri[(Inbox-Triage)] -.-> sel
+    cat -.-> tri[(Triage table: triage file,<br/>or data file on the web surface)] -.-> sel
     rev -.-> tri
     sel --> mi
-    subgraph mi [Process each released item - parallel]
+    subgraph mi [Process each released item - parallel, the comment is a datamarked input]
         g{Category?} -- learning material --> cl[[Process learning material]]
         g -- other --> co[[Process other resource]]
         cl -. security flag .-> hq[[Handle security flag]]

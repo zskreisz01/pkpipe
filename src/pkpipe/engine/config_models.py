@@ -590,8 +590,8 @@ class UiConfig(_Strict):
     )
     allowed_hosts: list[str] = Field(
         default_factory=list,
-        description="Extra Host header values (name or IP, no port) the UI accepts: the MagicDNS name and the "
-        "Tailscale IP. The host of public_url is added automatically",
+        description="Extra Host header values (name or IP, no port) the UI accepts: the MagicDNS name and "
+        "the Tailscale IP. The host of public_url is added automatically",
     )
 
     @field_validator("public_url")

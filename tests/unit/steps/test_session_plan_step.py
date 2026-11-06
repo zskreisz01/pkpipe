@@ -635,9 +635,7 @@ def test_a_flow_of_a_private_data_class_never_gets_the_note():
 
 def test_trace_content_capture_never_offers_the_note():
     plan = cat(s("a", ["item.extract", "item.owner_note"], output_schema="a_out"))
-    snap = make_snapshot(
-        OUTER, ONE, assets=ASSETS, categories=[plan], mcp_servers=SERVERS, security=SECURITY
-    )
+    snap = make_snapshot(OUTER, ONE, assets=ASSETS, categories=[plan], mcp_servers=SERVERS, security=SECURITY)
     tracer = RecordingTracer(capture=True)
     model = Model(lambda system, user, schema=None: {"x": f"echo: {NOTE}"})
     ports = make_ports(
@@ -646,13 +644,17 @@ def test_trace_content_capture_never_offers_the_note():
         tracer=tracer,
         classifier=FakeClassifier(),
     )
-    outcome = make_service(snap, ports).start("outer", inputs={"items": [item(owner_note=NOTE)]}, run_id="r23")
+    outcome = make_service(snap, ports).start(
+        "outer", inputs={"items": [item(owner_note=NOTE)]}, run_id="r23"
+    )
     assert outcome.ok, outcome.error
     assert NOTE in model.calls[0]["user"]  # the model got it
     assert tracer.captured, "capture was on"
     assert NOTE not in json.dumps(tracer.captured) and "CANARY-NOTE" not in json.dumps(tracer.captured)
     assert "[owner note omitted from capture]" in json.dumps(tracer.captured)
-    assert "CANARY-NOTE" not in json.dumps([(sp.name, sp.attributes, sp.events) for sp in tracer.spans], default=str)
+    assert "CANARY-NOTE" not in json.dumps(
+        [(sp.name, sp.attributes, sp.events) for sp in tracer.spans], default=str
+    )
 
 
 def test_a_web_search_session_still_goes_through_the_query_guard_with_text_copied_from_the_note():

@@ -129,7 +129,8 @@ class AppServices:
     candidates_dir: Path | None = None
     #: Vault snapshots of writing runs (spec 019); None = no vault configured, nothing to restore.
     snapshots: SnapshotPort | None = None
-    #: Decodes an INBOX image for the UI thumbnail (spec 023): the metadata-free scaled JPEG; None = the file as is.
+    #: Decodes an INBOX image for the UI thumbnail (spec 023): the metadata-free scaled JPEG; None = the
+    #: file as is.
     image_preparer: ImagePreparePort | None = None
 
     # -- runs -----------------------------------------------------------------------------------------------
@@ -391,12 +392,14 @@ class AppServices:
                 "reason": r.get("comment") or "",
                 "day": day,
             }
-            outcome = upsert_eval_candidate(self.candidates_dir / "triage.jsonl", {**case, "day": self._day(r, case)})
+            outcome = upsert_eval_candidate(
+                self.candidates_dir / "triage.jsonl", {**case, "day": self._day(r, case)}
+            )
             counts[outcome] = counts.get(outcome, 0) + 1
         return counts
 
     def _day(self, row: dict[str, Any], case: dict[str, Any]) -> str:
-        """Keep the day an existing candidate was first collected (re-collecting must not rewrite the file)."""
+        """Keep the day a candidate was first collected (re-collecting must not rewrite the file)."""
         path = self.candidates_dir / "triage.jsonl" if self.candidates_dir else None
         if path is not None and path.is_file():
             import json

@@ -94,7 +94,8 @@ class VaultLayout(BaseModel):
     inbox_list_file: str | None = None
     triage_file: str = "0-INBOX/Inbox-Triage.md"
     #: Spec 023: where the machine-owned triage table lives when ``triage.surface`` is ``web`` (the triage
-    #: file is then a generated summary page without a table). ``None``: ``<inbox_dir>/_pkpipe/triage-data.md``.
+    #: file is then a generated summary page without a table). ``None``:
+    #: ``<inbox_dir>/_pkpipe/triage-data.md``.
     triage_data_file: str | None = None
     processing_list: str = "0-INBOX/Manual-Resource-Processing-List.md"
     #: Where a processed INBOX note moves to.
@@ -194,7 +195,7 @@ class VaultLayout(BaseModel):
     # -- derived places --------------------------------------------------------------------------------
     @property
     def triage_data(self) -> str:
-        """The data file of the ``web`` surface (spec 023): the configured one, else below the INBOX folder."""
+        """The data file of the ``web`` surface (spec 023): the configured one, else below the INBOX."""
         return self.triage_data_file or f"{self.inbox_dir}/_pkpipe/triage-data.md"
 
     @property
