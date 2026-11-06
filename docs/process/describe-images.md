@@ -54,4 +54,4 @@ flowchart LR
 | Output guard + canary | `output_guard` behind `describe` (FR-007), then `image.finish` | On `visible_text`, `topic`, `urls`, `evidence`; the URL policy and the deny-list for `urls` |
 | Handle security flag | [Handle Security Flag](handle-security-flag.md) | Only that image is quarantined |
 | Pass the description to the category session | `inbox.source_note`, `triage.category_menu`, session `suggest` on the `vision` profile, `output_guard`, `triage.check_category` (FR-008) | The extract of an image item is its description (kind, topic, visible text, the URLs that passed); `category_hint` is not passed on |
-| Write batch report | `image.finish_batch` (`ImageBatchReport`) | Counts, estimates, elapsed; the rows go to the triage file, the message into the `triage_ready` notification |
+| Write batch report | `image.finish_batch` (`ImageBatchReport`) | Counts, estimates, elapsed; the rows go to the triage file, the message into the `triage_ready` notification. The resource cell of an image row is the local embed `![[name\|200]]` (`images.triage_embed_width`), so Obsidian shows the image next to the suggestion |

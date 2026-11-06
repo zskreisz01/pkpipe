@@ -17,7 +17,7 @@ from pkpipe.domain.triage import (
 
 from .atomic import update_text
 from .errors import InvalidRows
-from .models import ProcessingListRow, TriageRow, item_id_for
+from .models import EMBED_CELL, ProcessingListRow, TriageRow, item_id_for
 from .policy import is_conflict_name
 from .tables import TableFile
 
@@ -89,7 +89,7 @@ def _normalise_triage_update(update: dict[str, Any], existing: dict[str, str] | 
             raise ValueError("new triage rows start in state 'suggested' (or 'quarantined' when flagged)")
         if not data.get("resource"):
             raise ValueError("resource is required for a new row")
-        expected = item_id_for(data["resource"])
+        expected = item_id_for(_plain_resource(data["resource"]))
         if "item_id" in data and str(data["item_id"]).strip() != expected:
             raise ValueError("item_id of a new row must be the hash of its resource")
         data["item_id"] = expected
@@ -135,7 +135,7 @@ def update_triage(path: Path, updates: list[dict[str, Any]]) -> dict[str, Any]:
         errors: list[str] = []
         for i, update in enumerate(updates):
             if "item_id" not in update and update.get("resource"):
-                update = {**update, "item_id": item_id_for(str(update["resource"]))}
+                update = {**update, "item_id": item_id_for(_plain_resource(update["resource"]))}
             key = str(update.get("item_id", "")).strip()
             existing = table.get(key) if key else None
             try:
@@ -146,11 +146,31 @@ def update_triage(path: Path, updates: list[dict[str, Any]]) -> dict[str, Any]:
             outcome[table.upsert(row.to_cells())].append(row.item_id)
         if errors:
             raise InvalidRows("; ".join(errors))
+        width = max((int(u.get("embed_width") or 0) for u in updates), default=0)
+        if width:  # a run that shows images: image rows written before the embed existed get it too
+            for cells in table.rows():
+                if cells.get("kind") != "image":
+                    continue
+                try:
+                    old = TriageRow.from_cells(cells)
+                except (ValueError, ValidationError):
+                    continue
+                if old.embed_width is None and not old.resource_cell().startswith("!["):
+                    row = old.model_copy(update={"embed_width": width})
+                    if table.upsert(row.to_cells()) == "updated":
+                        outcome["updated"].append(row.item_id)
         result.update(outcome)
         return table.render()
 
     update_text(path, transform)
     return {**result, "conflicts": find_conflicts(path)}
+
+
+def _plain_resource(value: object) -> str:
+    """The name inside an embed (``![[name|200]]``), or the resource as given."""
+    text = str(value).strip()
+    match = EMBED_CELL.match(text)
+    return match.group(1).strip() if match else text
 
 
 def _owner_edit(path: Path, item_id: str, change) -> dict[str, Any]:

@@ -549,6 +549,13 @@ class ImagesConfig(_Strict):
     retries: int = Field(
         default=1, ge=0, le=3, description="Repeated description attempts after an invalid answer"
     )
+    triage_embed_width: int = Field(
+        default=200,
+        ge=0,
+        le=2000,
+        description="Width in pixels of the image the triage file shows for an image row: the resource cell "
+        "is the local Obsidian embed ![[name|width]] (never a remote URL); 0 writes the plain name",
+    )
     max_pixels: int = Field(
         default=40_000_000,
         gt=0,

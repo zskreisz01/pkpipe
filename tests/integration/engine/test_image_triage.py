@@ -13,12 +13,14 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from pathlib import Path
 
 import pytest
 
 from pkpipe.domain.triage import item_id_for
+from pkpipe.obsidian import lists
 from pkpipe.obsidian.policy import VaultPolicy
 from pkpipe.ports import ModelUnavailable, SchemaError
 from tests.fakes import (
@@ -632,6 +634,7 @@ def test_a_topic_with_markdown_html_or_a_url_never_reaches_the_triage_file_as_su
     w = World(vault, pack_dir, overlay, vision_script=s)
     w.run()
     text = (w.vault / "0-INBOX/Inbox-Triage.md").read_text(encoding="utf-8")
+    text = re.sub(r"!\[\[[^\]]*\]\]", "", text)  # the resource cell's own local embed of the image is meant
     for bad in ("evil.example", "![", "](", "[[", "`", "secret"):
         assert bad not in text, bad
     soft = w.rows[rid("proj-page.png")]
@@ -716,3 +719,67 @@ def test_a_schema_violation_that_quotes_the_image_text_reaches_no_span_log_error
     assert (
         "SchemaError" in w.rows[rid("proj-page.png")]["topic"]
     )  # the type stays: the reason code of the row
+
+
+# -- the triage file shows the image (local embed in the resource cell) ---------------------------
+
+
+def _triage_text(world):
+    return (world.vault / "0-INBOX/Inbox-Triage.md").read_text(encoding="utf-8")
+
+
+def test_image_rows_show_the_image_as_a_local_embed_and_the_table_stays_intact(world):
+    world.run()
+    text = _triage_text(world)
+    assert "![[proj-page.png\\|200]]" in text  # the width is the default images.triage_embed_width
+    assert "![[http" not in text and "](" not in text  # a local embed only, no remote reference
+    rows = world.rows
+    assert rows[rid("proj-page.png")]["resource"] == "proj-page.png"  # the plain name, the id is unchanged
+    assert rows[rid("proj-page.png")]["embed_width"] == 200
+    cells_per_row = {ln.count("|") - ln.count("\\|") for ln in text.splitlines() if ln.startswith("| ")}
+    assert cells_per_row == {
+        10
+    }  # every row (header included) is one cell per column, pipes of embeds escaped
+    broken = rows[rid("broken.png")]  # failed and flagged images show it too
+    assert broken["needs_owner"] and "![[broken.png\\|200]]" in text
+
+
+def test_the_owner_decision_and_later_runs_keep_the_embed_and_never_duplicate_a_row(world):
+    world.run()
+    n = len(world.rows)
+    world.decide = lambda item_id, **kw: lists.owner_decide(
+        world.vault / "0-INBOX/Inbox-Triage.md", item_id, **kw
+    )
+    world.decide(rid("proj-page.png"), override="tool")
+    world.run()  # nothing new: the file is not rewritten into another shape
+    assert len(world.rows) == n and world.rows[rid("proj-page.png")]["override"] == "tool"
+    assert "![[proj-page.png\\|200]]" in _triage_text(world)
+
+
+def test_width_zero_writes_the_plain_name(vault, pack_dir, overlay):
+    w = World(vault, pack_dir, overlay, images_config={"triage_embed_width": 0})
+    w.run()
+    text = _triage_text(w)
+    assert "![[" not in text and "| proj-page.png |" in text
+
+
+def test_the_width_is_configurable(vault, pack_dir, overlay):
+    w = World(vault, pack_dir, overlay, images_config={"triage_embed_width": 320})
+    w.run()
+    assert "![[proj-page.png\\|320]]" in _triage_text(w)
+
+
+def test_a_triage_file_with_plain_image_rows_is_migrated_by_the_next_image_run(vault, pack_dir, overlay):
+    """Rows written before the embed existed get it when a later run writes image rows; no duplicates."""
+    first = World(vault, pack_dir, overlay, images_config={"triage_embed_width": 0})
+    first.run()
+    plain = len(first.rows)
+    lists.owner_decide(vault / "0-INBOX/Inbox-Triage.md", rid("post.jpg"), confirm=True)
+    with (vault / "0-INBOX" / "INBOX.md").open("a", encoding="utf-8") as f:
+        f.write("- ![[late.png]]\n")
+    (vault / "0-INBOX/attachments/late.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"a late synthetic image")
+    second = World(vault, pack_dir, overlay, images_config={"triage_embed_width": 200}, store=first.store)
+    second.run()
+    text = _triage_text(second)
+    assert "![[late.png\\|200]]" in text and "![[post.jpg\\|200]]" in text  # the old row was migrated
+    assert len(second.rows) == plain + 1 and second.rows[rid("post.jpg")]["confirm"] is True

@@ -378,7 +378,8 @@ def finish_batch(ctx: StepContext) -> dict[str, Any]:
     every image that was processed in this run; a deferred image has no row, so it is first in line again."""
     state = (ctx.item or {})["batch"]
     rep = batch.report(state, now=ctx.ports.clock.now())
-    rows = [row for r in state["results"] if (row := _row(r)) is not None]
+    width = images_config(ctx).triage_embed_width
+    rows = [row for r in state["results"] if (row := _row(r, width)) is not None]
     return {
         "report": rep,
         "message": batch.describe_report(rep),
@@ -388,7 +389,7 @@ def finish_batch(ctx: StepContext) -> dict[str, Any]:
     }
 
 
-def _row(result: dict[str, Any]) -> dict[str, Any] | None:
+def _row(result: dict[str, Any], embed_width: int = 0) -> dict[str, Any] | None:
     """The triage row of one processed image. ``needs_owner`` only for a failed or flagged image; the topic
     column holds the one-line topic (never the visible text, never anything of a flagged image)."""
     item_id = result.get("id")
@@ -396,7 +397,8 @@ def _row(result: dict[str, Any]) -> dict[str, Any] | None:
     if not item_id or not resource:
         return None
     status = result["status"]
-    base = {"item_id": item_id, "resource": resource, "kind": "image"}
+    # the resource cell shows the image in Obsidian (a local embed of the name, never a remote URL)
+    base = {"item_id": item_id, "resource": resource, "kind": "image", "embed_width": embed_width}
     if status in (batch.DESCRIBED, batch.CACHED):
         return {
             **base,
