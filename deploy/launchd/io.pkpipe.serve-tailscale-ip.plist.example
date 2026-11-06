@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Example only: copy to ~/Library/LaunchAgents/, replace the placeholder paths, then
+     launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.pkpipe.serve-tailscale-ip.plist
+     Tokens: created in the data directory on first start (tokens.json, mode 0600), or set PKPIPE_TOKEN.
+
+     Setup B (spec 023): bind the Tailscale address of this Mac (`tailscale ip -4`; the address below is a placeholder). pkpipe refuses any address that is neither loopback nor a Tailscale address.
+     Add to ui.json in the overlay: {"public_url": "http://100.64.0.10:8787",
+     "allowed_hosts": ["<mac>.<tailnet>.ts.net"]} so the MagicDNS name works too. The owner token is
+     mandatory. Never use Tailscale Funnel (it would publish the UI to the internet). Start this agent after
+     tailscaled is up (the address does not exist before). Restart it, and the obsidian-vault agent, after
+     changing triage.json / ui.json / the vault policy file. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>io.pkpipe.serve-tailscale-ip</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/path/to/pkpipe/.venv/bin/pkpipe</string>
+    <string>serve</string>
+    <string>--host</string>
+    <string>100.64.0.10</string>
+    <string>--port</string>
+    <string>8787</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PKPIPE_OVERLAY_DIR</key><string>/path/to/pkpipe-overlay</string>
+    <key>PKPIPE_VAULT_DIR</key><string>/path/to/Vault</string>
+  </dict>
+  <key>WorkingDirectory</key><string>/path/to/pkpipe</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/pkpipe-serve-ts.log</string>
+  <key>StandardErrorPath</key><string>/tmp/pkpipe-serve-ts.err</string>
+</dict>
+</plist>

@@ -25,6 +25,8 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
 | `images.json` | Image input: the time budget of the image batch, the per-image estimate and timeout, scaling and size limits ([Image input](#image-input)) |
+| `triage.json` | `surface`: `vault` (default; the triage table is in the triage file) or `web` (the table lives in a data file, the triage file is a generated summary page; [below](#triage-surface-vault-or-web)) |
+| `ui.json` | How the web UI is reached: `public_url` (linked from the generated triage page) and `allowed_hosts` (extra `Host` names: the MagicDNS name, the Tailscale IP) ([operations](operations.md#config-ui-and-app-mcp)) |
 | `layout.json` | The vault layout: every folder and file the flows and steps name ([Vault layout](#vault-layout)) |
 | `snapshots.json` | Retention of the vault snapshots taken before writing runs: `retention_days` (14), `max_bytes` (1 GiB), `max_file_bytes` (5 MiB; a larger note is manifest-only) ([operations](operations.md#vault-snapshots-and-restore)) |
 | `security.json` | Guard models and thresholds, canary rotation, URL filter, quarantine dir ([Secure fetch](#secure-fetch)) |
@@ -47,7 +49,8 @@ Spec 020. Every folder or file of the vault that pkpipe names comes from one `la
 | --- | --- | --- |
 | `inbox_dir` | Folder of the INBOX notes | `0-INBOX` |
 | `inbox_list_file` | A single list file whose bullet entries are the triage items (empty: one note per item) | none |
-| `triage_file`, `processing_list` | The triage table and the manual processing list | `0-INBOX/Inbox-Triage.md`, `0-INBOX/Manual-Resource-Processing-List.md` |
+| `triage_file`, `processing_list` | The triage table (on the `web` surface: the generated summary page) and the manual processing list | `0-INBOX/Inbox-Triage.md`, `0-INBOX/Manual-Resource-Processing-List.md` |
+| `triage_data_file` | Spec 023: where the machine-owned triage table lives on the `web` surface; validated like the other paths, allowed for `read_triage` / `update_triage`, in the snapshot scope | `<inbox_dir>/_pkpipe/triage-data.md` |
 | `archive_dir` | Where a processed INBOX note moves to | `4-Archive/Inbox` |
 | `inbox_archive_pattern` | Dated archive file of entries removed from the list file | `4-Archive/Inbox/Inbox-Archive-{yyyy-MM-dd}.md` |
 | `agent_tasks_dir`, `proposals_dir`, `context_review_dir` | Agent task notes, system change proposals, context review notes | `2-Areas/Agent-Tasks`, `2-Areas/Self-Improvement/System-Changes`, `2-Areas/Context-Review` |
@@ -79,9 +82,28 @@ The category's PARA folder is `para_path` in `categories.json`. The pack writes 
 
 ### The triage table: your `comment`, the pipeline's `topic`
 
-`comment` (spec 022) is your column for your own words. The pipeline never writes, overwrites, trims or clears it: the vault tool refuses an update that names it, and it survives every rewrite of the row (state changes, owner decisions, the image embed, the column migrations). It is plain text; edge blanks of the cell are layout, everything inside stays (use `\|` for a pipe, as in any Obsidian table). It is private: no model, tool result, notification, trace or log sees it (the vault tool `read_triage` and the app MCP `list_triage` leave it out, the JSON API does too). `topic` is the pipeline's: it writes the one-line topic of an image row (and may overwrite it); for every other row the pipeline never writes a `topic` and keeps what it finds.
+`comment` (spec 022) is your column for your own words. The pipeline never writes, overwrites, trims or clears it: the vault tool refuses an update that names it, and it survives every rewrite of the row (state changes, owner decisions, the image embed, the column migrations). It is plain text; edge blanks of the cell are layout, everything inside stays (use `\|` for a pipe, as in any Obsidian table). `topic` is the pipeline's: it writes the one-line topic of an image row (and may overwrite it); for every other row the pipeline never writes a `topic` and keeps what it finds.
+
+Since spec 023 the comment is **owner input** (see [The owner note](#the-owner-note)): the vault tool `read_triage`, the JSON API and the UI return it, the app MCP `list_triage` returns it for the owner token only (datamarked), and a model gets it only as the declared session input `owner_note`. It never appears in a notification, a span, a log or the audit log (which keeps its length only).
 
 **Migration of an older table.** The first write after the upgrade (a triage run does one even without new items: `update_triage` with an empty list is the maintenance call and writes nothing when nothing changes) adds the missing columns and, only while the header has no `comment` column, moves the text that stands in the `topic` of a **non-image** row into `comment`: the pipeline never wrote it, so it is yours. The `topic` of an image row stays (a description is the pipeline's; words you typed there cannot be told apart and are not moved). The rule runs once: the header has `comment` afterwards.
+
+### Triage surface: vault or web
+
+Spec 023. `triage.json` `{"surface": "vault" | "web"}` decides where the machine-owned table lives, so the data is edited in one place only.
+
+| Surface | `layout.triage_file` | `layout.triage_data_file` | Decisions |
+| --- | --- | --- | --- |
+| `vault` (default) | The table, as before | not used (a tombstone note after a switch back) | Obsidian or the UI |
+| `web` | A generated page: preserved front matter, the title, the link `ui.public_url/triage` and a summary (waiting for you, images that need you, new-category proposals, counts per state, the last triage run), rewritten on every triage run and every UI decision, **never a table** | The table (columns as above) | The web UI |
+
+`triage.json` is mirrored in the vault policy file the vault server runs with: `"triage_surface": "web"` and `"ui_public_url": "https://..."` (the page is written by the vault tools). `pkpipe validate --vault-policy <file>` fails when the two disagree, and `web` without `ui.json` `public_url` fails too. Restart `pkpipe serve` and the vault server after changing them.
+
+**Switching moves the table on the next triage write**, in both directions, as text: the table block (header, every row including rows that do not parse, `[ x]`, image embeds `![[x.jpg\|200]]`, any number of columns) is copied verbatim to the target first and then the source is replaced (the generated page, or a tombstone note), under the file locks, with a re-plan when the source changed in between. It is idempotent. If both files hold a table (an interrupted move) the file of the current surface wins and only the rows it lacks are added from the other. Prose you had written on the retired page is kept below the table of the data file. The plan (direction, rows, unreadable rows) is logged before the move and returned by the maintenance call as `migration`; the vault snapshot of the writing run is taken first. Until the move, reads and decisions use the file that holds the table, so a switch never shows an empty table (the UI says so).
+
+### The owner note
+
+Spec 023. The `comment` of a row reaches a model only as the declared session input `item.owner_note`, for (a) the `misc` `evaluate` session of a new-category proposal (with the requested name) and (b) the sessions of the category plan at release time that list `item.owner_note` among their `inputs` (the public pack declares it for `tool` `research`, `compare` and `synthesize`, `marketing` `extract` and `synthesize`, and `misc` `evaluate`). The code step `triage.release` cleans it (control and invisible characters removed, blanks collapsed, at most 1000 characters) and puts it on the released item; `session_plan` hands it to a session that declares it, datamarked like every input under a heading that says what it is, and never in a system prompt; a flow of a private data class (journal, context, image) never receives it; trace content capture replaces it by a marker; a session with a web search tool still has every query checked by the query guard. An override that differs from the suggestion is kept with the comment as its reason as a private eval candidate (`<overlay>/evals/candidates/triage.jsonl`).
 
 ### An override that names no configured category
 

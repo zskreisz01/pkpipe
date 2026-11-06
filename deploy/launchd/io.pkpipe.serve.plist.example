@@ -2,7 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- Example only: copy to ~/Library/LaunchAgents/, replace the placeholder paths, then
      launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.pkpipe.serve.plist
-     Tokens: created in the data directory on first start (tokens.json, mode 0600), or set PKPIPE_TOKEN. -->
+     Tokens: created in the data directory on first start (tokens.json, mode 0600), or set PKPIPE_TOKEN.
+
+     Reaching the UI from your phone or laptop (spec 023), two supported setups, never Tailscale Funnel:
+       A) THIS file: listen on loopback and let Tailscale publish it inside your tailnet only:
+            tailscale serve --bg --https=443 http://127.0.0.1:8787
+          then set ui.json in the overlay: {"public_url": "https://<mac>.<tailnet>.ts.net"}
+          (the MagicDNS name: `tailscale status --json | jq -r .Self.DNSName`). The Host name of public_url
+          is accepted automatically.
+       B) io.pkpipe.serve-tailscale-ip.plist.example: bind the Tailscale address itself.
+     Both need the owner token to log in. After changing triage.json / ui.json / the vault policy file
+     (triage_surface, ui_public_url), restart this agent and the obsidian-vault agent. -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>io.pkpipe.serve</string>

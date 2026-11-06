@@ -90,7 +90,7 @@ def test_the_data_file_is_in_the_snapshot_scope_and_managed(tmp_path):
 
 def test_the_policy_surface_must_agree_with_the_config():
     layout = VaultLayout()
-    assert policy_file_errors(layout, {"triage_surface": "web"}, "web") == []
+    assert policy_file_errors(layout, {"triage_surface": "web", "ui_public_url": URL}, "web", URL) == []
     errors = policy_file_errors(layout, {}, "web")
     assert any("triage_surface" in e and "'web'" in e for e in errors)
     assert policy_file_errors(layout, {}, "vault") == []
@@ -100,9 +100,9 @@ def test_config_models_for_surface_and_ui():
     assert TriageConfig().surface == "vault"
     with pytest.raises(ValidationError):
         TriageConfig(surface="both")
-    ui = UiConfig(public_url="https://Mini.tail1234.ts.net/", allowed_hosts=["Mini.Tail1234.ts.net", "100.113.168.62"])
+    ui = UiConfig(public_url="https://Mini.tail1234.ts.net/", allowed_hosts=["Mini.Tail1234.ts.net", "100.64.0.10"])
     assert ui.public_url == "https://Mini.tail1234.ts.net"
-    assert ui.hosts() == ["mini.tail1234.ts.net", "100.113.168.62"]
+    assert ui.hosts() == ["mini.tail1234.ts.net", "100.64.0.10"]
     for bad in ("ftp://x", "https://u:p@x", "https://x/?q=1", "nothing"):
         with pytest.raises(ValidationError):
             UiConfig(public_url=bad)
@@ -332,3 +332,26 @@ def test_split_table_finds_the_block_with_front_matter_and_prose_around_it():
     block = split_table(text)
     assert block is not None and block.before.endswith("prose\n\n") and block.after == "\nafter\n"
     assert split_table("no table here\n| a | b |\n| --- | --- |\n") is None
+
+
+def test_validate_checks_the_overlay_surface_against_the_vault_policy_file(tmp_path, pack_dir):
+    import json
+
+    from pkpipe.engine.registry import ConfigError, load_effective
+
+    overlay = tmp_path / "overlay"
+    overlay.mkdir()
+    (overlay / "triage.json").write_text('{"surface": "web"}', encoding="utf-8")
+    (overlay / "ui.json").write_text(json.dumps({"public_url": URL}), encoding="utf-8")
+    policy = tmp_path / "policy.json"
+    policy.write_text("{}", encoding="utf-8")
+    with pytest.raises(ConfigError, match="triage_surface"):
+        load_effective(pack_dir, overlay, vault_policy=policy)
+    policy.write_text(json.dumps({"triage_surface": "web"}), encoding="utf-8")
+    with pytest.raises(ConfigError, match="ui_public_url"):
+        load_effective(pack_dir, overlay, vault_policy=policy)
+    policy.write_text(json.dumps({"triage_surface": "web", "ui_public_url": URL}), encoding="utf-8")
+    assert load_effective(pack_dir, overlay, vault_policy=policy).data["triage"]["surface"] == "web"
+    (overlay / "ui.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(ConfigError, match="public_url"):
+        load_effective(pack_dir, overlay, vault_policy=policy)

@@ -398,7 +398,7 @@ LEGACY_LAYOUT_KEYS = (
 
 
 def policy_file_errors(
-    layout: VaultLayout, policy: Mapping[str, Any], surface: str = "vault"
+    layout: VaultLayout, policy: Mapping[str, Any], surface: str = "vault", public_url: str | None = None
 ) -> list[str]:
     """Errors of an overlay layout against the vault policy file the vault server runs with (FR-008).
 
@@ -428,6 +428,11 @@ def policy_file_errors(
         errors.append(
             f"triage.json surface '{surface}' differs from the vault policy triage_surface "
             f"'{policy_surface}': the vault server would read the table from the wrong file"
+        )
+    if surface == "web" and data.get("ui_public_url") != public_url:
+        errors.append(
+            f"ui.json public_url '{public_url}' differs from the vault policy ui_public_url "
+            f"'{data.get('ui_public_url')}': the generated triage page would link to the wrong address"
         )
     return errors
 

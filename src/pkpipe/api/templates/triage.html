@@ -4,9 +4,42 @@
 <h1>Triage</h1>
 {% if error %}<p class="err">{{ error }}</p>{% endif %}
 {% if conflicts %}<p class="err">Sync conflict file(s): {{ conflicts|join(", ") }}</p>{% endif %}
-{% if invalid %}<p class="err">{{ invalid }} unreadable row(s) in the triage file.</p>{% endif %}
+{% if invalid %}<p class="err">{{ invalid }} unreadable row(s) in the triage table.</p>{% endif %}
+{% if info and info.migration %}
+<p class="warn" data-testid="migration-banner">The triage surface is <strong>{{ info.surface }}</strong>: the table still lives in <code>{{ info.migration.source }}</code> ({{ info.migration.rows }} row(s)) and moves to <code>{{ info.migration.target }}</code> with the next triage run. You can decide here meanwhile.</p>
+{% elif info and info.surface == "web" %}
+<p class="muted">Surface <strong>web</strong>: this page is where you decide; the table is machine-owned in <code>{{ info.data_file }}</code>.</p>
+{% endif %}
+{% if bulk %}<p class="ok" data-testid="bulk-result">Bulk confirm: {{ bulk }}.</p>{% endif %}
+<form class="filters row" method="get" action="/triage" hx-boost="false">
+  <label class="inline">State
+    <select name="state"><option value="">any</option>
+      {% for s in states %}<option value="{{ s }}" {{ "selected" if filters.state == s }}>{{ s }}</option>{% endfor %}
+    </select></label>
+  <label class="inline">Category
+    <select name="category"><option value="">any</option>
+      {% for c in categories %}<option value="{{ c }}" {{ "selected" if filters.category == c }}>{{ c }}</option>{% endfor %}
+      <option value="none" {{ "selected" if filters.category == "none" }}>none</option>
+    </select></label>
+  <label class="inline">Needs you
+    <select name="needs_owner">
+      <option value="">any</option>
+      <option value="yes" {{ "selected" if filters.needs_owner == "yes" }}>yes</option>
+      <option value="no" {{ "selected" if filters.needs_owner == "no" }}>no</option>
+    </select></label>
+  <button type="submit">Filter</button>
+  <a href="/triage">Clear</a>
+  <span class="muted" data-testid="row-count">{{ rows|length }} row(s)</span>
+</form>
+<form class="row bulk" hx-post="/ui/triage/bulk-confirm" hx-confirm="Confirm the suggested category of every waiting row in this filtered set?">
+  <input type="hidden" name="state" value="{{ filters.state }}">
+  <input type="hidden" name="category" value="{{ filters.category }}">
+  <input type="hidden" name="needs_owner" value="{{ filters.needs_owner }}">
+  <button type="submit" class="primary" data-testid="bulk-confirm">Confirm all suggested in this set</button>
+  <span class="muted">Rows with an override, images that need you and rows without a configured suggestion are left alone.</span>
+</form>
 <table id="triage-table">
-  <thead><tr><th>Item</th><th>Resource</th><th>Suggested</th><th>Override</th><th>State</th><th>Decision</th></tr></thead>
+  <thead><tr><th>Image</th><th>Item</th><th>State</th><th>Suggested</th><th>Decision</th><th>Comment</th></tr></thead>
   <tbody>
   {% for r in rows %}{% include "_triage_row.html" %}{% else %}<tr><td colspan="6" class="muted">No items.</td></tr>{% endfor %}
   </tbody>

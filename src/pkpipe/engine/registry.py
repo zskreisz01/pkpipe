@@ -330,7 +330,8 @@ def vault_policy_errors(data: dict[str, Any], policy_file: Path) -> list[str]:
     except (OSError, ValueError) as exc:
         return [f"vault policy '{policy_file}': {exc}"]
     surface = (data.get("triage") or {}).get("surface", "vault")
-    return [f"{policy_file.name}: {e}" for e in policy_file_errors(layout, policy, surface)]
+    public_url = (data.get("ui") or {}).get("public_url")
+    return [f"{policy_file.name}: {e}" for e in policy_file_errors(layout, policy, surface, public_url)]
 
 
 def load_effective(

@@ -252,6 +252,19 @@ class AppServices:
             rows.append(row)
         return {"rows": rows, "invalid": len(data["invalid"]), "conflicts": data["conflicts"]}
 
+    def triage_info(self) -> dict[str, Any]:
+        """Where the table lives and whether a switch of ``triage.surface`` still has to be moved by the next
+        triage run (spec 023); for the banner of the triage page."""
+        vault = self._vault()
+        layout = vault.policy.layout
+        return {
+            "surface": vault.policy.triage_surface,
+            "page": layout.triage_file,
+            "data_file": layout.triage_data,
+            "migration": vault.triage_migration_plan(),
+            "proposals_dir": layout.proposals_dir,
+        }
+
     def _decide(self, actor: str, action: str, item_id: str, **decision: Any) -> dict[str, Any]:
         try:
             row = self._vault().owner_decide(item_id, categories=self.category_map(), **decision)

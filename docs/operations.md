@@ -76,7 +76,7 @@ The default backend is Open Notebook with Speaches (Kokoro voice): `cd deploy/op
 
 ## Triage table maintenance
 
-The `triage` flow starts with the maintenance call `update_triage` with an empty list (spec 022): the table gets the full header (`kind`, `needs_owner`, `topic` and your `comment`), and non-image rows with text in `topic` move it into `comment` once, while the header has no `comment` column. The call writes only when it changes something, and the flow takes its vault snapshot first like any writing run (`pkpipe restore` undoes it). So the live file is migrated by simply running triage (`pkpipe run triage`). See [Configuration](configuration.md#the-triage-table-your-comment-the-pipelines-topic).
+The `triage` flow starts with the maintenance call `update_triage` with an empty list (spec 022): the table gets the full header (`kind`, `needs_owner`, `topic` and your `comment`), and non-image rows with text in `topic` move it into `comment` once, while the header has no `comment` column. The call writes only when it changes something, and the flow takes its vault snapshot first like any writing run (`pkpipe restore` undoes it). So the live file is migrated by simply running triage (`pkpipe run triage`). The same call moves the table between the triage file and its data file after a switch of `triage.surface` (spec 023; the plan is logged first and returned as `migration`). See [Configuration](configuration.md#the-triage-table-your-comment-the-pipelines-topic).
 
 ## Image input
 
@@ -254,4 +254,11 @@ PKPIPE_OVERLAY_DIR=~/pkpipe-overlay PKPIPE_VAULT_DIR=~/Vault uv run pkpipe serve
 
 **App MCP** is `http://127.0.0.1:8787/mcp` with `Authorization: Bearer <token>`. The agent token can `run_flow`, `get_run` and `list_triage`; `confirm_item`, `override_item` and `release_quarantine` are owner actions and need the owner token (give it only to a chat agent you trust to act for you). Every owner action and `run_flow` lands in the audit log (UI page `/audit`, `GET /api/audit`). Contract: `specs/014-config-ui-and-app-mcp/contracts/`.
 
-For Tailscale, bind to the machine's Tailscale address (or keep loopback and use `tailscale serve`), add the MagicDNS name with `--allow-host`, and keep using the tokens; Tailscale is not a substitute for them.
+**Reaching the UI over Tailscale** (spec 023). Two supported setups, both private to your tailnet, **never Tailscale Funnel** (it publishes the UI to the internet):
+
+1. *Loopback plus `tailscale serve`* (recommended): keep `--host 127.0.0.1` and run `tailscale serve --bg --https=443 http://127.0.0.1:8787`. The MagicDNS name is `tailscale status --json | jq -r .Self.DNSName`.
+2. *Bind the Tailscale address*: `--host $(tailscale ip -4)`. `check_bind` still refuses anything that is neither loopback nor a Tailscale address.
+
+Tell pkpipe the address in `ui.json`: `{"public_url": "https://<mac>.<tailnet>.ts.net", "allowed_hosts": ["<tailscale ip>"]}`. The host of `public_url` and `allowed_hosts` extend the Host allowlist of the UI and the MCP endpoint (`--allow-host` still works); the token, the CSRF header and the same-origin check are unchanged (a request with another `Host` gets 421). `public_url` is also the link on the generated triage page and, when https, marks the session cookie `Secure`. Launchd examples: `deploy/launchd/io.pkpipe.serve.plist.example` (setup 1) and `io.pkpipe.serve-tailscale-ip.plist.example` (setup 2). Tailscale is not a substitute for the tokens.
+
+**The triage page** (`/triage`, spec 023) is the primary place to decide: every field of a row, the image thumbnail (served from the read-only attachments folder through `read_image`), highlight of rows that need you, filters by state, category and needs-owner, **Confirm all suggested in this set** on the filtered rows, a category list plus a *propose a new category* input, the comment, the proposal note path of `awaiting_category` rows and the quarantine release. JSON: `GET /api/triage?state=&category=&needs_owner=`, `POST /api/triage/{id}/comment`, `POST /api/triage/bulk-confirm`, `GET /api/triage/{id}/image`. Every write goes through the same services as the app MCP (actor `ui`, audited, rules enforced on the server). The surface (`triage.surface`) decides whether the Obsidian file is the table or a generated summary ([Configuration](configuration.md#triage-surface-vault-or-web)).
