@@ -74,6 +74,10 @@ The default backend is Open Notebook with Speaches (Kokoro voice): `cd deploy/op
 
 `uv run python -m pkpipe.websearch.server` serves `websearch:search(query, max_results)` on `127.0.0.1:8702` (loopback only; `deploy/launchd/io.pkpipe.web-search.plist.example`). Backend: SearXNG at `--searxng-url` / `PKPIPE_SEARXNG_URL` (default `http://127.0.0.1:8080`; `deploy/docker-compose.yml` starts one with the JSON API enabled, `SEARXNG_SECRET` required) or `--backend brave` with `BRAVE_API_KEY`. Results are `{title, url, snippet}`; a result with a non-http(s) URL, credentials, a private host or a deny-listed domain is dropped, text is stripped of tags and invisible characters and capped, at most 10 results. A failing backend returns `{"results": [], "error": "<code>"}`. The server never logs queries; the query guard runs in the engine before the call.
 
+## Triage table maintenance
+
+The `triage` flow starts with the maintenance call `update_triage` with an empty list (spec 022): the table gets the full header (`kind`, `needs_owner`, `topic` and your `comment`), and non-image rows with text in `topic` move it into `comment` once, while the header has no `comment` column. The call writes only when it changes something, and the flow takes its vault snapshot first like any writing run (`pkpipe restore` undoes it). So the live file is migrated by simply running triage (`pkpipe run triage`). See [Configuration](configuration.md#the-triage-table-your-comment-the-pipelines-topic).
+
 ## Image input
 
 Image entries of the INBOX list are described by a local vision model ([Image input](configuration.md#image-input), [Describe Images](process/describe-images.md)). What to know to run it:

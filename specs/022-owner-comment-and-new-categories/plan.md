@@ -1,6 +1,6 @@
 ---
 spec_id: 022-owner-comment-and-new-categories
-status: Active
+status: Completed
 description: Plan for the owner comment column and new-category proposals
 updated: 2026-11-06
 ---

@@ -89,6 +89,8 @@ The flow calls [Handle Security Flag](process/handle-security-flag.md) for the i
 
 ## Private data
 
+The owner's `comment` column of the triage table (spec 022) is private owner text: the pipeline never writes it, and it is never sent to a model, a tool result (the vault tool `read_triage`, the app MCP `list_triage` and the API leave it out), a notification, a trace or a log. A requested new category name in an override is handled as untrusted input: only its slug (letters, digits, hyphens, at most 40 characters) reaches a prompt or a path, the item text and the model's evaluation are datamarked, pass the output guard and are neutralised before they are written into the proposal note, and the pipeline never edits the versioned configuration.
+
 Journals, context packs and images are processed only by local sessions without tools, are never sent to web search or the learning service, are excluded from trace content capture, and never appear in this repository. The flows that handle them declare the data classes `journal`, `context` and `image`; validation and every run refuse a model profile, fallback or environment value that is not on a loopback address, any `egress` tool, any session with tools and any code function that handles the data in a flow without its class, so no remote model can be selected for the enterprise notes.
 
 Vault snapshots (spec 019) hold copies of the notes a writing run can change. They live in the data directory (mode 0700), never in the vault, the overlay or a repository, exclude the journal folder, expire after `snapshots.retention_days`, and neither spans, audit entries, notifications nor the app MCP results carry note paths or text (the MCP restore plan datamarks its paths).

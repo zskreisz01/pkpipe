@@ -1,8 +1,8 @@
 ---
 spec_id: 022-owner-comment-and-new-categories
 title: Owner comment column and proposals for new categories
-status: Active
-status_reason: Owner requests of 2026-11-06 (comment column; "can an override create a category?"); implementation under way
+status: Completed
+status_reason: Implemented 2026-11-06 on branch spec/022-owner-comment-and-new-categories (T001-T007); suite, ruff and mypy green; awaiting the owner's approval to publish
 description: The triage table gets an owner-owned `comment` column the pipeline never writes and no model or tool ever sees; an override naming a category that is not configured is normalised (case, spaces) or becomes a new-category proposal note instead of a dead end, and the versioned config is never edited by the pipeline.
 relevant_when:
   - triage
@@ -19,7 +19,7 @@ updated: 2026-11-06
 
 **Feature Branch**: `spec/022-owner-comment-and-new-categories`
 **Created**: 2026-11-06
-**Status**: Active
+**Status**: Completed
 **Input**: Owner (translated): "An owner comment field is needed. I just filled the topic column with my own comments." and "Could it be that if I override with a category that does not exist, the pipeline creates it?"
 **Companions**: [data-model.md](data-model.md)
 
@@ -31,6 +31,8 @@ updated: 2026-11-06
 4. **An override that names no configured category is not an error and not an auto-edit.** Categories are versioned config (sessions, `para_path`, instructions); a pipeline that edited them would bypass the draft, validate, eval, publish path (constitution III and IX). So: (a) an obvious variant of a configured id or label (`Misc`, ` misc `, `Learning Material`) is **normalised deterministically in code** to the configured id; the owner's cell is not rewritten. (b) A genuinely unknown value that is a valid slug (`children`: letters, digits and hyphens, at most 40 characters after normalisation) makes the item a **new-category proposal**: it goes through the existing `misc` category's `evaluate` session with the requested name as input and the session output passes the output guard; the pipeline writes a proposal note below `layout.proposals_dir` and sets the row state `awaiting_category`. Nothing is filed into a PARA folder, nothing is deleted, the INBOX entry stays. (c) The notification and the backlog say "N item(s) propose a new category: ..." instead of "name a category that is no longer configured". (d) A value that is no slug at all is still the old dead end (`invalid`, back to the owner).
 5. **How the owner then adds the category.** The proposal note holds a ready-to-paste `categories.json` entry (id, label, `subflow`, `para_path`, `triage_hint`, one generic `summarize` session) and the evaluation of the item. The owner adds the entry (and, for more than the generic session, instructions) to the overlay through the config UI draft, validates, evals and publishes. The row waits in `awaiting_category`; when the owner's override (unchanged) names a configured category, the next 06:00 run releases it like any item. The owner may also change the override to an existing category at any time.
 6. **Injection safety.** The requested name is owner text, but it is handled as untrusted input anyway: it is reduced to a slug (`[a-z0-9-]`, 40 characters) before it reaches a prompt or a path; the item text and the model's evaluation are datamarked, pass the output guard, and are neutralised (`text_safety`) before they are written into the proposal note; the model never decides a category, a path or a state.
+
+7. **Status: Completed (2026-11-06).** Gate 2: tasks done, suite green, docs and BPMN (drawio, PNG, Mermaid) updated. Decisions taken while implementing: the triage table always has the full header (a note-only file is no longer byte-identical after the first write: the owner needs the `comment` column), the UI override form stays strict (a configured category), `awaiting_category` rows are skipped by the release until the override names a configured category, the evening message notifies only for a **new** proposal, and a failed evaluation leaves the item as it was so the next 06:00 run retries.
 
 ## User Scenarios & Testing *(mandatory)*
 
