@@ -125,8 +125,9 @@ class TriageRow(BaseModel):
 
     @classmethod
     def from_cells(cls, cells: dict[str, str]) -> TriageRow:
-        mark = cells["confirm"].strip().lower()
-        if mark not in ("[ ]", "[x]", ""):
+        # hand edits in Obsidian leave stray blanks: "[ x]" and "[x ]" are checked, "[  ]" and "[]" unchecked
+        mark = "".join(cells["confirm"].split()).lower()
+        if mark not in ("[]", "[x]", ""):
             raise ValueError(f"bad checkbox {cells['confirm']!r}")
         embed = EMBED_CELL.match(cells["resource"].strip())
         return cls(
