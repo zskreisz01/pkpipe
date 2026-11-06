@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.1 – 2026-11-06
+- Fix: the default pack ships inside the wheel (`pkpipe/_packs`), so an installed release (git tag) finds `packs/learning-inbox` without a source checkout.
+
 ## 0.1.0 – 2026-11-06
 - Spec 001: core-defaults config layer, layer-confined session references, Pydantic config models + JSON Schema export, `pkpipe validate`, effective-config sha256 hash, test layout (unit/integration/e2e, fakes, `live` marker), CI + Pages workflows, Docusaurus site.
 - Spec 002: `ModelPort.complete(..., profile)` with `SchemaError`/`ModelUnavailable`/`ContextOverflow`, OpenAI-compatible adapter (json_schema, local validation, retry, fallback, OpenTelemetry spans), `env:` profile resolution, recorded LM Studio fixtures + `ReplayModel`.

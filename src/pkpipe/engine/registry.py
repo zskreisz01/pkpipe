@@ -199,7 +199,12 @@ def config_version(data: Mapping[str, Any]) -> str:
 
 def default_pack_dir() -> Path:
     env = os.environ.get(PACK_ENV)
-    return Path(env) if env else Path(__file__).resolve().parents[3] / "packs" / "learning-inbox"
+    if env:
+        return Path(env)
+    # a source checkout has packs/ next to src/; an installed wheel ships it as pkpipe/_packs
+    checkout = Path(__file__).resolve().parents[3] / "packs" / "learning-inbox"
+    installed = Path(__file__).resolve().parents[1] / "_packs" / "learning-inbox"
+    return checkout if checkout.is_dir() or not installed.is_dir() else installed
 
 
 def overlay_dir_from_env(environ: Mapping[str, str] | None = None) -> Path | None:

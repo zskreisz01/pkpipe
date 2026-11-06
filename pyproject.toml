@@ -1,6 +1,6 @@
 [project]
 name = "pkpipe"
-version = "0.1.0"
+version = "0.1.1"
 description = "Personal Knowledge Pipeline – local-first agent pipeline: Obsidian INBOX -> triage -> guarded LLM sessions -> curated notes"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -58,6 +58,10 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# the default pack must ship with the installed package (found by engine.registry.default_pack_dir)
+[tool.hatch.build.targets.wheel.force-include]
+"packs" = "pkpipe/_packs"
 
 [tool.ruff]
 line-length = 110
