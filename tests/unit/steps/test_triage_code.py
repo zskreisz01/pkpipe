@@ -96,12 +96,13 @@ def test_release_only_confirmed_or_overridden_items():
         "a": ("tool", "other", "3-Resources/Tools"),
         "b": ("misc", "other", "3-Resources/Misc"),
     }
-    assert sorted(out["pending"]) == ["c", "d"] and out["unknown_category"] == ["d"]
+    # spec 022: an unknown but plausible override ("no-such-category") is a new-category proposal, not pending
+    assert out["pending"] == ["c"] and out["unknown_category"] == []
+    assert [p["id"] for p in out["proposals"]] == ["d"]
     assert sorted((r["item_id"], r["state"]) for r in out["rows"]) == [
         ("a", "released"),
         ("b", "released"),
         ("c", "pending"),
-        ("d", "pending"),
     ]
 
 
@@ -186,7 +187,7 @@ def test_backlog_reports_decisions_on_an_unconfigured_category_even_without_new_
     owner is told to write a configured override; an unchanged unreviewed backlog alone sends nothing."""
     rows = [
         _row("conf", cat="removed-cat", confirm=True, state="pending"),
-        _row("ov", override="no-such", state="pending"),
+        _row("ov", override="no such " * 10, state="pending"),  # no plain name: the old dead end
         _row("old", state="pending"),
         _row("fin", cat="removed-cat", confirm=True, state="processed"),
     ]
@@ -242,3 +243,67 @@ def test_finalize_lists_a_failed_item_with_its_reason_in_the_link_column():
     assert rows["a"]["link"].startswith("session 'synthesize' failed: SchemaError")
     assert rows["b"]["link"] == "http://127.0.0.1/nb-b"  # an existing link stays
     assert rows["c"]["status"] == "done" and rows["c"]["link"] is None  # a reason only matters when failed
+
+
+# -- spec 022: normalised overrides and new-category proposals -----------------------------------------------
+
+
+def test_release_normalises_an_override_that_is_a_variant_of_a_configured_category():
+    rows = [_row("a", override="Misc"), _row("b", override=" MISC "), _row("c", override="Tools")]
+    out = CODE["triage.release"](_ctx(), triage={"rows": rows})
+    assert {i["id"]: i["category"] for i in out["released"]} == {"a": "misc", "b": "misc", "c": "tool"}
+    assert out["proposals"] == [] and out["unknown_category"] == []
+
+
+def test_release_turns_an_unknown_but_plausible_override_into_a_proposal_that_keeps_its_state():
+    rows = [_row("d", override="Children"), _row("e", override="no such category at all " * 5)]
+    out = CODE["triage.release"](_ctx(), triage={"rows": rows})
+    [p] = out["proposals"]
+    assert p["id"] == "d" and p["requested_category"] == "children" and p["resource"] == "0-INBOX/d.md"
+    assert "category" not in p and "subflow" not in p and "para_path" not in p  # nothing is filed
+    assert out["released"] == [] and out["count_proposals"] == 1
+    assert out["pending"] == ["e"] and out["unknown_category"] == ["e"]  # no plain name: the old dead end
+    assert out["rows"] == [{"item_id": "e", "state": "pending"}]  # the proposal row is written by its flow
+
+
+def test_a_suggestion_that_was_removed_is_never_a_proposal_only_the_owners_words_are():
+    rows = [_row("r", cat="removed-cat", confirm=True)]
+    out = CODE["triage.release"](_ctx(), triage={"rows": rows})
+    assert out["proposals"] == [] and out["unknown_category"] == ["r"] and out["pending"] == ["r"]
+
+
+def test_an_item_that_awaits_a_category_is_left_alone_until_the_override_names_a_configured_one():
+    rows = [
+        _row("w1", override="children", state="awaiting_category"),
+        _row("w2", override="misc", state="awaiting_category"),
+        _row("w3", override="Misc", state="awaiting_category"),
+        _row("w4", state="awaiting_category"),
+    ]
+    out = CODE["triage.release"](_ctx(), triage={"rows": rows})
+    assert out["proposals"] == []  # no second evaluation, no second note
+    assert sorted(i["id"] for i in out["released"]) == ["w2", "w3"]
+    assert {r["item_id"]: r["state"] for r in out["rows"]} == {"w2": "released", "w3": "released"}
+    assert out["count_awaiting"] == 2  # w1 and w4 still wait
+
+
+def test_backlog_says_which_new_categories_the_owner_proposes_and_keeps_invalid_for_the_rest():
+    rows = [
+        _row("p1", override="children", state="pending"),
+        _row("p2", override="Gyerek Programok", state="awaiting_category"),
+        _row("p3", override="children", state="awaiting_category"),
+        _row("conf", cat="removed-cat", confirm=True, state="pending"),
+        _row("junk", override="x " * 40, state="pending"),
+        _row("fine", override="Misc", state="pending"),  # a variant of a configured id: nothing to say
+    ]
+    out = CODE["triage.backlog"](_ctx(), triage={"rows": rows}, new_rows=[])
+    assert out["proposed"] == 3 and out["invalid"] == 2
+    assert "3 item(s) propose a new category: children, gyerek-programok" in out["message"]
+    assert "2 item(s) name a category that is no longer configured" in out["message"]
+    assert out["notify"] is True
+
+
+def test_the_proposal_list_in_the_message_is_short_plain_slugs_only():
+    rows = [_row(f"p{i}", override=f"Cat{i}x", state="pending") for i in range(12)]
+    msg = CODE["triage.backlog"](_ctx(), triage={"rows": rows}, new_rows=[])["message"]
+    assert "12 item(s) propose a new category: cat0x, cat1x, cat2x, cat3x, cat4x" in msg and "..." in msg
+    assert "cat11x" not in msg

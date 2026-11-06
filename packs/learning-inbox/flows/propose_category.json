@@ -1,0 +1,211 @@
+{
+  "id": "propose_category",
+  "description": "Spec 022: the owner's override names no configured category. One item: read it (code), evaluate it with the misc evaluation session (no tools, the requested name as input, datamarked, run canary), check the answer with the output guard, write a new-category proposal note below layout.proposals_dir (the evaluation and a ready-to-paste categories.json entry) and mark the item awaiting_category. Nothing is filed into a PARA folder, the INBOX entry stays, and the versioned config is never written: the owner adds the category through a config draft, validate, eval, publish. A flag quarantines only this item; a failed evaluation leaves the item as it is, so the next 06:00 run tries again.",
+  "bpmn": "process-inbox-items",
+  "nodes": [
+    {
+      "id": "fetch_note",
+      "type": "tool",
+      "bpmn_element": "Propose new category",
+      "config": {
+        "tool": "obsidian:read_note",
+        "arguments": {
+          "path": "${item.path}"
+        }
+      }
+    },
+    {
+      "id": "read",
+      "type": "code",
+      "bpmn_element": "Propose new category",
+      "config": {
+        "function": "inbox.source_note"
+      }
+    },
+    {
+      "id": "request",
+      "type": "code",
+      "bpmn_element": "Propose new category",
+      "config": {
+        "function": "category.proposal_input",
+        "args": {
+          "note": "${read}",
+          "requested": "${item.requested_category}"
+        }
+      }
+    },
+    {
+      "id": "evaluate",
+      "type": "session_plan",
+      "bpmn_element": "Propose new category",
+      "config": {
+        "category": "misc",
+        "note_text": "${request.text}"
+      }
+    },
+    {
+      "id": "eval_failed",
+      "type": "code",
+      "bpmn_element": "Propose new category",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "processing_status": "failed",
+          "failure_reason": "the new category could not be evaluated"
+        }
+      }
+    },
+    {
+      "id": "guard",
+      "type": "output_guard",
+      "bpmn_element": "Output guard",
+      "config": {
+        "input": [
+          "evaluate"
+        ]
+      }
+    },
+    {
+      "id": "security_flag",
+      "type": "subflow",
+      "bpmn_element": "Handle security flag",
+      "config": {
+        "flow": "handle_security_flag"
+      }
+    },
+    {
+      "id": "mark_quarantined",
+      "type": "tool",
+      "bpmn_element": "Handle security flag",
+      "config": {
+        "tool": "obsidian:update_triage",
+        "arguments": {
+          "rows": [
+            {
+              "item_id": "${item.id}",
+              "state": "quarantined"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "note",
+      "type": "code",
+      "bpmn_element": "Propose new category",
+      "config": {
+        "function": "category.proposal_note",
+        "args": {
+          "sessions": "${evaluate}"
+        }
+      }
+    },
+    {
+      "id": "write",
+      "type": "tool",
+      "bpmn_element": "Propose new category",
+      "config": {
+        "tool": "obsidian:write_note",
+        "arguments": {
+          "path": "${note.path}",
+          "body": "${note.body}",
+          "front_matter": "${note.front_matter}",
+          "overwrite": true
+        }
+      }
+    },
+    {
+      "id": "mark",
+      "type": "tool",
+      "bpmn_element": "Propose new category",
+      "config": {
+        "tool": "obsidian:update_triage",
+        "arguments": {
+          "rows": [
+            {
+              "item_id": "${item.id}",
+              "state": "awaiting_category"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "record",
+      "type": "code",
+      "bpmn_element": "Propose new category",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "state": "awaiting_category",
+          "processing_status": "proposed"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "START",
+      "to": "fetch_note",
+      "when": {
+        "path": "item.path",
+        "exists": true
+      }
+    },
+    {
+      "from": "START",
+      "to": "read",
+      "default": true
+    },
+    {
+      "from": "fetch_note",
+      "to": "read"
+    },
+    {
+      "from": "read",
+      "to": "request"
+    },
+    {
+      "from": "request",
+      "to": "evaluate"
+    },
+    {
+      "from": "evaluate",
+      "to": "guard"
+    },
+    {
+      "from": "evaluate",
+      "to": "eval_failed",
+      "on": "error"
+    },
+    {
+      "from": "guard",
+      "to": "security_flag",
+      "when": {
+        "path": "guard.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "security_flag",
+      "to": "mark_quarantined"
+    },
+    {
+      "from": "guard",
+      "to": "note",
+      "default": true
+    },
+    {
+      "from": "note",
+      "to": "write"
+    },
+    {
+      "from": "write",
+      "to": "mark"
+    },
+    {
+      "from": "mark",
+      "to": "record"
+    }
+  ]
+}

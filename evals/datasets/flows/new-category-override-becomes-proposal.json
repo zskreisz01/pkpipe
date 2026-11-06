@@ -1,0 +1,90 @@
+{
+  "id": "new-category-override-becomes-proposal",
+  "source": "synthetic",
+  "description": "The owner's override names a category that is not configured: the misc evaluation session runs with the requested name, a proposal note with a categories.json draft is written below the proposals folder, the item waits as awaiting_category, nothing is filed and the config is untouched (spec 022).",
+  "input": {
+    "vault": {
+      "0-INBOX/kids-museum.md": "A museum with a hands-on science corner for children, open on weekends.\n"
+    },
+    "model": [
+      {
+        "when": "new category named",
+        "reply": {
+          "title": "Children's science museum",
+          "note": "A hands-on museum for children.",
+          "suggestion": {
+            "name": "Children",
+            "triage_hint": "Outings and activities for the children."
+          }
+        },
+        "fields": [
+          "suggestion"
+        ]
+      },
+      {
+        "when": "museum",
+        "reply": {
+          "category": "misc",
+          "confidence": 0.6,
+          "reason": "synthetic"
+        },
+        "fields": [
+          "category"
+        ]
+      }
+    ],
+    "steps": [
+      {
+        "run": "triage"
+      },
+      {
+        "owner": {
+          "override": {
+            "0-INBOX/kids-museum.md": "Children"
+          }
+        }
+      },
+      {
+        "run": "process_released"
+      },
+      {
+        "run": "triage"
+      }
+    ]
+  },
+  "expected": {
+    "runs": [
+      "done",
+      "done",
+      "done"
+    ],
+    "triage": {
+      "0-INBOX/kids-museum.md": {
+        "override": "Children",
+        "state": "awaiting_category"
+      }
+    },
+    "files": {
+      "2-Areas/Self-Improvement/System-Changes/new-category-children-{id:0-INBOX/kids-museum.md}.md": {
+        "contains": [
+          "type: agent_task",
+          "kind: new_category",
+          "# New category proposal: Children",
+          "\"id\": \"children\"",
+          "Outings and activities for the children."
+        ]
+      },
+      "0-INBOX/kids-museum.md": {
+        "contains": [
+          "hands-on science corner"
+        ]
+      }
+    },
+    "processing": {
+      "0-INBOX/kids-museum.md": null
+    },
+    "notify_contains": [
+      "1 item(s) propose a new category: children"
+    ]
+  }
+}

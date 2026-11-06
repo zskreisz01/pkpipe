@@ -270,6 +270,40 @@ def note(
     return out
 
 
+@register_code("category.proposal_input")
+def proposal_input(ctx: StepContext, note: dict[str, Any], requested: str) -> dict[str, Any]:
+    """The text the ``misc`` evaluation reads for a new-category proposal (spec 022): the owner's requested
+    name (already a slug: it came through ``resolve_category``) and the item's note, which is untrusted and
+    reaches the session datamarked like any note text."""
+    if not plans._SLUG.match(str(requested)):  # noqa: SLF001 - the one definition of a slug
+        raise StepError("the requested category is not a slug")
+    body = str((note or {}).get("body") or "")
+    return {
+        "text": (
+            f"The owner wants to file this item under a new category named '{requested}'. Evaluate the "
+            f"item and say whether it deserves that category.\n\n{body}"
+        )
+    }
+
+
+@register_code("category.proposal_note")
+def proposal_note(ctx: StepContext, sessions: dict[str, Any]) -> dict[str, Any]:
+    """The proposal note of a new category (after the output guard): path below ``layout.proposals_dir``,
+    body with the evaluation and a ready-to-paste ``categories.json`` entry, front matter. The versioned
+    config is never written."""
+    item = ctx.item or {}
+    output = ((sessions or {}).get("sessions") or {}).get("evaluate")
+    if not isinstance(output, dict) or _skipped(output):
+        raise StepError("the evaluation session produced no answer")
+    path, body, front = plans.proposal_note(
+        str(item.get("requested_category") or ""),
+        output,
+        item_id=str(item["id"]),
+        folder=layout_of(ctx).proposals_dir,
+    )
+    return {"path": path, "body": body, "front_matter": front}
+
+
 #: What the note says about the system relevance, by the outcome of ``tool_candidate.propose``.
 _RELEVANCE_TEXT = {
     "in_use": "In use: pkpipe already uses this tool.",

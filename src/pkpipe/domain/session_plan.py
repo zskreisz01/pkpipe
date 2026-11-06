@@ -22,6 +22,7 @@ Rules (``plan_errors``)
 
 from __future__ import annotations
 
+import json
 import re
 import unicodedata
 from collections.abc import Callable, Mapping
@@ -29,6 +30,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pkpipe.domain.layout import DEFAULT_LAYOUT
+from pkpipe.domain.text_safety import neutralize_text
 
 #: Inputs that are raw, unvalidated text: a session with tools must never receive them (constitution IV).
 RAW_INPUTS = frozenset({"*", "item", "item.text", "item.body", "item.content", "item.raw"})
@@ -267,3 +269,73 @@ def agent_task_note(
         "pkpipe_item": item_id,
     }
     return path, body, front
+
+
+# -- a new-category proposal (spec 022) --------------------------------------------------------------
+_SLUG = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+PROPOSAL_STATE = "awaiting_category"
+
+
+def proposal_note(
+    requested: str,
+    output: Mapping[str, Any],
+    *,
+    item_id: str,
+    folder: str = DEFAULT_LAYOUT.proposals_dir,
+) -> tuple[str, str, dict[str, Any]]:
+    """(path, body, front matter) of the note that proposes the category ``requested`` (a slug the owner
+    asked for in an override). The pipeline never edits the versioned config: the note holds the evaluation
+    of the item and a ready-to-paste ``categories.json`` entry; the owner adds it through a config draft
+    (validate, eval, publish). The evaluation text comes from a model over untrusted input: it is neutralised
+    before it is written (no markdown, HTML, wikilink or URL). Raises ``ValueError`` unless ``requested`` is
+    a plain slug of 2 to 40 characters: it names the file."""
+    if not _SLUG.match(requested) or not 2 <= len(requested) <= 40:
+        raise ValueError("a new category is named by a slug (letters, digits, hyphens, 2 to 40 characters)")
+    label = requested.replace("-", " ").capitalize()
+    title = neutralize_text(output.get("title") or f"Item {item_id}", 120)
+    note = neutralize_text(output.get("note") or "", 1000)
+    suggestion = output.get("suggestion")
+    hint = (
+        neutralize_text(suggestion.get("triage_hint") or "", 200) if isinstance(suggestion, Mapping) else ""
+    )
+    hint = hint or f"Items the owner files under {label}."
+    entry = {
+        "id": requested,
+        "label": label,
+        "subflow": "other_resource",
+        "para_path": "{resources_dir}/" + label.replace(" ", "-"),
+        "triage_hint": hint,
+        "sessions": [
+            {
+                "id": "summarize",
+                "system": "synthesizer",
+                "instruction": "other/summarize.md",
+                "inputs": ["item.text"],
+                "output_schema": "resource_note",
+            }
+        ],
+    }
+    body = (
+        f"# New category proposal: {label}\n\n"
+        f"- [ ] Decide whether to add the category `{requested}`.\n\n"
+        f"The owner wrote `{requested}` as the override of item {item_id}, and no category with that name is "
+        "configured. The pipeline never edits the configuration: the item waits (state "
+        f"`{PROPOSAL_STATE}`) and nothing was filed.\n\n"
+        f"## Evaluation of the item\n\nTitle: {title}\n\n{note}\n\n"
+        "## Draft entry for categories.json\n\n```json\n"
+        f"{json.dumps(entry, indent=2, ensure_ascii=False)}\n```\n\n"
+        "## How to add it\n\n"
+        "1. Open a config draft (the UI), add the entry above to the overlay `categories.json`, add an "
+        "instruction file and a session of your own if the generic `summarize` session is not enough.\n"
+        "2. Validate the draft, run the evals, publish it.\n"
+        "3. The item is released by the next 06:00 run when its override names the configured category; "
+        "you can also change the override to an existing category at any time.\n"
+    )
+    front = {
+        "type": "agent_task",
+        "kind": "new_category",
+        "status": "proposed",
+        "category_id": requested,
+        "pkpipe_item": item_id,
+    }
+    return f"{folder.rstrip('/')}/new-category-{requested}-{item_id}.md", body, front

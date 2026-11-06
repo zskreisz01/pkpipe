@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import re
+import unicodedata
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -18,6 +21,9 @@ class ItemState(StrEnum):
     RELEASED = "released"
     PROCESSED = "processed"
     QUARANTINED = "quarantined"
+    #: Spec 022: the owner's override names no configured category; a proposal note for a new one was written.
+    #: Left by the owner only (an override naming a configured category, or the quarantine rules).
+    AWAITING_CATEGORY = "awaiting_category"
 
 
 # Allowed state changes made by pipeline code (constitution V/VI). Leaving ``quarantined`` is an owner
@@ -25,13 +31,34 @@ class ItemState(StrEnum):
 # requires the owner's confirm tick or override (see :func:`check_transition`).
 TRANSITIONS: dict[ItemState, frozenset[ItemState]] = {
     ItemState.SUGGESTED: frozenset(
-        {ItemState.SUGGESTED, ItemState.PENDING, ItemState.RELEASED, ItemState.QUARANTINED}
+        {
+            ItemState.SUGGESTED,
+            ItemState.PENDING,
+            ItemState.RELEASED,
+            ItemState.QUARANTINED,
+            ItemState.AWAITING_CATEGORY,
+        }
     ),
     ItemState.PENDING: frozenset(
-        {ItemState.PENDING, ItemState.SUGGESTED, ItemState.RELEASED, ItemState.QUARANTINED}
+        {
+            ItemState.PENDING,
+            ItemState.SUGGESTED,
+            ItemState.RELEASED,
+            ItemState.QUARANTINED,
+            ItemState.AWAITING_CATEGORY,
+        }
     ),
     ItemState.RELEASED: frozenset(
-        {ItemState.RELEASED, ItemState.PENDING, ItemState.PROCESSED, ItemState.QUARANTINED}
+        {
+            ItemState.RELEASED,
+            ItemState.PENDING,
+            ItemState.PROCESSED,
+            ItemState.QUARANTINED,
+            ItemState.AWAITING_CATEGORY,
+        }
+    ),
+    ItemState.AWAITING_CATEGORY: frozenset(
+        {ItemState.AWAITING_CATEGORY, ItemState.RELEASED, ItemState.PENDING, ItemState.QUARANTINED}
     ),
     ItemState.PROCESSED: frozenset({ItemState.PROCESSED}),
     ItemState.QUARANTINED: frozenset({ItemState.QUARANTINED}),
@@ -124,7 +151,9 @@ class OwnerDecisionError(ValueError):
 
 
 #: states in which the owner may still confirm or override an item
-DECIDABLE = frozenset({ItemState.SUGGESTED, ItemState.PENDING, ItemState.RELEASED})
+DECIDABLE = frozenset(
+    {ItemState.SUGGESTED, ItemState.PENDING, ItemState.RELEASED, ItemState.AWAITING_CATEGORY}
+)
 
 
 def check_owner_decision(
@@ -153,3 +182,40 @@ def check_quarantine_release(state: ItemState) -> None:
     """Only a quarantined item can be released from quarantine (back to ``pending`` for a new decision)."""
     if state is not ItemState.QUARANTINED:
         raise OwnerDecisionError(f"item is '{state.value}', not quarantined")
+
+
+# -- the owner's override naming no configured category (spec 022) -------------------------------------------
+NEW_CATEGORY_MAX = 40
+#: What the owner may type as a category name: letters (any script), digits, blanks, hyphens, underscores.
+_PLAIN_NAME = re.compile(r"^[\w \-]{2,60}$")
+
+
+def slugify_category(text: str) -> str:
+    """Lower case ASCII letters and digits joined by single hyphens (accents folded)."""
+    folded = unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode("ascii").lower()
+    return re.sub(r"[^a-z0-9]+", "-", folded).strip("-")
+
+
+def resolve_category(value: str, categories: Mapping[str, Mapping[str, object]]) -> tuple[str, str | None]:
+    """What an override means (deterministic, constitution V).
+
+    ``("exact", id)``: a configured id. ``("normalised", id)``: an obvious variant of a configured id or label
+    (case, blanks, underscores, repeated hyphens). ``("new", slug)``: a plain name (letters, digits, blanks,
+    hyphens, at most 60 characters) that names nothing configured; its slug (2 to 40 characters, with a
+    letter) is a new-category request. ``("invalid", None)``: anything else (markup, a sentence, a
+    symbol): the old dead end, the owner writes a configured category. The value is owner text, but it is
+    handled as untrusted input: nothing but the slug goes on to a prompt or a path."""
+    raw = str(value or "").strip()
+    if raw in categories:
+        return "exact", raw
+    if not _PLAIN_NAME.match(raw):
+        return "invalid", None
+    slug = slugify_category(raw)
+    if slug in categories:
+        return "normalised", slug
+    for cid, cat in categories.items():
+        if slugify_category(str(cat.get("label") or "")) == slug:
+            return "normalised", cid
+    if 2 <= len(slug) <= NEW_CATEGORY_MAX and re.search(r"[a-z]", slug):
+        return "new", slug
+    return "invalid", None
