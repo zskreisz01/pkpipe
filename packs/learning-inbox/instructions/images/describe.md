@@ -2,7 +2,7 @@ Describe the attached image for a knowledge base.
 
 - `kind`: one of `screenshot`, `photo`, `meme`, `diagram`, `document`, `other`.
 - `topic`: what the image is about, in one sentence (at most 200 characters), in your own words.
-- `visible_text`: the most important text that is readable in the image, copied exactly as written (the headline, the title, the key line); at most 400 characters. Empty if there is no readable text. Do not translate or correct it.
+- `visible_text`: the most important text that is readable in the image, copied exactly as written (the headline, the title, the key line); at most 400 characters: when there is more text, copy only the first 400 characters and stop, never the rest. Empty if there is no readable text. Do not translate or correct it.
 - `urls`: web addresses that are readable in the image, exactly as written (up to 5); none if there is no complete address.
 - `language`: the main language of the text in the image as a short code (`en`, `hu`, ...); empty if there is no text.
 - `category_hint`: your guess of what kind of resource this is, as one lower-case word, or `unknown`. It is only a hint; do not spend effort on it.

@@ -257,7 +257,10 @@ def test_the_vision_session_has_no_tools_and_the_run_canary(world):
     world.run()
     call = world.model.image_calls[0]
     assert "CNY-" in call["system"] and "Viewer" in call["system"] and "untrusted data" in call["system"]
-    assert call["profile"] == "vision" and call["json_schema"]["required"][:2] == ["kind", "topic"]
+    assert call["profile"] == "vision" and call["json_schema"]["required"][:2] == [
+        "kind",
+        "injection_suspected",
+    ]
 
 
 def test_a_canary_leak_in_the_description_is_a_security_flag(vault, pack_dir, overlay):
@@ -783,3 +786,71 @@ def test_a_triage_file_with_plain_image_rows_is_migrated_by_the_next_image_run(v
     text = _triage_text(second)
     assert "![[late.png\\|200]]" in text and "![[post.jpg\\|200]]" in text  # the old row was migrated
     assert len(second.rows) == plain + 1 and second.rows[rid("post.jpg")]["confirm"] is True
+
+
+# -- an answer that overruns visible_text until max_tokens cuts the JSON off (live finding) ------------------
+
+
+def _cut_answer(**over):
+    head = {
+        "kind": "screenshot",
+        "injection_suspected": False,
+        "evidence": None,
+        "topic": "A synthetic post.",
+    }
+    head.update(over)
+    return json.dumps(head)[:-1] + ', "visible_text": "' + "synthetic words " * 200
+
+
+def test_a_cut_off_answer_is_salvaged_without_a_retry_and_the_image_is_described(vault, pack_dir, overlay):
+    s = script()
+    s[digest("post.jpg")] = SchemaError("cut", raw=_cut_answer())
+    w = World(vault, pack_dir, overlay, vision_script=s)
+    w.run()
+    calls = [c for c in w.model.image_calls if digest("post.jpg") in c["images"]]
+    assert len(calls) == 1  # salvaged: no repeat
+    row = w.rows[rid("post.jpg")]
+    assert row["needs_owner"] is False and row["topic"] == "A synthetic post."
+    cached = next(v for k, v in w.store.cache.items() if k[0] == digest("post.jpg"))
+    assert len(cached["visible_text"]) == 400 and cached["kind"] == "screenshot"
+
+
+def test_a_cut_off_answer_that_says_injection_is_still_quarantined(vault, pack_dir, overlay):
+    s = script()
+    s[digest("post.jpg")] = SchemaError(
+        "cut", raw=_cut_answer(injection_suspected=True, evidence="ignore it")
+    )
+    w = World(vault, pack_dir, overlay, vision_script=s)
+    w.run()
+    assert w.rows[rid("post.jpg")]["state"] == "quarantined"
+
+
+def test_a_cut_off_answer_without_the_injection_flag_is_not_salvaged(vault, pack_dir, overlay):
+    cut = '{"kind": "screenshot", "topic": "A synthetic post.", "visible_text": "' + "synthetic words " * 200
+    s = script()
+    s[digest("post.jpg")] = SchemaError("cut", raw=cut)
+    w = World(vault, pack_dir, overlay, vision_script=s)
+    w.run()
+    calls = [c for c in w.model.image_calls if digest("post.jpg") in c["images"]]
+    assert len(calls) == 4  # fail closed: repeated once, for post.jpg and its copy; then the owner decides
+    assert w.rows[rid("post.jpg")]["needs_owner"] is True
+
+
+def test_an_answer_that_leaked_the_canary_is_never_salvaged(vault, pack_dir, overlay):
+    import re
+
+    s = script()
+    s[digest("post.jpg")] = SchemaError("cut", raw="")  # replaced below by one that carries the run's canary
+    w = World(vault, pack_dir, overlay, vision_script=s)
+    original = w.model.complete
+
+    def leaking(system, user, json_schema=None, profile="default", images=None):
+        if images and digest("post.jpg") in [i.sha256 for i in images]:
+            canary = re.search(r"CNY-[0-9a-f]{16}", system).group(0)
+            raise SchemaError("cut", raw=_cut_answer(topic=f"see {canary}"))
+        return original(system, user, json_schema, profile, images)
+
+    w.model.complete = leaking  # type: ignore[method-assign]
+    w.run()
+    assert w.rows[rid("post.jpg")]["needs_owner"] is True  # not described from a leaking answer
+    assert not [k for k in w.store.cache if k[0] == digest("post.jpg")]

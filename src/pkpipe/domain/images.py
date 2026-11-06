@@ -5,11 +5,12 @@ Decoding and re-encoding is the adapter :mod:`pkpipe.adapters.image_pillow` (por
 
 from __future__ import annotations
 
+import json
 import threading
 from collections import OrderedDict
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pkpipe.ports import PreparedImage
 
@@ -80,3 +81,106 @@ class ImageDescription(BaseModel):
     category_hint: str = Field(default="unknown", max_length=60)
     injection_suspected: bool
     evidence: str | None = Field(default=None, max_length=1000)
+
+
+# -- salvage of an answer that overran its limits ------------------------------------------------------------
+_DEFAULTS: dict[str, Any] = {"urls": [], "language": "", "category_hint": "unknown", "evidence": None}
+_REQUIRED = ("kind", "topic", "injection_suspected")
+
+
+def _cut_string(raw: str, start: int) -> str:
+    """The text of a JSON string that starts after the quote at ``start``-1 and may be cut off: unescaped
+    as far as it goes (a dangling escape or half a ``\\uXXXX`` at the end is dropped)."""
+    chars: list[str] = []
+    i, n = start, len(raw)
+    escapes = {'"': '"', "\\": "\\", "/": "/", "b": "\b", "f": "\f", "n": "\n", "r": "\r", "t": "\t"}
+    while i < n:
+        c = raw[i]
+        if c == '"':
+            break
+        if c == "\\":
+            if i + 1 >= n:
+                break
+            e = raw[i + 1]
+            if e == "u":
+                digits = raw[i + 2 : i + 6]
+                if len(digits) < 4 or any(d not in "0123456789abcdefABCDEF" for d in digits):
+                    break
+                chars.append(chr(int(digits, 16)))
+                i += 6
+                continue
+            chars.append(escapes.get(e, e))
+            i += 2
+            continue
+        chars.append(c)
+        i += 1
+    return "".join(chars)
+
+
+def salvage_description(raw: str | None) -> dict[str, Any] | None:
+    """A usable description out of an answer that failed schema validation only because it overran its limits.
+
+    A vision model does not keep ``visible_text`` under 400 characters (the decoder does not enforce
+    ``maxLength``): it goes on transcribing until ``max_tokens`` cuts the JSON off, or it ends the JSON with
+    a field too long. Everything before the cut is complete: this reads the fields in order, keeps the
+    complete ones and the text of a cut string, caps every field at its limit, drops unknown keys, fills
+    only the optional fields (urls, language, category_hint, evidence) and returns ``None`` unless ``kind``,
+    ``topic`` and ``injection_suspected`` are present and valid: that flag is never assumed (fail closed).
+    The result goes through the same output guard, canary check and URL policy as any description.
+    Content-free: no text of the answer leaves this function except in the returned fields."""
+    if not raw:
+        return None
+    text = raw.rsplit("</think>", 1)[-1] if "</think>" in raw else raw
+    start = text.find("{")
+    if start < 0:
+        return None
+    decoder = json.JSONDecoder()
+    found: dict[str, Any] = {}
+    pos = start + 1
+    n = len(text)
+    while pos < n:
+        while pos < n and text[pos] in " \t\r\n,":
+            pos += 1
+        if pos >= n or text[pos] != '"':
+            break
+        try:
+            key, pos = decoder.raw_decode(text, pos)
+        except ValueError:
+            break
+        while pos < n and text[pos] in " \t\r\n":
+            pos += 1
+        if pos >= n or text[pos] != ":":
+            break
+        pos += 1
+        while pos < n and text[pos] in " \t\r\n":
+            pos += 1
+        if pos >= n:
+            break
+        try:
+            value, pos = decoder.raw_decode(text, pos)
+        except ValueError:
+            if text[pos] == '"':  # a string that was cut off: what there is of it
+                found[key] = _cut_string(text, pos + 1)
+            break
+        found[key] = value
+    fields = {k: found[k] for k in ImageDescription.model_fields if k in found}
+    if any(k not in fields for k in _REQUIRED):
+        return None
+    for key, limit in (
+        ("topic", MAX_TOPIC),
+        ("visible_text", MAX_VISIBLE_TEXT),
+        ("language", 20),
+        ("category_hint", 60),
+        ("evidence", 1000),
+    ):
+        if isinstance(fields.get(key), str):
+            fields[key] = fields[key][:limit]
+    if isinstance(fields.get("urls"), list):
+        fields["urls"] = [u for u in fields["urls"] if isinstance(u, str) and len(u) <= 500][:10]
+    for key, default in _DEFAULTS.items():
+        fields.setdefault(key, default)
+    fields.setdefault("visible_text", "")
+    try:
+        return ImageDescription.model_validate(fields).model_dump()
+    except ValidationError:
+        return None

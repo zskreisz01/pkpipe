@@ -36,7 +36,12 @@ from pydantic import Field, ValidationError
 
 from pkpipe.domain import image_batch as batch
 from pkpipe.domain.data_classes import content_free_errors
-from pkpipe.domain.images import PREPARED_MEDIA_TYPE, ImageBuffer, ImageDescription
+from pkpipe.domain.images import (
+    PREPARED_MEDIA_TYPE,
+    ImageBuffer,
+    ImageDescription,
+    salvage_description,
+)
 from pkpipe.domain.text_safety import neutralize_text
 from pkpipe.engine.config_models import ImagesConfig
 from pkpipe.engine.envref import resolve_chain
@@ -596,6 +601,8 @@ class VisionStep(StepExecutor):
         deadline = started + cfg.per_image_timeout_s
         attempts = 1 + cfg.retries
         last: Exception | None = None
+        canary = _canary_of(ctx)
+        repaired = False
         with ctx.ports.tracer.llm(config.profile) as span, content_free_errors(True):
             span.set("pkpipe.model.profile", config.profile)
             span.set("pkpipe.image.bytes", len(prepared.data))
@@ -610,10 +617,21 @@ class VisionStep(StepExecutor):
                         remaining,
                     )
                     desc = ImageDescription.model_validate(reply)
-                except (SchemaError, ValidationError) as exc:
+                except SchemaError as exc:
+                    last, reply = exc, None
+                    # A model overruns visible_text (the decoder does not enforce maxLength) until max_tokens
+                    # cuts the JSON off: what came before is complete. Cap and keep it, unless the answer
+                    # leaked the canary (the guard must see a leak, not a cropped copy). The flag
+                    # injection_suspected is never assumed: without it the answer is not salvaged.
+                    fixed = None if leaked(canary, exc.raw or "") else salvage_description(exc.raw)
+                    if fixed is None:
+                        continue
+                    reply, desc, repaired = fixed, ImageDescription.model_validate(fixed), True
+                except ValidationError as exc:
                     last, reply = exc, None
                     continue
                 span.set("pkpipe.image.attempts", attempt)
+                span.set("pkpipe.image.repaired", repaired)
                 break
             if reply is None:
                 span.set("pkpipe.image.attempts", attempts)
@@ -622,8 +640,8 @@ class VisionStep(StepExecutor):
                     # image: only the type and a fixed text go on
                     raise SchemaError("the answer does not satisfy the schema") from None
                 raise DescriptionInvalid("the model's answer did not satisfy the schema") from None
-        canary = _canary_of(ctx)
         out = desc.model_dump()
+        out["repaired"] = repaired
         out["canary_leaked"] = leaked(canary, json.dumps(reply, ensure_ascii=False, default=str))
         out["attempts"] = attempt
         out["seconds"] = round(time.monotonic() - started, 2)

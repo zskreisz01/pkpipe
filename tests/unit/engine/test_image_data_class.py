@@ -255,3 +255,15 @@ def test_a_flow_that_calls_read_image_must_declare_the_image_class():
     errors = _errors(_read_image_flow(()), servers=servers)
     assert any("'v:read_image' reads an image" in e and "data class 'image'" in e for e in errors)
     assert _errors(_read_image_flow(("image",)), servers=servers) == []
+
+
+def test_the_description_schema_puts_the_decisions_before_the_long_free_text(pack_dir):
+    """A model emits the keys in schema order. If it overruns visible_text until max_tokens cuts the JSON off,
+    the flag injection_suspected, the kind and the topic must already be there (live finding, spec 021)."""
+    import json
+
+    schema = json.loads((pack_dir / "schemas" / "image_description.json").read_text())
+    keys = list(schema["properties"])
+    assert keys[-1] == "visible_text" and keys.index("urls") > keys.index("topic")
+    assert keys.index("injection_suspected") < keys.index("topic") < keys.index("visible_text")
+    assert list(schema["required"]) == keys
