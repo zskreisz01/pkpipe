@@ -18,20 +18,33 @@ def _row(resource, **extra):
     return {"resource": resource, "ai_suggested_category": "misc", **extra}
 
 
-def test_note_rows_keep_the_six_column_table_byte_for_byte(tmp_path):
+def test_a_six_column_table_is_widened_by_the_next_write_and_keeps_every_cell(tmp_path):
+    """Spec 022: every write gives the table the full header (the owner's comment column); the cells stay."""
     p = tmp_path / "T.md"
     p.write_text(OLD)
     res = lists.update_triage(p, [{"item_id": "b2", "state": "released"}])
     assert res["updated"] == ["b2"]
-    assert p.read_text() == OLD.replace("| pending |", "| released |")
-    assert lists.read_triage(p)["rows"][0]["kind"] == "note"
+    lines = p.read_text().splitlines()
+    assert (
+        "| confirm | item | resource | suggested | override | state | kind | needs_owner | topic | comment |"
+        in lines
+    )
+    rows = {r["item_id"]: r for r in lists.read_triage(p)["rows"]}
+    assert rows["b2"]["state"] == "released" and rows["a1"]["confirm"] is True
+    assert {r["kind"] for r in rows.values()} == {"note"}
+    before = p.read_text()
+    lists.update_triage(p, [{"item_id": "b2", "state": "released"}])
+    assert p.read_text() == before  # a table that is full already is rewritten byte for byte
 
 
-def test_a_new_file_with_note_rows_only_has_six_columns(tmp_path):
+def test_a_new_file_has_the_full_header_with_the_owner_comment_column(tmp_path):
     p = tmp_path / "T.md"
     lists.update_triage(p, [_row("0-INBOX/x.md")])
     header = next(ln for ln in p.read_text().splitlines() if ln.startswith("| confirm"))
-    assert header == "| confirm | item | resource | suggested | override | state |"
+    assert (
+        header
+        == "| confirm | item | resource | suggested | override | state | kind | needs_owner | topic | comment |"  # noqa: E501
+    )
 
 
 def test_first_list_row_widens_header_and_rows_once(tmp_path):
@@ -40,11 +53,12 @@ def test_first_list_row_widens_header_and_rows_once(tmp_path):
     img = _row("IMG_1.jpg", ai_suggested_category="none", kind="image", needs_owner=True)
     lists.update_triage(p, [img])
     lines = p.read_text().splitlines()
-    # the optional columns (kind, needs_owner, and spec 021's topic) are added together, once
-    assert (
-        "| confirm | item | resource | suggested | override | state | kind | needs_owner | topic |" in lines
+    # the optional columns (kind, needs_owner, topic and the owner's comment) are added together, once
+    header = (
+        "| confirm | item | resource | suggested | override | state | kind | needs_owner | topic | comment |"
     )
-    assert "| --- | --- | --- | --- | --- | --- | --- | --- | --- |" in lines
+    assert header in lines
+    assert "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |" in lines
     rows = {r["item_id"]: r for r in lists.read_triage(p)["rows"]}
     assert rows["a1"]["confirm"] is True and rows["a1"]["kind"] == "note"  # the owner's tick survived
     assert rows[item_id_for("IMG_1.jpg")]["kind"] == "image" and rows[item_id_for("IMG_1.jpg")]["needs_owner"]

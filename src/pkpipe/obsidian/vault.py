@@ -358,7 +358,11 @@ class Vault:
     @_traced
     def read_triage(self) -> dict[str, Any]:
         path = self.policy.resolve(self.policy.triage_file, "read_triage")
-        return lists.read_triage(path)
+        data = lists.read_triage(path)
+        # the owner's comment (spec 022) is private: not in a tool result, so not in a flow state, a session
+        # with tools or an agent. The owner channels read the file through the library.
+        data["rows"] = [{k: v for k, v in r.items() if k != "comment"} for r in data["rows"]]
+        return data
 
     @_traced
     def update_triage(self, rows: list[dict[str, Any]]) -> dict[str, Any]:

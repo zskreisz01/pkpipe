@@ -58,8 +58,12 @@ def test_escaped_pipe_survives_parse(tmp_path):
 
 def test_update_preserves_manual_edits_in_other_rows(tmp_path):
     """US2.2: only the addressed row changes; every other line stays as the owner left it."""
-    text = FIXTURES["05-prose-after"].replace("| [ ] | a1 |", "|[x]|   a1 |")  # owner's odd spacing
     p = tmp_path / "t.md"
+    p.write_text(FIXTURES["05-prose-after"])
+    lists.update_triage(
+        p, []
+    )  # spec 022: the first write widens the table (one re-serialisation of every row)
+    text = p.read_text().replace("| [ ] | a1 |", "|[x]|   a1 |")  # then the owner's odd spacing
     p.write_text(text)
     res = lists.update_triage(p, [{"item_id": "c3", "state": "released"}])
     assert res["updated"] == ["c3"]
@@ -67,7 +71,7 @@ def test_update_preserves_manual_edits_in_other_rows(tmp_path):
     old_lines, new_lines = text.splitlines(), new.splitlines()
     changed = [(o, n) for o, n in zip(old_lines, new_lines, strict=True) if o != n]
     assert len(old_lines) == len(new_lines) and len(changed) == 1
-    assert "c3" in changed[0][1] and changed[0][1].endswith("| released |")
+    assert "c3" in changed[0][1] and "| released |" in changed[0][1]
     assert "|[x]|   a1 |" in new  # untouched hand-edited row
 
 
@@ -120,8 +124,8 @@ def test_invalid_batch_writes_nothing(tmp_path):
         with pytest.raises(InvalidRows):
             lists.update_triage(p, bad)
         assert p.read_text() == before
-    with pytest.raises(InvalidRows):
-        lists.update_triage(p, [])
+    # an empty list is the maintenance call (spec 022), not an error: it widens the table and nothing else
+    assert lists.update_triage(p, [])["inserted"] == []
 
 
 def test_crlf_file_stays_crlf_after_update(tmp_path):

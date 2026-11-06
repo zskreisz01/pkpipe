@@ -250,3 +250,24 @@ def test_release_over_mcp_is_owner_only_and_returns_no_note_text(stack, server):
     err, row = run(call(server.url, OWNER_TOKEN, "release_quarantine", item_id=item))
     assert not err and row["requeued"] is True and row["eval_candidate"].startswith(f"release-{item}-")
     assert "known attack" not in str(row) and (stack.vault / resource).is_file()
+
+
+def test_list_triage_over_mcp_and_the_json_api_never_carry_the_owner_comment(stack, server):
+    """Spec 022: `comment` is the owner's private text: not for an agent over the app MCP, not in the API."""
+    from tests.support.app_stack import api_client
+
+    ids = seed_triage(stack, a="tool")
+    path = stack.vault / TRIAGE_FILE
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        "\n".join(
+            ln[: -len("|  |")] + "| PRIVATE-OWNER-WORDS |" if ids["a"] in ln and ln.endswith("|  |") else ln
+            for ln in text.splitlines()
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert lists.read_triage(path)["rows"][0]["comment"] == "PRIVATE-OWNER-WORDS"
+    err, data = run(call(server.url, AGENT_TOKEN, "list_triage"))
+    assert not err and "PRIVATE-OWNER-WORDS" not in repr(data)
+    assert "PRIVATE-OWNER-WORDS" not in api_client(stack).get("/api/triage").text

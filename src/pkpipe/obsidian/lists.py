@@ -22,9 +22,10 @@ from .policy import is_conflict_name
 from .tables import TableFile
 
 TRIAGE_COLUMNS = ("confirm", "item", "resource", "suggested", "override", "state")
-#: Added by spec 020 (``kind``, ``needs_owner``) and spec 021 (``topic``); a triage file written before
-#: them is widened on its next write, and only when a row needs a column.
-TRIAGE_OPTIONAL = ("kind", "needs_owner", "topic")
+#: Added by spec 020 (``kind``, ``needs_owner``), spec 021 (``topic``) and spec 022 (``comment``, the
+#: owner's own words). Every write gives the table the full header (:func:`_prepare_table`): a file written
+#: before them is widened on its next write, no row or cell lost.
+TRIAGE_OPTIONAL = ("kind", "needs_owner", "topic", "comment")
 PROCESSING_COLUMNS = ("item", "category", "note", "nb_id", "link", "status")
 TRIAGE_PREAMBLE = (
     "# Inbox triage\n\n"
@@ -87,6 +88,8 @@ def _normalise_triage_update(update: dict[str, Any], existing: dict[str, str] | 
         new_states = (ItemState.SUGGESTED.value, ItemState.QUARANTINED.value)
         if "state" in data and str(data["state"]).strip().lower() not in new_states:
             raise ValueError("new triage rows start in state 'suggested' (or 'quarantined' when flagged)")
+        if data.get("comment"):
+            raise ValueError("comment is the owner's: the pipeline never writes it")
         if not data.get("resource"):
             raise ValueError("resource is required for a new row")
         expected = item_id_for(_plain_resource(data["resource"]))
@@ -102,6 +105,8 @@ def _normalise_triage_update(update: dict[str, Any], existing: dict[str, str] | 
     for field in OWNER_FIELDS:
         if field in data and getattr(candidate, field) != getattr(current, field):
             raise ValueError(f"{field} is set by the owner, not by the pipeline")
+    if "comment" in data and data["comment"] != current.comment:
+        raise ValueError("comment is the owner's: the pipeline never writes it")
     for field in CREATION_FIELDS:
         if field in data and getattr(candidate, field) != getattr(current, field):
             raise ValueError(f"{field} is fixed when the row is created")
@@ -123,14 +128,17 @@ def update_triage(path: Path, updates: list[dict[str, Any]]) -> dict[str, Any]:
     resource, and state changes follow the domain transition rules. The whole batch is validated before
     anything is written.
     """
-    if not updates:
-        raise InvalidRows("no rows given")
     result: dict[str, list[str]] = {}
+    if (
+        not updates
+    ):  # the maintenance call (spec 022): the column migration only, nothing is written if current
+        return _maintain_triage(path)
 
     def transform(text: str | None) -> str:
         table = TableFile(
             text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE, optional=TRIAGE_OPTIONAL
         )
+        _prepare_table(table)
         outcome: dict[str, list[str]] = {"inserted": [], "updated": [], "unchanged": []}
         errors: list[str] = []
         for i, update in enumerate(updates):
@@ -166,6 +174,39 @@ def update_triage(path: Path, updates: list[dict[str, Any]]) -> dict[str, Any]:
     return {**result, "conflicts": find_conflicts(path)}
 
 
+def _prepare_table(table: TableFile) -> None:
+    """Every write: the column migration of spec 022, then the full header.
+
+    A table whose header has no ``comment`` column was written before the owner had one. Its non-image rows
+    can only hold text in ``topic`` that the owner typed (the pipeline writes a topic for image rows only), so
+    that text moves into ``comment``, once: the rule runs only while the header lacks the column, and the
+    header is full afterwards. The topic of an image row is the pipeline's and stays."""
+    if table.has_header and not table.header_has("comment"):
+        for cells in table.rows():
+            if cells.get("kind") != "image" and cells.get("topic"):
+                table.upsert({**cells, "comment": cells.get("comment") or cells["topic"], "topic": ""})
+    table.widen()
+
+
+def _maintain_triage(path: Path) -> dict[str, Any]:
+    """``update_triage([])``: migrate and widen the table of an existing file; write only when it changes."""
+    empty: dict[str, list[str]] = {"inserted": [], "updated": [], "unchanged": []}
+    if not path.exists():
+        return {**empty, "conflicts": find_conflicts(path)}
+
+    def transform(text: str | None) -> str:
+        table = TableFile(
+            text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE, optional=TRIAGE_OPTIONAL
+        )
+        _prepare_table(table)
+        return table.render()
+
+    current = path.read_text(encoding="utf-8")
+    if transform(current) != current:
+        update_text(path, transform)
+    return {**empty, "conflicts": find_conflicts(path)}
+
+
 def _plain_resource(value: object) -> str:
     """The name inside an embed (``![[name|200]]``), or the resource as given."""
     text = str(value).strip()
@@ -181,6 +222,7 @@ def _owner_edit(path: Path, item_id: str, change) -> dict[str, Any]:
         table = TableFile(
             text, TRIAGE_COLUMNS, key="item", preamble=TRIAGE_PREAMBLE, optional=TRIAGE_OPTIONAL
         )
+        _prepare_table(table)
         existing = table.get(item_id)
         if existing is None:
             raise InvalidRows(f"unknown triage item '{item_id}'")
