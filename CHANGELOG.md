@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.2 – 2026-11-06
+- Fix: the triage confirm checkbox tolerates stray blanks from hand edits (`[ x]`, `[x ]`, `[  ]`, `[]`); a single odd cell no longer fails the whole `update_triage` call.
+
 ## 0.1.1 – 2026-11-06
 - Fix: the default pack ships inside the wheel (`pkpipe/_packs`), so an installed release (git tag) finds `packs/learning-inbox` without a source checkout.
 
