@@ -1,6 +1,6 @@
 {
   "id": "propose_category",
-  "description": "Spec 022: the owner's override names no configured category. One item: read it (code), evaluate it with the misc evaluation session (no tools, the requested name as input, datamarked, run canary), check the answer with the output guard, write a new-category proposal note below layout.proposals_dir (the evaluation and a ready-to-paste categories.json entry) and mark the item awaiting_category. Nothing is filed into a PARA folder, the INBOX entry stays, and the versioned config is never written: the owner adds the category through a config draft, validate, eval, publish. A flag quarantines only this item; a failed evaluation leaves the item as it is, so the next 06:00 run tries again.",
+  "description": "Spec 022: the owner's override names no configured category. One item: read it (code), evaluate it with the misc evaluation session (no tools, the requested name as input, datamarked, run canary), check the answer with the output guard, write a new-category proposal note below layout.proposals_dir (the evaluation and a ready-to-paste categories.json entry) and mark the item awaiting_category. Nothing is filed into a PARA folder, the INBOX entry stays, and the versioned config is never written: the owner adds the category through a config draft, validate, eval, publish. A flag quarantines only this item; a failed evaluation leaves the item as it is and is counted (category.proposal_failed), so the next 06:00 run tries again, at most 3 times per item and requested name; after that the item stays pending, the owner is told in the evening message, and a changed override starts a fresh count.",
   "bpmn": "process-inbox-items",
   "nodes": [
     {
@@ -48,11 +48,7 @@
       "type": "code",
       "bpmn_element": "Propose new category",
       "config": {
-        "function": "item.set",
-        "args": {
-          "processing_status": "failed",
-          "failure_reason": "the new category could not be evaluated"
-        }
+        "function": "category.proposal_failed"
       }
     },
     {
@@ -135,11 +131,7 @@
       "type": "code",
       "bpmn_element": "Propose new category",
       "config": {
-        "function": "item.set",
-        "args": {
-          "state": "awaiting_category",
-          "processing_status": "proposed"
-        }
+        "function": "category.proposal_recorded"
       }
     }
   ],

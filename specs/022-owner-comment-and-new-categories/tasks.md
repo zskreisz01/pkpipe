@@ -23,4 +23,5 @@ Format: `- [ ] T001 [USx] Description`
 
 ## Phase: Polish
 
+- [x] T008 FR-009 retry cap: `ProposalAttemptsPort` (app DB table, fake), `category.proposal_failed` / `category.proposal_recorded`, `triage.release` and `triage.backlog` (`proposal_gave_up`), tests, docs, BPMN label
 - [x] T007 [P] Docs (configuration, flows, operations, security), BPMN Process Inbox Items (drawio, PNG, Mermaid), CHANGELOG

@@ -215,6 +215,8 @@ def clean_owner_note(value: object) -> str:
 
 # -- the owner's override naming no configured category (spec 022) -------------------------------------------
 NEW_CATEGORY_MAX = 40
+#: Failed evaluations of one proposal (per item and requested name) before it is no longer retried (spec 022).
+MAX_PROPOSAL_ATTEMPTS = 3
 #: What the owner may type as a category name: letters (any script), digits, blanks, hyphens, underscores.
 _PLAIN_NAME = re.compile(r"^[\w \-]{2,60}$")
 
