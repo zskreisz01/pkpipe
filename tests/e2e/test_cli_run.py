@@ -92,7 +92,7 @@ def test_failed_run_exits_nonzero_and_is_recorded(served_vault, fakes, capsys, w
         overlay, "mcp_servers.json", {"obsidian": {"url": "http://127.0.0.1:9/mcp"}}
     )  # nothing listens
     code, out = _run(capsys, "run", "triage", "--overlay", str(overlay), "--db", str(db), "--json")
-    assert code == 1 and out["status"] == "failed" and "list_inbox" in out["error"]
+    assert code == 1 and out["status"] == "failed" and "migrate" in out["error"]
     assert not (vault / TRIAGE_FILE).exists()
 
 

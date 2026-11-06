@@ -855,7 +855,7 @@ def test_an_answer_that_leaked_the_canary_is_never_salvaged(vault, pack_dir, ove
     assert not [k for k in w.store.cache if k[0] == digest("post.jpg")]
 
 
-# -- spec 022: the owner's comment column through a triage run ------------------------------------------------------
+# -- spec 022: the owner's comment column through a triage run ----------------------------------
 
 
 def test_a_triage_run_migrates_an_old_table_keeps_the_comments_and_leaks_nothing(vault, pack_dir, overlay):
@@ -864,7 +864,8 @@ def test_a_triage_run_migrates_an_old_table_keeps_the_comments_and_leaks_nothing
     triage = vault / "0-INBOX/Inbox-Triage.md"
     old = item_id_for("0-INBOX/old.md")
     triage.write_text(
-        "# Inbox triage\n\n| confirm | item | resource | suggested | override | state | kind | needs_owner | topic |\n"
+        "# Inbox triage\n\n"
+        "| confirm | item | resource | suggested | override | state | kind | needs_owner | topic |\n"
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
         f"| [ ] | {old} | 0-INBOX/old.md | misc |  | suggested |  |  | PRIVATE-OWNER-WORDS |\n",
         encoding="utf-8",
