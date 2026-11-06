@@ -136,7 +136,8 @@ def test_every_category_session_has_a_synthetic_dataset():
         node = find_node(snap, category, session)
         for case in cases:
             assert case.source == "synthetic" and case.expected, (name, case.id)
-            assert "*" in node.inputs or set(node.inputs) <= set(case.input), (name, case.id)
+            required = set(node.inputs) - {"item.owner_note"}  # the owner's note is optional (spec 023)
+            assert "*" in node.inputs or required <= set(case.input), (name, case.id)
             assert ("context" in case.input) == bool(node.config.get("context")), (name, case.id)
         injected = [c for c in cases if "ignore all previous instructions" in json.dumps(c.input).lower()]
         assert injected, f"{name} has no case with an injected instruction"

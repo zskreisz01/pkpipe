@@ -108,7 +108,7 @@ def test_agent_token_cannot_perform_owner_actions(stack, server):
 def test_override_and_quarantine_release_over_mcp_follow_the_triage_rules(stack, server):
     ids = seed_triage(stack, a="tool", q="tool")
     stack.services.vault.update_triage([{"item_id": ids["q"], "state": "quarantined"}])
-    err, msg = run(call(server.url, OWNER_TOKEN, "override_item", item_id=ids["a"], category="invented"))
+    err, msg = run(call(server.url, OWNER_TOKEN, "override_item", item_id=ids["a"], category="<b>x</b>"))
     assert err and "unknown category" in msg
     err, row = run(call(server.url, OWNER_TOKEN, "override_item", item_id=ids["a"], category="marketing"))
     assert not err and row["override"] == "marketing"
@@ -189,7 +189,7 @@ def test_list_triage_datamarks_untrusted_resources_for_the_chat_agent(stack, ser
         [{"resource": hostile, "ai_suggested_category": "tool", "state": "suggested"}]
     )
     err, data = run(call(server.url, AGENT_TOKEN, "list_triage"))
-    assert not err and data["untrusted_fields"] == ["resource"]
+    assert not err and data["untrusted_fields"] == ["resource", "comment"]
     resource = data["rows"][0]["resource"]
     nonce = resource.split("<<DATA:", 1)[1].split(">>", 1)[0]
     assert resource == f"<<DATA:{nonce}>>\n{hostile}\n<<END:{nonce}>>" and len(nonce) >= 8
@@ -250,3 +250,28 @@ def test_release_over_mcp_is_owner_only_and_returns_no_note_text(stack, server):
     err, row = run(call(server.url, OWNER_TOKEN, "release_quarantine", item_id=item))
     assert not err and row["requeued"] is True and row["eval_candidate"].startswith(f"release-{item}-")
     assert "known attack" not in str(row) and (stack.vault / resource).is_file()
+
+
+def test_the_owner_comment_is_for_the_owner_token_and_the_api_never_for_the_agent_token(stack, server):
+    """Spec 023 (reverses 022): the owner's comment is owner input. The owner token (and the owner API/UI)
+    gets it, datamarked over MCP; the agent token over the app MCP never does."""
+    from tests.support.app_stack import api_client
+
+    ids = seed_triage(stack, a="tool")
+    path = stack.vault / TRIAGE_FILE
+    text = path.read_text(encoding="utf-8")
+    path.write_text(
+        "\n".join(
+            ln[: -len("|  |")] + "| PRIVATE-OWNER-WORDS |" if ids["a"] in ln and ln.endswith("|  |") else ln
+            for ln in text.splitlines()
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert lists.read_triage(path)["rows"][0]["comment"] == "PRIVATE-OWNER-WORDS"
+    err, data = run(call(server.url, AGENT_TOKEN, "list_triage"))
+    assert not err and "PRIVATE-OWNER-WORDS" not in repr(data) and "comment" not in data["rows"][0]
+    err, data = run(call(server.url, OWNER_TOKEN, "list_triage"))
+    assert not err and "PRIVATE-OWNER-WORDS" in data["rows"][0]["comment"]
+    assert data["rows"][0]["comment"].startswith("<<DATA:") and "comment" in data["untrusted_fields"]
+    assert api_client(stack).get("/api/triage").json()["rows"][0]["comment"] == "PRIVATE-OWNER-WORDS"

@@ -71,7 +71,7 @@ def build_services(
     store = AppStore(db)
     workspace = ConfigWorkspace(pack, overlay)
     vault_path = vault_dir if vault_dir is not None else _env_path(VAULT_ENV)
-    vault = default_vault(vault_path)
+    vault = default_vault(vault_path, app.vault_policy_for(runs.config(), vault_path))
     if snapshots is None:  # the restore of spec 019: same vault policy as the runs' snapshots
         snapshots = app.make_snapshots(runs.config(), db, vault_path)
     return AppServices(
@@ -84,7 +84,25 @@ def build_services(
         gate_factory=gate_factory or default_gate_factory(overlay),
         candidates_dir=app.candidates_dir(overlay),
         snapshots=snapshots,
+        image_preparer=_image_preparer(app),
     )
+
+
+def _image_preparer(app):
+    """The Pillow preparer for UI thumbnails, or None without the optional extra ``images``."""
+    from pkpipe.adapters.image_pillow import pillow_available
+
+    return app.make_image_preparer() if pillow_available() else None
+
+
+def ui_settings(data: dict, extra_hosts: tuple[str, ...] = ()) -> tuple[tuple[str, ...], str | None]:
+    """``(Host names the UI answers to, public URL)`` from the effective config (``ui.json``, spec 023) and
+    ``--allow-host``: the MagicDNS name, the Tailscale IP and the host of ``public_url``."""
+    from pkpipe.engine.config_models import UiConfig
+
+    ui = UiConfig.model_validate(data.get("ui") or {})
+    hosts = tuple(dict.fromkeys([*ui.hosts(), *(h.strip().lower() for h in extra_hosts if h.strip())]))
+    return hosts, ui.public_url
 
 
 def _env_path(name: str) -> Path | None:
@@ -156,11 +174,19 @@ def serve_command(args: argparse.Namespace) -> int:
             scheduler.shutdown(wait=False)
         tel.shutdown()
 
+    hosts, public_url = ui_settings(cfg.data, tuple(args.allow_host))
     web = create_app(
-        services, tokens, bind_host=host, extra_hosts=tuple(args.allow_host), on_shutdown=shutdown
+        services,
+        tokens,
+        bind_host=host,
+        extra_hosts=hosts,
+        public_url=public_url,
+        on_shutdown=shutdown,
     )
     tel.instrument(langchain=False, httpx=False, fastapi_app=web)  # request spans (constitution X)
     print(f"pkpipe UI    http://{host}:{args.port}/   (log in with the owner token)")
+    if public_url:
+        print(f"public URL   {public_url}   (Host names accepted: {', '.join(hosts)})")
     print(f"app MCP      http://{host}:{args.port}/mcp  (Authorization: Bearer <owner or agent token>)")
     print(f"tokens       {db.parent / 'tokens.json'} (or PKPIPE_TOKEN / PKPIPE_AGENT_TOKEN)")
     if services.vault is None:

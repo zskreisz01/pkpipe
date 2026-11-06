@@ -12,11 +12,13 @@ from pkpipe.domain.inbox_list import EntryKind, list_items, parse_list
 from pkpipe.domain.triage import (
     ItemState,
     TriageItem,
+    clean_owner_note,
     is_unreviewed,
     item_id_for,
     needs_decision,
     needs_retriage,
     release,
+    resolve_category,
 )
 from pkpipe.steps.base import StepContext, StepResult, layout_of, register_code
 from pkpipe.steps.image_code import description_note
@@ -240,6 +242,15 @@ def suggested_rows(
     return {"rows": rows, "count": len(rows), "failed": failed, "quarantined": quarantined}
 
 
+def _decide_where(ctx: StepContext) -> str:
+    """Where the owner decides, for the messages: the triage file or, on the ``web`` surface, the UI."""
+    data = ctx.snapshot.data
+    if (data.get("triage") or {}).get("surface") == "web":
+        url = (data.get("ui") or {}).get("public_url")
+        return f"the web UI ({url}/triage)" if url else "the web UI"
+    return layout_of(ctx).triage_file
+
+
 @register_code("triage.backlog")
 def backlog(
     ctx: StepContext, triage: dict[str, Any], new_rows: list[dict[str, Any]] | None = None
@@ -254,7 +265,10 @@ def backlog(
     new_rows = [*(new_rows or []), *(finish.get("rows") or [])]  # the rows of the image batch (spec 021)
     quarantined = {r["item_id"] for r in new_rows or [] if r.get("state") == ItemState.QUARANTINED.value}
     fresh = {r["item_id"] for r in new_rows or []} - quarantined
-    older = invalid = 0
+    older = invalid = proposed_new = 0
+    proposed_names: list[str] = []  # slugs of new categories the owner asks for (plain slugs only)
+    proposed_rows = 0
+    cats = _categories(ctx)
     for r in (triage or {}).get("rows", []):
         try:
             state = ItemState(r.get("state", "suggested"))
@@ -263,12 +277,27 @@ def backlog(
         if r.get("item_id") in fresh or r.get("item_id") in quarantined:
             continue
         confirm, override = bool(r.get("confirm")), r.get("override") or None
+        if override and state in (ItemState.SUGGESTED, ItemState.PENDING, ItemState.AWAITING_CATEGORY):
+            kind, found = resolve_category(override, cats)
+            if kind == "new":  # the owner asks for a new category: a proposal, not a dead end (spec 022)
+                proposed_rows += 1
+                proposed_new += state is not ItemState.AWAITING_CATEGORY
+                if found not in proposed_names:
+                    proposed_names.append(found or "")
+                continue
+            if kind in ("exact", "normalised"):
+                continue  # released by the next 06:00 run
+            invalid += 1
+            continue
+        if state is ItemState.AWAITING_CATEGORY:
+            invalid += 1  # the override was cleared: the owner names a category
+            continue
         if is_unreviewed(state, confirm, override):
             older += 1
         elif needs_decision(state, r.get("ai_suggested_category", ""), confirm, override, valid):
             invalid += 1
     new = len(fresh)
-    triage_file = layout_of(ctx).triage_file
+    triage_file = _decide_where(ctx)
     if new:
         message = f"Triage ready: {new} new item(s) to confirm or override in {triage_file}."
     else:
@@ -282,6 +311,13 @@ def backlog(
     deferred = int(report.get("deferred") or 0)
     if older:
         message += f" {older} older item(s) still wait for your decision."
+    if proposed_rows:
+        shown = ", ".join(proposed_names[:5]) + (", ..." if len(proposed_names) > 5 else "")
+        message += (
+            f" {proposed_rows} item(s) propose a new category: {shown}. The next release run (06:00) "
+            f"writes a proposal note with a categories.json draft below {layout_of(ctx).proposals_dir}; "
+            "add the category through a config draft and the item is released."
+        )
     if invalid:
         message += (
             f" {invalid} item(s) name a category that is no longer configured: write a configured category"
@@ -296,42 +332,93 @@ def backlog(
         "quarantined": len(quarantined),
         "backlog": older,
         "invalid": invalid,
-        "awaiting": new + older + invalid,
+        "awaiting": new + older + invalid + proposed_rows,
         "message": message,
         # New suggestions or a decision that can never be released need the owner; an unchanged backlog of
         # unreviewed items alone does not send a mail every evening (it is in the 06:00 summary).
-        "notify": bool(new or invalid or quarantined or deferred),
+        "notify": bool(new or invalid or quarantined or deferred or proposed_new),
+        "proposed": proposed_rows,
+        "proposed_names": proposed_names,
         "images_deferred": deferred,
     }
+
+
+def _proposal_note(proposals: list[dict[str, Any]]) -> str:
+    """The sentence of the daily summary about new-category proposals (plain slugs only)."""
+    if not proposals:
+        return ""
+    names = sorted({p["requested_category"] for p in proposals})
+    shown = ", ".join(names[:5]) + (", ..." if len(names) > 5 else "")
+    return f" {len(proposals)} item(s) propose a new category: {shown} (proposal notes were written)."
 
 
 @register_code("triage.release")
 def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
     """06:00 rule: only confirmed or overridden items are released; the rest stays pending.
 
-    An override naming an unknown category is not released (the owner gets it back as pending).
+    An override is read by :func:`~pkpipe.domain.triage.resolve_category` (spec 022): a variant of a
+    configured category (``Misc``) is the configured one; a plain name that names nothing configured is a
+    new-category **proposal** (``proposals``: the item keeps its state, the flow ``propose_category``
+    evaluates it and marks it ``awaiting_category``, nothing is filed); anything else, and a removed
+    category the owner only confirmed, goes back as pending (``unknown_category``). An item that awaits a
+    category is left alone until its override names a configured one.
     """
     cats = _categories(ctx)
     layout = layout_of(ctx)
-    items = [
-        TriageItem(
-            id=r["item_id"],
-            resource=r["resource"],
-            ai_suggested_category=r["ai_suggested_category"],
-            confirm=bool(r.get("confirm")),
-            override=r.get("override") or None,
-            state=ItemState(r.get("state", "suggested")),
-            kind=r.get("kind") or "note",
+    items = []
+    awaiting = 0
+    originals: dict[str, ItemState] = {}
+    notes: dict[str, str] = {}  # the owner's comment as the declared input owner_note (spec 023)
+    for r in (triage or {}).get("rows", []):
+        state = ItemState(r.get("state", "suggested"))
+        override = r.get("override") or None
+        if override:
+            kind, found = resolve_category(override, cats)
+            if kind in ("exact", "normalised"):
+                override = found
+        else:
+            kind = "none"
+        originals[r["item_id"]] = state
+        if note := clean_owner_note(r.get("comment")):
+            notes[r["item_id"]] = note
+        if state is ItemState.AWAITING_CATEGORY:
+            if kind not in ("exact", "normalised"):
+                awaiting += 1  # still waits for the category: no second evaluation, no second note
+                continue
+            state = ItemState.SUGGESTED  # the owner named a configured category: an ordinary decided item
+        items.append(
+            TriageItem(
+                id=r["item_id"],
+                resource=r["resource"],
+                ai_suggested_category=r["ai_suggested_category"],
+                confirm=bool(r.get("confirm")),
+                override=override,
+                state=state,
+                kind=r.get("kind") or "note",
+            )
         )
-        for r in (triage or {}).get("rows", [])
-    ]
-    before = {i.id: i.state for i in items}
+    before = {i.id: originals[i.id] for i in items}
     released, pending = release(items)
     unknown = [i for i in released if i.effective_category not in cats]
-    for i in unknown:  # also a ``released`` item left over from a failed run: back to the owner, never stuck
-        i.state = ItemState.PENDING
+    proposals = []
+    for i in unknown:  # also a ``released`` item left over from a failed run: never stuck
+        kind, slug = resolve_category(i.override, cats) if i.override else ("invalid", None)
+        if kind == "new":  # the owner's own words only: a removed suggestion is no proposal
+            proposals.append(
+                {
+                    "id": i.id,
+                    "resource": i.resource,
+                    **({"path": i.resource} if i.kind == "note" else {"kind": i.kind, "source": "list"}),
+                    "requested_category": slug,
+                    **({"owner_note": notes[i.id]} if i.id in notes else {}),
+                }
+            )
+            i.state = before[i.id]  # unchanged: the proposal flow writes ``awaiting_category``
+        else:
+            i.state = ItemState.PENDING
+    proposed_ids = {p["id"] for p in proposals}
     released = [i for i in released if i.effective_category in cats]
-    pending = pending + unknown
+    pending = pending + [i for i in unknown if i.id not in proposed_ids]
     rows = [
         {"item_id": i.id, "state": i.state.value} for i in released + pending if before[i.id] is not i.state
     ]
@@ -344,16 +431,21 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
             "category": i.effective_category,
             "subflow": cats[i.effective_category]["subflow"],
             "para_path": layout.expand(cats[i.effective_category]["para_path"]),
+            **({"owner_note": notes[i.id]} if i.id in notes else {}),
         }
         for i in released
     ]
     return {
         "released": out_items,
+        "proposals": proposals,
         "pending": [i.id for i in pending],
-        "unknown_category": [i.id for i in unknown],
+        "unknown_category": [i.id for i in unknown if i.id not in proposed_ids],
         "rows": rows,
         "count_released": len(out_items),
         "count_pending": len(pending),
+        "count_proposals": len(proposals),
+        "count_awaiting": awaiting,
+        "proposal_note": _proposal_note(proposals),
     }
 
 

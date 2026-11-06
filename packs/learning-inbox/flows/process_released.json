@@ -46,6 +46,16 @@
       }
     },
     {
+      "id": "propose",
+      "type": "subflow",
+      "bpmn_element": "Propose new category",
+      "for_each": "release.proposals",
+      "on_item_error": "continue",
+      "config": {
+        "flow": "propose_category"
+      }
+    },
+    {
       "id": "finalize",
       "type": "code",
       "bpmn_element": "Process each released item",
@@ -127,7 +137,7 @@
       "bpmn_element": "Notify: daily summary",
       "config": {
         "event": "daily_summary",
-        "message": "Processed ${finalize.processed}, quarantined ${finalize.quarantined}, failed ${finalize.failed}; ${release.count_pending} item(s) still pending.${list_report.note}",
+        "message": "Processed ${finalize.processed}, quarantined ${finalize.quarantined}, failed ${finalize.failed}; ${release.count_pending} item(s) still pending.${release.proposal_note}${list_report.note}",
         "payload": {
           "processed": "${finalize.processed}",
           "quarantined": "${finalize.quarantined}",
@@ -163,6 +173,10 @@
     },
     {
       "from": "process_item",
+      "to": "propose"
+    },
+    {
+      "from": "propose",
       "to": "finalize"
     },
     {

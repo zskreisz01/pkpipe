@@ -19,7 +19,8 @@ from typing import Any
 from pkpipe.adapters.app_store_sqlite import AppStore
 from pkpipe.api.publish import Publisher, PublishError
 from pkpipe.api.workspace import ConfigWorkspace, WorkspaceError, category_entry
-from pkpipe.domain.triage import ItemState
+from pkpipe.domain import session_plan as plans
+from pkpipe.domain.triage import ItemState, is_unreviewed, resolve_category
 from pkpipe.domain.vault_snapshot import SnapshotError, UnknownSnapshot
 from pkpipe.engine.restore import restore_run
 from pkpipe.engine.runs import ACTIVE, RunService
@@ -27,7 +28,7 @@ from pkpipe.engine.snapshot import ConfigSnapshot
 from pkpipe.evals.gate import GateDecision, PublishGate
 from pkpipe.obsidian.errors import VaultError
 from pkpipe.obsidian.vault import Vault
-from pkpipe.ports import SnapshotPort
+from pkpipe.ports import ImageError, ImagePreparePort, SnapshotPort
 
 log = logging.getLogger("pkpipe.api")
 MAX_RESOURCE_CHARS = 300
@@ -128,6 +129,9 @@ class AppServices:
     candidates_dir: Path | None = None
     #: Vault snapshots of writing runs (spec 019); None = no vault configured, nothing to restore.
     snapshots: SnapshotPort | None = None
+    #: Decodes an INBOX image for the UI thumbnail (spec 023): the metadata-free scaled JPEG; None = the
+    #: file as is.
+    image_preparer: ImagePreparePort | None = None
 
     # -- runs -----------------------------------------------------------------------------------------------
     def flows(self) -> list[str]:
@@ -209,25 +213,62 @@ class AppServices:
     def categories(self) -> set[str]:
         return {c["id"] for c in self.runs.config().data.get("categories", []) if c.get("enabled", True)}
 
-    def list_triage(self, state: str | None = None) -> dict[str, Any]:
+    def category_map(self) -> dict[str, dict[str, str]]:
+        """Enabled categories as ``{id: {label}}`` (what an owner decision is resolved against)."""
+        return {
+            c["id"]: {"label": c.get("label", c["id"])}
+            for c in self.runs.config().data.get("categories", [])
+            if c.get("enabled", True)
+        }
+
+    def list_triage(
+        self,
+        state: str | None = None,
+        *,
+        category: str | None = None,
+        needs_owner: bool | None = None,
+        with_comment: bool = True,
+    ) -> dict[str, Any]:
+        """The triage rows for the owner channels, optionally filtered by state, effective category and
+        ``needs_owner``. ``with_comment=False`` is for a caller that is not the owner (the agent token of the
+        app MCP): the owner's comment is for the owner and the sessions' declared input only."""
         data = self._vault().read_triage()
+        layout = self._vault().policy.layout
         rows = []
         for r in data["rows"]:
+            effective = r["override"] or r["ai_suggested_category"]
             if state and r["state"] != state:
                 continue
-            resource = r["resource"]
-            rows.append(
-                {
-                    **r,
-                    "resource": resource[:MAX_RESOURCE_CHARS],
-                    "category": r["override"] or r["ai_suggested_category"],
-                }
-            )
+            if category and effective != category:
+                continue
+            if needs_owner is not None and bool(r["needs_owner"]) != needs_owner:
+                continue
+            row = {**r, "resource": r["resource"][:MAX_RESOURCE_CHARS], "category": effective}
+            if not with_comment:
+                row.pop("comment", None)
+            if r["state"] == ItemState.AWAITING_CATEGORY.value and r["override"]:
+                kind, slug = resolve_category(r["override"], self.category_map())
+                if kind == "new" and slug:
+                    row["proposal_note"] = plans.proposal_path(layout.proposals_dir, slug, r["item_id"])
+            rows.append(row)
         return {"rows": rows, "invalid": len(data["invalid"]), "conflicts": data["conflicts"]}
+
+    def triage_info(self) -> dict[str, Any]:
+        """Where the table lives and whether a switch of ``triage.surface`` still has to be moved by the next
+        triage run (spec 023); for the banner of the triage page."""
+        vault = self._vault()
+        layout = vault.policy.layout
+        return {
+            "surface": vault.policy.triage_surface,
+            "page": layout.triage_file,
+            "data_file": layout.triage_data,
+            "migration": vault.triage_migration_plan(),
+            "proposals_dir": layout.proposals_dir,
+        }
 
     def _decide(self, actor: str, action: str, item_id: str, **decision: Any) -> dict[str, Any]:
         try:
-            row = self._vault().owner_decide(item_id, categories=self.categories(), **decision)
+            row = self._vault().owner_decide(item_id, categories=self.category_map(), **decision)
         except VaultError as exc:
             self.store.audit(actor, f"{action}_refused", item_id, reason=str(exc))
             raise Refused(str(exc)) from None
@@ -238,9 +279,135 @@ class AppServices:
         return self._decide(actor, "confirm_item" if confirm else "unconfirm_item", item_id, confirm=confirm)
 
     def override_item(self, item_id: str, category: str, *, actor: str) -> dict[str, Any]:
+        """An override: a configured category (an id, or a variant of an id or label, stored as the id) or
+        a valid new-category name (stored as its slug: the next 06:00 run proposes the category, spec 022)."""
         if not category or not category.strip():
             raise Refused("an override needs a category")
-        return self._decide(actor, "override_item", item_id, override=category)
+        row = self._decide(actor, "override_item", item_id, override=category)
+        self.collect_override_candidates()
+        return row
+
+    def comment_item(self, item_id: str, comment: str, *, actor: str) -> dict[str, Any]:
+        """The owner's comment of one row (spec 023). Audited by length only, never by text."""
+        try:
+            row = self._vault().owner_comment(item_id, comment)
+        except VaultError as exc:
+            self.store.audit(actor, "comment_item_refused", item_id, reason=str(exc))
+            raise Refused(str(exc)) from None
+        self.store.audit(actor, "comment_item", item_id, chars=len(row.get("comment") or ""))
+        self.collect_override_candidates()
+        return row
+
+    def bulk_confirm(
+        self,
+        *,
+        actor: str,
+        state: str | None = None,
+        category: str | None = None,
+        needs_owner: bool | None = None,
+    ) -> dict[str, Any]:
+        """Confirm the suggested category of every row of the filtered set that still waits for the owner
+        and has a configured suggestion (spec 023). An image that needs the owner, a row with an override
+        and a row without a valid suggestion are skipped; the same rules as a single confirm apply."""
+        valid = self.categories()
+        confirmed, skipped = [], 0
+        for r in self.list_triage(state, category=category, needs_owner=needs_owner)["rows"]:
+            try:
+                unreviewed = is_unreviewed(ItemState(r["state"]), bool(r["confirm"]), r["override"])
+            except ValueError:
+                unreviewed = False
+            if not unreviewed or r["needs_owner"] or r["ai_suggested_category"] not in valid:
+                skipped += 1
+                continue
+            try:
+                self._vault().owner_decide(r["item_id"], confirm=True, categories=self.category_map())
+            except VaultError:
+                skipped += 1
+                continue
+            confirmed.append(r["item_id"])
+        self.store.audit(
+            actor,
+            "bulk_confirm",
+            None,
+            confirmed=len(confirmed),
+            skipped=skipped,
+            state=state,
+            category=category,
+            needs_owner=needs_owner,
+        )
+        return {"confirmed": len(confirmed), "skipped": skipped, "item_ids": confirmed}
+
+    def item_image(self, item_id: str, *, max_side: int = 480) -> dict[str, Any]:
+        """The thumbnail of an image row for the UI (spec 023): the file is read through ``read_image`` (name
+        only, the read-only attachments folder, size limit, signature check, never a URL) and, with Pillow,
+        decoded and re-encoded without metadata, like the bytes a vision model gets."""
+        from pathlib import PurePosixPath
+
+        from pkpipe.obsidian.errors import ImageRejected
+
+        rows = {r["item_id"]: r for r in self._vault().read_triage()["rows"]}
+        row = rows.get(item_id)
+        if row is None:
+            raise NotFound(f"unknown triage item '{item_id}'")
+        resource = str(row["resource"])
+        if row["kind"] != "image" or resource.startswith(("http://", "https://")):
+            raise NotFound("this item has no local image")
+        try:
+            raw = self._vault().read_image(PurePosixPath(resource).name)
+        except ImageRejected as exc:
+            raise NotFound(f"image not available ({exc.code})") from None
+        import base64
+
+        data = base64.b64decode(raw["data_base64"])
+        media_type = raw["media_type"]
+        if self.image_preparer is not None:
+            try:
+                prepared = self.image_preparer.prepare(data, max_side=max_side, max_pixels=40_000_000)
+                data, media_type = prepared.data, "image/jpeg"
+            except ImageError:
+                pass  # the original (it passed the signature check): better than no thumbnail
+        return {"media_type": media_type, "data": data}
+
+    def collect_override_candidates(self) -> dict[str, int]:
+        """Spec 023 / design rule 6.4: an owner override that differs from the suggestion is kept, with the
+        owner's comment as the reason, as an eval candidate in the private overlay
+        (``<overlay>/evals/candidates/triage.jsonl``, else the data directory; never the public repo). The
+        owner reviews candidates before they join a dataset. Idempotent: one line per item."""
+        if self.candidates_dir is None or self.vault is None:
+            return {}
+        from pkpipe.adapters.security_log_files import upsert_eval_candidate
+
+        counts: dict[str, int] = {}
+        day = time.strftime("%Y-%m-%d", time.gmtime())
+        for r in self.vault.read_triage()["rows"]:
+            override = r.get("override")
+            if not override or override == r["ai_suggested_category"]:
+                continue
+            case = {
+                "id": f"override-{r['item_id']}",
+                "source": "owner_override",
+                "input": {"resource": r["resource"][:MAX_RESOURCE_CHARS], "kind": r.get("kind") or "note"},
+                "expected": {"category": override},
+                "ai_suggested": r["ai_suggested_category"],
+                "reason": r.get("comment") or "",
+                "day": day,
+            }
+            outcome = upsert_eval_candidate(
+                self.candidates_dir / "triage.jsonl", {**case, "day": self._day(r, case)}
+            )
+            counts[outcome] = counts.get(outcome, 0) + 1
+        return counts
+
+    def _day(self, row: dict[str, Any], case: dict[str, Any]) -> str:
+        """Keep the day a candidate was first collected (re-collecting must not rewrite the file)."""
+        path = self.candidates_dir / "triage.jsonl" if self.candidates_dir else None
+        if path is not None and path.is_file():
+            import json
+
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if line.strip() and json.loads(line).get("id") == case["id"]:
+                    return str(json.loads(line).get("day") or case["day"])
+        return str(case["day"])
 
     def release_quarantine(self, item_id: str, *, actor: str) -> dict[str, Any]:
         """Owner decision (spec 009 US3): the item is re-queued (``pending``, its note back in the INBOX, so
@@ -443,9 +610,13 @@ def gate_metrics(decision: GateDecision) -> dict[str, dict[str, Any]]:
     }
 
 
-def default_vault(vault_dir: Path | None) -> Vault | None:
-    if vault_dir is None:
+def default_vault(vault_dir: Path | None, policy: Any = None) -> Vault | None:
+    """The UI's vault: with the policy of the run configuration when given (layout, ``triage.surface``),
+    else the defaults."""
+    if vault_dir is None and policy is None:
         return None
+    if policy is not None:
+        return Vault(policy)
     from pkpipe.obsidian.policy import VaultPolicy
 
     return Vault(VaultPolicy(vault_dir=vault_dir))

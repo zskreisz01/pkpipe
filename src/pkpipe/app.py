@@ -69,7 +69,12 @@ def vault_policy_for(snapshot: ConfigSnapshot, vault_dir: Path | None = None) ->
     policy_file = os.environ.get(VAULT_POLICY_ENV)
     if policy_file:
         return VaultPolicy.load(Path(policy_file).expanduser(), vault)
-    return VaultPolicy(vault_dir=vault, layout=layout_from(snapshot.data.get("layout")))
+    return VaultPolicy(
+        vault_dir=vault,
+        layout=layout_from(snapshot.data.get("layout")),
+        triage_surface=(snapshot.data.get("triage") or {}).get("surface", "vault"),
+        ui_public_url=(snapshot.data.get("ui") or {}).get("public_url"),
+    )
 
 
 def make_snapshots(

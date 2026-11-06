@@ -141,11 +141,14 @@ def test_a_security_flag_quarantines_only_its_own_item(synthetic_vault, pack_dir
 
 
 def test_unknown_override_is_not_released(world):
-    """FR-003 + code decides: an override naming a removed/unknown category is never processed."""
+    """FR-003 + code decides: an override naming a removed/unknown category is never processed. Spec 022: a
+    plain name is a new-category proposal (the item waits, nothing is filed), anything else goes back as
+    pending."""
     assert world.svc.start("triage").ok
     owner_decides(world.vault, confirm=[VIDEO], override={TOOL: "no-such-category"})
     assert world.svc.start("process_released").ok
-    assert _states(world.vault) == {TOOL: "pending", VIDEO: "processed"}
+    assert _states(world.vault) == {TOOL: "awaiting_category", VIDEO: "processed"}
+    assert not list((world.vault / "3-Resources").rglob(f"*{TOOL}*"))  # nothing filed under a wrong folder
 
 
 def test_quarantined_and_processed_items_are_skipped_by_release(world):

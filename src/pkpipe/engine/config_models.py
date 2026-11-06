@@ -563,6 +563,84 @@ class ImagesConfig(_Strict):
     )
 
 
+# triage.json / ui.json -------------------------------------------------------------------------------------
+class TriageConfig(_Strict):
+    """Where the triage decisions are made and kept (spec 023)."""
+
+    surface: Literal["vault", "web"] = Field(
+        default="vault",
+        description="vault: the triage table is in layout.triage_file (Obsidian, as before). web: the "
+        "machine-owned table lives in layout.triage_data_file, decisions are made in the web UI, and "
+        "layout.triage_file is a generated summary page with a link and no table. The vault policy file "
+        "of the vault server mirrors it as triage_surface (pkpipe validate checks both agree)",
+    )
+
+
+_HOST = re.compile(r"^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$")
+
+
+class UiConfig(_Strict):
+    """How the web UI is reached (spec 023): the address the owner opens, and the Host names it answers to
+    besides loopback and its own bind address (Tailscale MagicDNS name and IP)."""
+
+    public_url: str | None = Field(
+        default=None,
+        description="The address the owner opens the UI at (for example the Tailscale URL); linked from the "
+        "generated triage page. http or https, no credentials, no query",
+    )
+    allowed_hosts: list[str] = Field(
+        default_factory=list,
+        description="Extra Host header values (name or IP, no port) the UI accepts: the MagicDNS name and "
+        "the Tailscale IP. The host of public_url is added automatically",
+    )
+
+    @field_validator("public_url")
+    @classmethod
+    def _url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        from urllib.parse import urlsplit
+
+        parts = urlsplit(value.strip())
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise ValueError("public_url must be an http or https URL with a host name")
+        if parts.username or parts.password or parts.query or parts.fragment:
+            raise ValueError("public_url must not contain credentials, a query or a fragment")
+        return value.strip().rstrip("/")
+
+    @field_validator("allowed_hosts")
+    @classmethod
+    def _hosts(cls, values: list[str]) -> list[str]:
+        import ipaddress
+
+        out: list[str] = []
+        for raw in values:
+            host = str(raw).strip().lower()
+            try:
+                ip = ipaddress.ip_address(host.strip("[]"))
+                host = f"[{ip}]" if ip.version == 6 else str(ip)
+            except ValueError:
+                if not _HOST.match(host) or ".." in host:
+                    raise ValueError(
+                        f"allowed host '{raw}': give a host name or an IP address (no scheme, port or path)"
+                    ) from None
+            if host not in out:
+                out.append(host)
+        return out
+
+    def hosts(self) -> list[str]:
+        """``allowed_hosts`` plus the host of ``public_url``, as the Host allowlist wants them."""
+        from urllib.parse import urlsplit
+
+        hosts = list(self.allowed_hosts)
+        if self.public_url:
+            host = (urlsplit(self.public_url).hostname or "").lower()
+            host = f"[{host}]" if ":" in host else host
+            if host and host not in hosts:
+                hosts.append(host)
+        return hosts
+
+
 # registry --------------------------------------------------------------------------------------------------
 from pkpipe.domain.layout import VaultLayout  # noqa: E402  (layout.json is validated by the domain model)
 
@@ -577,6 +655,8 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "layout": VaultLayout,
     "snapshots": SnapshotsConfig,
     "images": ImagesConfig,
+    "triage": TriageConfig,
+    "ui": UiConfig,
     "telemetry": TelemetrySettings,
     "evals": EvalsConfig,
 }
@@ -607,6 +687,7 @@ def validate_effective(data: dict[str, Any]) -> list[str]:
                 loc = ".".join(str(p) for p in err["loc"])
                 errors.append(f"{name}.json: {loc}: {err['msg']}" if loc else f"{name}.json: {err['msg']}")
     errors += _layout_errors(data)
+    errors += _surface_errors(data)
     if "flows" in data:
         from pkpipe.engine.flow_models import FlowsConfig
 
@@ -619,6 +700,16 @@ def validate_effective(data: dict[str, Any]) -> list[str]:
                 rest = ".".join(str(p) for p in loc[1:])
                 errors.append(f"{where}: {rest}: {err['msg']}" if rest else f"{where}: {err['msg']}")
     return errors
+
+
+def _surface_errors(data: dict[str, Any]) -> list[str]:
+    """Spec 023: the ``web`` surface sends the owner to the UI, so the generated page needs its address."""
+    triage, ui = data.get("triage"), data.get("ui")
+    if not isinstance(triage, dict) or triage.get("surface") != "web":
+        return []
+    if not isinstance(ui, dict) or not ui.get("public_url"):
+        return ["triage.json: surface 'web' needs ui.json public_url (the link the triage page shows)"]
+    return []
 
 
 def _layout_errors(data: dict[str, Any]) -> list[str]:

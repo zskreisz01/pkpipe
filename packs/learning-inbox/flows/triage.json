@@ -1,6 +1,6 @@
 {
   "id": "triage",
-  "description": "20:00: read new INBOX items (one note per item, or the entries of the INBOX list file when the layout names one), suggest a category per text item in an isolated session without tools, write the triage file, then describe the new image entries with the local vision model (phase two, bounded by the time budget, spec 021) and write their rows, and notify the owner.",
+  "description": "20:00: bring the triage table up to date (maintenance call: columns, owner comment migration), read new INBOX items (one note per item, or the entries of the INBOX list file when the layout names one), suggest a category per text item in an isolated session without tools, write the triage file, then describe the new image entries with the local vision model (phase two, bounded by the time budget, spec 021) and write their rows, and notify the owner.",
   "bpmn": "process-inbox-items",
   "start": "cycle",
   "max_parallel": 2,
@@ -11,6 +11,17 @@
       "bpmn_element": "Read new INBOX items",
       "config": {
         "function": "triage.cycle_start"
+      }
+    },
+    {
+      "id": "migrate",
+      "type": "tool",
+      "bpmn_element": "Read new INBOX items",
+      "config": {
+        "tool": "obsidian:update_triage",
+        "arguments": {
+          "rows": []
+        }
       }
     },
     {
@@ -163,6 +174,10 @@
   "edges": [
     {
       "from": "cycle",
+      "to": "migrate"
+    },
+    {
+      "from": "migrate",
       "to": "list_inbox"
     },
     {

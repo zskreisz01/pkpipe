@@ -9,7 +9,7 @@ import re
 import unicodedata
 from collections import Counter
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +22,7 @@ from .atomic import dir_lock, update_text
 from .errors import ImageRejected, NoteExists, NoteNotFound, PathRejected, VaultError, WriteConflict
 from .notes import append_text, dump_front_matter, jsonable, parse_note, render_note
 from .policy import VaultPolicy, is_conflict_name
+from .surface import DATA_PREAMBLE, TriageSurface
 
 
 def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -87,9 +88,16 @@ ITEM_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 class Vault:
-    def __init__(self, policy: VaultPolicy, *, today: Callable[[], date] = date.today):
+    def __init__(
+        self,
+        policy: VaultPolicy,
+        *,
+        today: Callable[[], date] = date.today,
+        now: Callable[[], datetime] = datetime.now,
+    ):
         self.policy = policy
         self._today = today
+        self._now = now
 
     # -- images (spec 021) ---------------------------------------------------------------------------------
 
@@ -324,7 +332,13 @@ class Vault:
         """Whether ``target`` is one of the maintained table files (not the list file itself)."""
         key = _fold(self.policy.rel(target))
         p = self.policy
-        for managed in (p.triage_file, p.processing_list, p.improvement_file, p.tool_candidates_file):
+        for managed in (
+            p.triage_file,
+            p.layout.triage_data,
+            p.processing_list,
+            p.improvement_file,
+            p.tool_candidates_file,
+        ):
             if key == _fold(managed) or _same_file(target, self.policy.root / managed):
                 return True
         return False
@@ -355,17 +369,55 @@ class Vault:
 
     # -- lists -----------------------------------------------------------------------------------------------
 
+    # -- the triage table (spec 023: it lives in the triage file or, on the ``web`` surface, in its data file)
+
+    def _surface(self, tool: str) -> TriageSurface:
+        layout = self.policy.layout
+        return TriageSurface(
+            surface=self.policy.triage_surface,
+            page=self.policy.resolve(layout.triage_file, tool),
+            data=self.policy.resolve(layout.triage_data, tool),
+            page_rel=layout.triage_file,
+            data_rel=layout.triage_data,
+            public_url=self.policy.ui_public_url,
+            now=self._now,
+        )
+
+    def _table(self, tool: str) -> tuple[TriageSurface, Path, str]:
+        """The surface, the file that holds the table now and the preamble a new table there gets."""
+        surface = self._surface(tool)
+        path = surface.holder()
+        return surface, path, (DATA_PREAMBLE if path == surface.data else lists.TRIAGE_PREAMBLE)
+
+    def triage_migration_plan(self) -> dict[str, Any] | None:
+        """What the next triage write moves between the triage file and its data file (dry run), or None."""
+        plan = self._surface("read_triage").plan()
+        return plan.as_dict() if plan else None
+
     @_traced
     def read_triage(self) -> dict[str, Any]:
-        path = self.policy.resolve(self.policy.triage_file, "read_triage")
+        _, path, _ = self._table("read_triage")
         return lists.read_triage(path)
 
     @_traced
     def update_triage(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
-        path = self.policy.resolve(self.policy.triage_file, "update_triage")
-        return lists.update_triage(path, rows)
+        """The pipeline's write path. First moves the table if the surface was switched (spec 023), then
+        applies the rows; an empty list is the maintenance call (migration, columns). The generated page of
+        the ``web`` surface is refreshed with the run time."""
+        surface = self._surface("update_triage")
+        plan = surface.migrate()
+        _, path, preamble = self._table("update_triage")
+        result = lists.update_triage(path, rows, preamble=preamble)
+        surface.refresh_page(stamp=True)
+        return {**result, "migration": plan.as_dict() if plan else None}
 
     # Owner channels only (UI, app MCP): not registered on the vault MCP server that sessions can reach.
+
+    def _owner_write(self, fn: Callable[..., dict[str, Any]], *args: Any, **kwargs: Any) -> dict[str, Any]:
+        surface, path, preamble = self._table("update_triage")
+        result = fn(path, *args, preamble=preamble, **kwargs)
+        surface.refresh_page(stamp=False)
+        return result
 
     @_traced
     def owner_decide(
@@ -374,19 +426,24 @@ class Vault:
         *,
         confirm: bool | None = None,
         override: str | None = None,
-        categories: set[str] | frozenset[str] | None = None,
+        categories: Any = None,
     ) -> dict[str, Any]:
-        path = self.policy.resolve(self.policy.triage_file, "update_triage")
-        return lists.owner_decide(path, item_id, confirm=confirm, override=override, categories=categories)
+        return self._owner_write(
+            lists.owner_decide, item_id, confirm=confirm, override=override, categories=categories
+        )
+
+    @_traced
+    def owner_comment(self, item_id: str, comment: str) -> dict[str, Any]:
+        """The owner's comment of one row (spec 022 clarification 1, spec 023): owner channels only."""
+        return self._owner_write(lists.owner_comment, item_id, comment)
 
     @_traced
     def owner_release_quarantine(self, item_id: str) -> dict[str, Any]:
         """Owner decision (spec 009 US3): the row goes back to ``pending`` and the quarantined note back to
         its INBOX path. ``content`` (the restored text, for the eval candidate) must not be passed on to an
         agent; :class:`pkpipe.api.services.AppServices` drops it."""
-        path = self.policy.resolve(self.policy.triage_file, "update_triage")
         self._restore_quarantined(item_id, dry_run=True)  # refuse before the row changes
-        row = lists.release_quarantine(path, item_id)
+        row = self._owner_write(lists.release_quarantine, item_id)
         restore = self._restore_quarantined(item_id, dry_run=False)
         return {**row, **restore}
 

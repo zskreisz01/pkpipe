@@ -587,3 +587,105 @@ def test_session_failed_reason_is_one_short_clean_line():
         and len(res.output["reason"]) <= 200
     )
     assert res.item["processing_status"] == "failed"
+
+
+# -- spec 023: the owner's note as the declared input item.owner_note --------------------------------------
+NOTE = "CANARY-NOTE focus on the licence and the offline mode"
+
+
+def test_the_owner_note_reaches_only_a_session_that_declares_it_as_datamarked_data():
+    plan = cat(
+        s("a", ["item.extract", "item.owner_note"], output_schema="a_out"),
+        s("b", ["a"], "demo/b.md", output_schema="b_out"),
+        s("synthesize", ["*"], "demo/c.md", output_schema="note_out"),
+    )
+    outcome, model, *_ = run([item(owner_note=NOTE)], categories=[plan])
+    assert outcome.ok, outcome.error
+    a, b, synth = model.calls
+    assert NOTE in a["user"] and "### item.owner_note (the owner's own direction" in a["user"]
+    assert re.search(rf"<<<DATA ([0-9a-f]{{12}})>>>\n{re.escape(NOTE)}\n<<<END DATA \1>>>", a["user"])
+    assert NOTE not in b["user"] and NOTE not in synth["user"]  # `*` is the extract and earlier outputs only
+    assert all(NOTE not in c["system"] for c in model.calls)  # never in a system prompt
+
+
+def test_without_a_note_the_prompt_is_unchanged():
+    plan = cat(s("a", ["item.extract", "item.owner_note"], output_schema="a_out"))
+    with_decl, *_ = run([item()], categories=[plan])[1].calls
+    plain, *_ = run([item()], categories=[cat(s("a", ["item.extract"], output_schema="a_out"))])[1].calls
+    assert "owner_note" not in with_decl["user"]
+    assert re.sub(r"[0-9a-f]{12}", "T", with_decl["user"]) == re.sub(r"[0-9a-f]{12}", "T", plain["user"])
+
+
+def test_a_flow_of_a_private_data_class_never_gets_the_note():
+    from types import SimpleNamespace
+
+    from pkpipe.engine.config_models import Session
+    from pkpipe.steps.session_plan import session_inputs
+
+    session = Session.model_validate(
+        {"id": "a", "system": "analyst", "instruction": "demo/a.md", "inputs": ["item.owner_note", "item.id"]}
+    )
+    for classes, expected in ((("journal",), False), (("image",), False), (("context",), False), ((), True)):
+        ctx = SimpleNamespace(
+            item={"id": "x", "owner_note": NOTE}, flow=SimpleNamespace(data_classes=classes)
+        )
+        got = session_inputs(session, ctx, {}, None)
+        assert ("item.owner_note" in got) is expected and got["item.id"] == "x"
+
+
+def test_trace_content_capture_never_offers_the_note():
+    plan = cat(s("a", ["item.extract", "item.owner_note"], output_schema="a_out"))
+    snap = make_snapshot(OUTER, ONE, assets=ASSETS, categories=[plan], mcp_servers=SERVERS, security=SECURITY)
+    tracer = RecordingTracer(capture=True)
+    model = Model(lambda system, user, schema=None: {"x": f"echo: {NOTE}"})
+    ports = make_ports(
+        model=model,
+        tools=FakeTools({"t:done": lambda path: {}, "t:read": READ}),
+        tracer=tracer,
+        classifier=FakeClassifier(),
+    )
+    outcome = make_service(snap, ports).start(
+        "outer", inputs={"items": [item(owner_note=NOTE)]}, run_id="r23"
+    )
+    assert outcome.ok, outcome.error
+    assert NOTE in model.calls[0]["user"]  # the model got it
+    assert tracer.captured, "capture was on"
+    assert NOTE not in json.dumps(tracer.captured) and "CANARY-NOTE" not in json.dumps(tracer.captured)
+    assert "[owner note omitted from capture]" in json.dumps(tracer.captured)
+    assert "CANARY-NOTE" not in json.dumps(
+        [(sp.name, sp.attributes, sp.events) for sp in tracer.spans], default=str
+    )
+
+
+def test_a_web_search_session_still_goes_through_the_query_guard_with_text_copied_from_the_note():
+    """The note is trusted as intent, not as a licence to send names out: a query the model builds from the
+    note passes the same query guard as any other, so a blocked term in the owner's own words is refused."""
+    plan = cat(
+        s("research", ["item.extract", "item.owner_note"], tools=["websearch:search"], output_schema="a_out"),
+        s("synthesize", ["research"], "demo/c.md", output_schema="note_out"),
+    )
+    note = "compare it with what Project Falcon uses"
+    queries = iter([note, "xtool alternatives"])  # first the note copied verbatim, then a clean one
+    searched = []
+
+    def fn(system, user, schema=None):
+        props = set((schema or {}).get("properties", {}))
+        if props == {"action", "tool", "arguments", "answer"}:
+            assert note in user  # the session did get the note
+            q = next(queries, None)
+            if q is None:
+                return {"action": "final", "answer": "ok"}
+            return {"action": "call", "tool": "websearch:search", "arguments": {"query": q}}
+        return reply_for(system, user, schema)
+
+    tools = FakeTools(
+        {
+            "t:done": lambda path: {},
+            "t:read": READ,
+            "websearch:search": lambda query, **kw: searched.append(query) or {"results": []},
+        }
+    )
+    outcome, _, _, tracer = run([item(owner_note=note)], categories=[plan], model=Model(fn), tools=tools)
+    assert outcome.ok, outcome.error
+    assert searched == ["xtool alternatives"]  # the note's query never reached the search server
+    assert any(f.get("flag") == "query_guard" or "query_guard" in str(f) for f in tracer.flags)

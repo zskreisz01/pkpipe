@@ -29,6 +29,7 @@ from pkpipe.api.security import (
 )
 from pkpipe.api.services import AppServices, NotFound, Refused
 from pkpipe.api.workspace import Conflict, WorkspaceError
+from pkpipe.domain.triage import ItemState
 from pkpipe.engine.registry import ConfigError
 from pkpipe.mcp.server import build_app_mcp
 
@@ -71,6 +72,16 @@ class DecisionRequest(BaseModel):
     category: str | None = None
 
 
+class CommentRequest(BaseModel):
+    comment: str = ""
+
+
+class BulkConfirmRequest(BaseModel):
+    state: str | None = None
+    category: str | None = None
+    needs_owner: bool | None = None
+
+
 def create_app(
     services: AppServices,
     tokens: Tokens,
@@ -78,6 +89,7 @@ def create_app(
     bind_host: str = "127.0.0.1",
     extra_hosts: tuple[str, ...] = (),
     mount_mcp: bool = True,
+    public_url: str | None = None,
     on_shutdown: Callable[[], None] | None = None,
 ) -> FastAPI:
     sessions, throttle = Sessions(), LoginThrottle()
@@ -152,7 +164,8 @@ def create_app(
             samesite="strict",
             path="/",
             max_age=sessions.ttl_s,
-            secure=request.url.scheme == "https",
+            # behind `tailscale serve` the app sees http, but the owner's browser is on https
+            secure=request.url.scheme == "https" or (public_url or "").startswith("https://"),
         )
         return resp
 
@@ -194,8 +207,22 @@ def create_app(
         return services.restore_run(run_id, apply=body.apply, force=body.force, actor="ui")
 
     @app.get("/api/triage")
-    def api_triage(state: str | None = None):
-        return services.list_triage(state)
+    def api_triage(state: str | None = None, category: str | None = None, needs_owner: bool | None = None):
+        return services.list_triage(state, category=category, needs_owner=needs_owner)
+
+    @app.post("/api/triage/bulk-confirm")
+    def api_bulk_confirm(body: BulkConfirmRequest):
+        return services.bulk_confirm(
+            actor="ui", state=body.state, category=body.category, needs_owner=body.needs_owner
+        )
+
+    @app.get("/api/triage/{item_id}/image")
+    def api_triage_image(item_id: str):
+        return image_response(services.item_image(item_id))
+
+    @app.post("/api/triage/{item_id}/comment")
+    def api_comment(item_id: str, body: CommentRequest):
+        return services.comment_item(item_id, body.comment, actor="ui")
 
     @app.post("/api/triage/{item_id}/confirm")
     def api_confirm(item_id: str):
@@ -287,11 +314,23 @@ def create_app(
         return {"audit": services.store.audit_log(min(limit, 500))}
 
     # -- UI pages ---------------------------------------------------------------------------------
-    def triage_ctx() -> dict[str, Any]:
+    def triage_ctx(**filters: Any) -> dict[str, Any]:
         try:
-            return {**services.list_triage(), "error": None}
+            return {**services.list_triage(**filters), "error": None}
         except Refused as exc:
             return {"rows": [], "invalid": 0, "conflicts": [], "error": str(exc)}
+
+    def image_response(image: dict[str, Any]) -> Response:
+        """An INBOX image for the owner's browser: the bytes only, no script or markup can come with them."""
+        return Response(
+            image["data"],
+            media_type=image["media_type"],
+            headers={
+                "content-security-policy": "default-src 'none'; sandbox",
+                "x-content-type-options": "nosniff",
+                "cache-control": "private, max-age=300",
+            },
+        )
 
     @app.get("/", response_class=HTMLResponse)
     def ui_index(request: Request):
@@ -306,9 +345,33 @@ def create_app(
             triage_error=triage["error"],
         )
 
+    def triage_filters(state: str, category: str, needs_owner: str) -> dict[str, Any]:
+        """The filters of the triage page from its query string (an empty value is no filter)."""
+        return {
+            "state": state or None,
+            "category": category or None,
+            "needs_owner": {"yes": True, "no": False}.get(needs_owner),
+        }
+
     @app.get("/triage", response_class=HTMLResponse)
-    def ui_triage(request: Request):
-        return render(request, "triage.html", categories=sorted(services.categories()), **triage_ctx())
+    def ui_triage(
+        request: Request, state: str = "", category: str = "", needs_owner: str = "", bulk: str = ""
+    ):
+        filters = triage_filters(state, category, needs_owner)
+        try:
+            info = services.triage_info()
+        except Refused:
+            info = {}
+        return render(
+            request,
+            "triage.html",
+            categories=sorted(services.categories()),
+            states=[s.value for s in ItemState],
+            filters={"state": state, "category": category, "needs_owner": needs_owner},
+            info=info,
+            bulk=bulk,
+            **triage_ctx(**filters),
+        )
 
     def triage_row(request: Request, item_id: str, message: str | None = None, error: bool = False):
         rows = {r["item_id"]: r for r in services.list_triage()["rows"]}
@@ -330,6 +393,28 @@ def create_app(
             return triage_row(request, item_id, str(exc), True)
         return triage_row(request, item_id, done)
 
+    @app.post("/ui/triage/bulk-confirm", response_class=HTMLResponse)
+    def ui_bulk_confirm(
+        request: Request, state: str = Form(""), category: str = Form(""), needs_owner: str = Form("")
+    ):
+        filters = triage_filters(state, category, needs_owner)
+        result = services.bulk_confirm(actor="ui", **filters)
+        from urllib.parse import urlencode
+
+        query = urlencode(
+            {
+                "state": state,
+                "category": category,
+                "needs_owner": needs_owner,
+                "bulk": f"{result['confirmed']} confirmed, {result['skipped']} left alone",
+            }
+        )
+        return Response(status_code=200, headers={"HX-Redirect": f"/triage?{query}"})
+
+    @app.get("/ui/triage/{item_id}/image")
+    def ui_triage_image(item_id: str):
+        return image_response(services.item_image(item_id))
+
     @app.post("/ui/triage/{item_id}/confirm", response_class=HTMLResponse)
     def ui_confirm(request: Request, item_id: str):
         return triage_action(
@@ -337,9 +422,20 @@ def create_app(
         )
 
     @app.post("/ui/triage/{item_id}/override", response_class=HTMLResponse)
-    def ui_override(request: Request, item_id: str, category: str = Form("")):
+    def ui_override(request: Request, item_id: str, category: str = Form(""), new_category: str = Form("")):
+        # a name typed into "propose a new category" wins over the dropdown; the server checks both alike
+        value = new_category.strip() or category
         return triage_action(
-            request, item_id, lambda: services.override_item(item_id, category, actor="ui"), "overridden"
+            request,
+            item_id,
+            lambda: services.override_item(item_id, value, actor="ui"),
+            "proposes a new category" if new_category.strip() else "overridden",
+        )
+
+    @app.post("/ui/triage/{item_id}/comment", response_class=HTMLResponse)
+    def ui_comment(request: Request, item_id: str, comment: str = Form("")):
+        return triage_action(
+            request, item_id, lambda: services.comment_item(item_id, comment, actor="ui"), "comment saved"
         )
 
     @app.post("/ui/triage/{item_id}/release", response_class=HTMLResponse)

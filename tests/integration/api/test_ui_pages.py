@@ -42,7 +42,7 @@ def test_triage_page_confirm_override_and_release_fragments(stack, ui):
     assert 'data-testid="confirmed"' in row and f'id="row-{ids["a"]}"' in row
     row = ui.post(f"/ui/triage/{ids['b']}/override", data={"category": "tool"}).text
     assert "overridden" in row
-    bad = ui.post(f"/ui/triage/{ids['b']}/override", data={"category": "bogus"}).text
+    bad = ui.post(f"/ui/triage/{ids['b']}/override", data={"category": "<bogus>"}).text
     assert "unknown category" in bad and "err" in bad
     q = ui.post(f"/ui/triage/{ids['q']}/release").text
     assert "released from quarantine" in q and ">pending<" in q

@@ -59,6 +59,7 @@ class TableFile:
         self._lines: list[_Line] = []
         self._header_idx: int | None = None
         self._last_row_idx: int | None = None
+        self._names: tuple[str, ...] = ()  # the header columns as the file has them
         if text is None:
             text = preamble
         self._parse(text)
@@ -73,6 +74,7 @@ class TableFile:
             if self._header_idx is None:
                 names = [c.lower() for c in split_cells(body)] if body.startswith("|") else []
                 if self._is_header(names):
+                    self._names = tuple(names)
                     self._header_idx = idx
                     self._header_columns = self.columns[: len(names)]
                     self._widened = len(names) == len(self.columns)
@@ -107,6 +109,24 @@ class TableFile:
             self._widened = True
             self._header_columns = self.columns
             self._rewrite_all = self._header_idx is not None
+
+    @property
+    def has_header(self) -> bool:
+        """Whether the text had a table header (a new file has none)."""
+        return self._header_idx is not None
+
+    def header_has(self, column: str) -> bool:
+        """Whether the header of the parsed text names ``column`` (False for a text without a table)."""
+        return column in self._names
+
+    def widen(self) -> None:
+        """Write the full header (every optional column) from now on; rows are re-serialised once when the
+        parsed header was narrower. Nothing changes for a header that is full already."""
+        if self._widened and self._header_columns == self.columns:
+            return
+        self._widened = True
+        self._header_columns = self.columns
+        self._rewrite_all = self._header_idx is not None
 
     def rows(self) -> list[dict[str, str]]:
         return [dict(ln.cells) for ln in self._lines if ln.cells is not None]

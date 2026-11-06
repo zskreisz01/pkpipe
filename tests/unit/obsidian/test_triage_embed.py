@@ -34,7 +34,7 @@ def test_an_image_row_renders_as_an_embed_with_the_width_and_an_escaped_pipe(tmp
     lists.update_triage(p, [image_row(embed_width=200)])
     line = resource_cell(p)
     assert f"![[{NAME}\\|200]]" in line  # the pipe of the alias is escaped so the table cell stays one cell
-    assert line.count("|") - line.count("\\|") == 10  # nine cells of the widened table, ten separators
+    assert line.count("|") - line.count("\\|") == 11  # ten cells of the full table, eleven separators
 
 
 def test_the_row_parses_back_to_the_plain_name_and_the_id_is_unchanged(tmp_path):

@@ -100,7 +100,7 @@ def owner_decides(vault_dir: Path, confirm: list[str] = (), override: dict[str, 
     out = []
     for line in lines:
         cells = [c.strip() for c in line.strip().strip("|").split("|")] if line.startswith("|") else None
-        if cells and len(cells) == 6 and re.fullmatch(r"[0-9a-f]{12}", cells[1]):
+        if cells and len(cells) >= 6 and re.fullmatch(r"[0-9a-f]{12}", cells[1]):
             if cells[1] in confirm:
                 cells[0] = "[x]"
             if override and cells[1] in override:

@@ -14,6 +14,7 @@ It runs on one machine with a local model (LM Studio, Ollama or any OpenAI-compa
 | Page | What it answers |
 | --- | --- |
 | [Installation checklist](installation.md) | What to install and configure before the first run |
+| [User guide](user-guide.md) | The daily flow, every triage field, the web UI, new categories, the two surfaces, Tailscale access |
 | [Owner manual](owner-manual.md) | The manual tasks: what, when, how |
 | [Architecture](architecture.md) | Principles, technology, C4 context / container / component views |
 | [Process model](bpmn.md) | The BPMN process model: every process as an image and as Mermaid |

@@ -30,7 +30,15 @@ def test_final_or_quarantined_items_cannot_be_decided(state):
 
 def test_override_must_be_a_known_category_and_a_decision_is_required():
     with pytest.raises(OwnerDecisionError, match="unknown category"):
-        check_owner_decision(ItemState.PENDING, override="invented", categories=CATS)
+        check_owner_decision(ItemState.PENDING, override="<script>alert(1)</script>", categories=CATS)
+    with pytest.raises(OwnerDecisionError, match="unknown category"):
+        check_owner_decision(ItemState.PENDING, override="x", categories=CATS)  # a slug needs 2 characters
+    # spec 023: a valid new-category name is accepted and stored as its slug (the next release proposes it)
+    assert (
+        check_owner_decision(ItemState.PENDING, override="Children Books", categories=CATS)
+        == "children-books"
+    )
+    assert check_owner_decision(ItemState.PENDING, override=" Tool ", categories=CATS) == "tool"
     with pytest.raises(OwnerDecisionError, match="nothing to decide"):
         check_owner_decision(ItemState.PENDING, categories=CATS)
     check_owner_decision(ItemState.PENDING, override="  ", confirm=False, categories=CATS)  # clears override
@@ -41,3 +49,14 @@ def test_only_quarantined_items_can_be_released_from_quarantine():
     for state in (ItemState.SUGGESTED, ItemState.PENDING, ItemState.RELEASED, ItemState.PROCESSED):
         with pytest.raises(OwnerDecisionError, match="not quarantined"):
             check_quarantine_release(state)
+
+
+def test_clean_owner_note_drops_control_and_invisible_characters_collapses_blanks_and_caps():
+    from pkpipe.domain.triage import OWNER_NOTE_MAX_CHARS, clean_owner_note
+
+    assert clean_owner_note("  a\n\tb \x00c ​d‮e ") == "a b c d e"
+    assert clean_owner_note(None) == "" and clean_owner_note("   ") == ""
+    assert len(clean_owner_note("x" * 5000)) == OWNER_NOTE_MAX_CHARS == 1000
+    assert (
+        clean_owner_note("ünï 😀 <b>[[x]]</b>") == "ünï 😀 <b>[[x]]</b>"
+    )  # the owner's own text, not neutralised

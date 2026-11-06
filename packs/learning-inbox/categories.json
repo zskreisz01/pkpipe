@@ -34,7 +34,8 @@
           "websearch:search"
         ],
         "inputs": [
-          "item.extract"
+          "item.extract",
+          "item.owner_note"
         ],
         "output_schema": "tool_research"
       },
@@ -46,7 +47,8 @@
           "websearch:search"
         ],
         "inputs": [
-          "research"
+          "research",
+          "item.owner_note"
         ],
         "output_schema": "tool_comparison"
       },
@@ -77,7 +79,8 @@
         "system": "synthesizer",
         "instruction": "tool/synthesize.md",
         "inputs": [
-          "*"
+          "*",
+          "item.owner_note"
         ],
         "output_schema": "tool_evaluation"
       },
@@ -107,7 +110,8 @@
         "system": "analyst",
         "instruction": "marketing/extract.md",
         "inputs": [
-          "item.extract"
+          "item.extract",
+          "item.owner_note"
         ],
         "output_schema": "marketing_idea"
       },
@@ -116,7 +120,8 @@
         "system": "synthesizer",
         "instruction": "marketing/synthesize.md",
         "inputs": [
-          "extract"
+          "extract",
+          "item.owner_note"
         ],
         "output_schema": "resource_note"
       }
@@ -134,7 +139,8 @@
         "system": "analyst",
         "instruction": "misc/evaluate.md",
         "inputs": [
-          "item.text"
+          "item.text",
+          "item.owner_note"
         ],
         "output_schema": "misc_evaluation"
       }

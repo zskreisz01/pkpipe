@@ -48,6 +48,10 @@ class TriageRow(BaseModel):
     #: ``![[name|width]]`` (an escaped pipe inside the table). ``None``/0: the plain name. It is part of how
     #: the row is written, not of its identity: the item id stays the hash of the resource (the listed name).
     embed_width: int | None = Field(default=None, ge=0, le=4000)
+    #: The owner's own words (spec 022). Owner-owned: the pipeline never writes, overwrites, trims or clears
+    #: it, it is not neutralised (it is the owner's text in the owner's own notes) and it never leaves the
+    #: vault: no model, tool result, notification, span or log sees it.
+    comment: str = ""
 
     @field_validator("embed_width")
     @classmethod
@@ -110,6 +114,7 @@ class TriageRow(BaseModel):
             "kind": "" if self.kind == "note" else self.kind,
             "needs_owner": "yes" if self.needs_owner else "",
             "topic": self.topic,
+            "comment": self.comment,
         }
 
     def resource_cell(self) -> str:
@@ -141,6 +146,7 @@ class TriageRow(BaseModel):
             kind=cells.get("kind", ""),
             needs_owner=cells.get("needs_owner", ""),
             topic=cells.get("topic", ""),
+            comment=cells.get("comment", ""),
         )
 
 

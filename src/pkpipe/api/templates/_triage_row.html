@@ -1,21 +1,44 @@
-<tr id="row-{{ r.item_id }}" data-item="{{ r.item_id }}">
-  <td><code>{{ r.item_id }}</code></td>
-  <td>{{ r.resource }}</td>
-  <td>{{ r.ai_suggested_category }}{% if r.confirm %} <span class="ok" data-testid="confirmed">&#10003; confirmed</span>{% endif %}</td>
-  <td>{{ r.override or "" }}</td>
+<tr id="row-{{ r.item_id }}" data-item="{{ r.item_id }}" class="{{ 'needs-owner' if r.needs_owner else '' }}">
+  <td class="thumb">
+    {% if r.kind == "image" and not r.resource.startswith(("http://", "https://")) %}
+      <img src="/ui/triage/{{ r.item_id }}/image" alt="" loading="lazy" data-testid="thumb">
+    {% endif %}
+  </td>
+  <td>
+    <code>{{ r.item_id }}</code>
+    <div class="resource">{{ r.resource }}</div>
+    <div class="muted">{{ r.kind }}{% if r.topic %} · <span data-testid="topic">{{ r.topic }}</span>{% endif %}</div>
+    {% if r.needs_owner %}<div class="warn" data-testid="needs-owner">needs a category from you</div>{% endif %}
+  </td>
   <td><span class="pill {{ r.state }}" data-testid="state">{{ r.state }}</span></td>
+  <td>{{ r.ai_suggested_category }}{% if r.confirm %} <span class="ok" data-testid="confirmed">&#10003; confirmed</span>{% endif %}
+    {% if r.override %}<div>override: <strong data-testid="override">{{ r.override }}</strong></div>{% endif %}
+    {% if r.proposal_note %}<div class="muted" data-testid="proposal-note">proposal note: <code>{{ r.proposal_note }}</code></div>{% endif %}
+  </td>
   <td>
     {% if r.state == "quarantined" %}
       <button hx-post="/ui/triage/{{ r.item_id }}/release" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML">Release from quarantine</button>
-    {% elif r.state in ("suggested", "pending", "released") %}
-      <form class="row" hx-post="/ui/triage/{{ r.item_id }}/override" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML">
+    {% elif r.state in ("suggested", "pending", "released", "awaiting_category") %}
+      <form class="decide" hx-post="/ui/triage/{{ r.item_id }}/override" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML">
+        {% if r.state != "awaiting_category" %}
         <button type="button" class="primary" hx-post="/ui/triage/{{ r.item_id }}/confirm" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML">Confirm</button>
+        {% endif %}
         <select name="category" aria-label="override category">
           {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
         </select>
         <button type="submit">Override</button>
       </form>
+      <form class="decide" hx-post="/ui/triage/{{ r.item_id }}/override" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML">
+        <input type="text" name="new_category" maxlength="60" placeholder="or propose a new category" aria-label="propose a new category">
+        <button type="submit">Propose</button>
+      </form>
     {% endif %}
     {% if message %}<div class="{{ 'err' if error else 'ok' }}" data-testid="row-message">{{ message }}</div>{% endif %}
+  </td>
+  <td class="comment">
+    <form hx-post="/ui/triage/{{ r.item_id }}/comment" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML">
+      <textarea name="comment" rows="2" maxlength="1000" aria-label="comment">{{ r.comment }}</textarea>
+      <button type="submit">Save</button>
+    </form>
   </td>
 </tr>

@@ -45,6 +45,10 @@ CORE_DEFAULTS: dict[str, Any] = {
     "layout": DEFAULT_LAYOUT.model_dump(),
     #: spec 019: retention of the vault snapshots taken before a writing run
     "snapshots": {"retention_days": 14, "max_bytes": 1024**3, "max_file_bytes": 5 * 1024**2},
+    #: spec 023: where the triage decisions are made (``vault``: the table in the triage file) and how the
+    #: UI is reached
+    "triage": {"surface": "vault"},
+    "ui": {"public_url": None, "allowed_hosts": []},
     "channels": {"channels": {}, "routes": {}},
     "telemetry": {"capture_content": {"flows": []}},
     # Code-only levels are all-or-nothing (docs/evaluation.md); LLM gates come from the pack.
@@ -326,7 +330,9 @@ def vault_policy_errors(data: dict[str, Any], policy_file: Path) -> list[str]:
         layout = layout_from(data.get("layout"))
     except (OSError, ValueError) as exc:
         return [f"vault policy '{policy_file}': {exc}"]
-    return [f"{policy_file.name}: {e}" for e in policy_file_errors(layout, policy)]
+    surface = (data.get("triage") or {}).get("surface", "vault")
+    public_url = (data.get("ui") or {}).get("public_url")
+    return [f"{policy_file.name}: {e}" for e in policy_file_errors(layout, policy, surface, public_url)]
 
 
 def load_effective(

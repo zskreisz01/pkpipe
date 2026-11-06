@@ -52,6 +52,7 @@ WRITING_FLOWS = {
     "describe_image_item": "triage",
     "handle_security_flag": "process_released",
     "process_released": "process_released",
+    "propose_category": "process_released",  # spec 022: the proposal note and the awaiting_category row
     "process_item": "process_released",
     "other_resource": "process_released",
     "learning_material": "process_released",

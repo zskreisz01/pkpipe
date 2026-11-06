@@ -25,6 +25,7 @@ _PATH_FIELDS = (
     "inbox_dir",
     "inbox_list_file",
     "triage_file",
+    "triage_data_file",
     "processing_list",
     "archive_dir",
     "inbox_archive_pattern",
@@ -92,6 +93,10 @@ class VaultLayout(BaseModel):
     #: A single list file whose bullet entries are the triage items; ``None`` = one note per item.
     inbox_list_file: str | None = None
     triage_file: str = "0-INBOX/Inbox-Triage.md"
+    #: Spec 023: where the machine-owned triage table lives when ``triage.surface`` is ``web`` (the triage
+    #: file is then a generated summary page without a table). ``None``:
+    #: ``<inbox_dir>/_pkpipe/triage-data.md``.
+    triage_data_file: str | None = None
     processing_list: str = "0-INBOX/Manual-Resource-Processing-List.md"
     #: Where a processed INBOX note moves to.
     archive_dir: str = "4-Archive/Inbox"
@@ -115,7 +120,7 @@ class VaultLayout(BaseModel):
     @field_validator(*_PATH_FIELDS, mode="before")
     @classmethod
     def _relative(cls, value: Any, info: Any) -> Any:
-        if value is None and info.field_name == "inbox_list_file":
+        if value is None and info.field_name in ("inbox_list_file", "triage_data_file"):
             return None
         check_relative(value, what=info.field_name)
         return value.rstrip("/") if isinstance(value, str) else value
@@ -134,7 +139,12 @@ class VaultLayout(BaseModel):
         return value
 
     @field_validator(
-        "inbox_list_file", "triage_file", "processing_list", "tool_candidates_file", "improvement_file"
+        "inbox_list_file",
+        "triage_file",
+        "triage_data_file",
+        "processing_list",
+        "tool_candidates_file",
+        "improvement_file",
     )
     @classmethod
     def _markdown_file(cls, value: str | None, info: Any) -> str | None:
@@ -148,6 +158,7 @@ class VaultLayout(BaseModel):
         (a layout where the archive is the triage file would let ``inbox_remove_entries`` write it)."""
         managed = {
             "triage_file": self.triage_file,
+            "triage_data_file": self.triage_data,
             "processing_list": self.processing_list,
             "improvement_file": self.improvement_file,
             "tool_candidates_file": self.tool_candidates_file,
@@ -183,6 +194,11 @@ class VaultLayout(BaseModel):
 
     # -- derived places --------------------------------------------------------------------------------
     @property
+    def triage_data(self) -> str:
+        """The data file of the ``web`` surface (spec 023): the configured one, else below the INBOX."""
+        return self.triage_data_file or f"{self.inbox_dir}/_pkpipe/triage-data.md"
+
+    @property
     def archive_root(self) -> str:
         """Top level folder of the archive (the folder the archive notes live below)."""
         return check_relative(self.archive_dir, what="archive_dir")[0]
@@ -190,7 +206,11 @@ class VaultLayout(BaseModel):
     @property
     def managed_names(self) -> tuple[str, ...]:
         """File names in the INBOX folder that are never items (triage file, processing list, list file)."""
-        names = [PurePosixPath(self.triage_file).name, PurePosixPath(self.processing_list).name]
+        names = [
+            PurePosixPath(self.triage_file).name,
+            PurePosixPath(self.triage_data).name,
+            PurePosixPath(self.processing_list).name,
+        ]
         if self.inbox_list_file:
             names.append(PurePosixPath(self.inbox_list_file).name)
         return tuple(names)
@@ -199,7 +219,13 @@ class VaultLayout(BaseModel):
         """The vault folders the pipeline writes to, one per top level: the scope a vault snapshot (spec 019)
         covers, derived from the layout instead of its own list (FR-009)."""
         roots = [self.inbox_dir, self.projects_dir, self.areas_dir, self.resources_dir, self.archive_root]
-        paths = [self.triage_file, self.processing_list, self.improvement_file, self.tool_candidates_file]
+        paths = [
+            self.triage_file,
+            self.triage_data,
+            self.processing_list,
+            self.improvement_file,
+            self.tool_candidates_file,
+        ]
         extra = [self.inbox_archive_pattern, *([self.inbox_list_file] if self.inbox_list_file else [])]
         roots += [
             p.split("/")[0]
@@ -274,6 +300,8 @@ class VaultLayout(BaseModel):
         out = [
             ("read_triage", "triage_file", self.triage_file),
             ("update_triage", "triage_file", self.triage_file),
+            ("read_triage", "triage_data_file", self.triage_data),
+            ("update_triage", "triage_data_file", self.triage_data),
             ("upsert_processing_list", "processing_list", self.processing_list),
             ("read_improvements", "improvement_file", self.improvement_file),
             ("update_improvements", "improvement_file", self.improvement_file),
@@ -331,6 +359,7 @@ def layout_errors(layout: VaultLayout, allow: Mapping[str, Sequence[str]]) -> li
 #: grants its folder in the vault policy ``allow``), so it is not part of the structure check.
 STRUCTURAL_FIELDS = (
     "triage_file",
+    "triage_data_file",
     "processing_list",
     "improvement_file",
     "tool_candidates_file",
@@ -369,7 +398,9 @@ LEGACY_LAYOUT_KEYS = (
 )
 
 
-def policy_file_errors(layout: VaultLayout, policy: Mapping[str, Any]) -> list[str]:
+def policy_file_errors(
+    layout: VaultLayout, policy: Mapping[str, Any], surface: str = "vault", public_url: str | None = None
+) -> list[str]:
     """Errors of an overlay layout against the vault policy file the vault server runs with (FR-008).
 
     The layout of the policy and the overlay ``layout.json`` must be the same, and every layout path must be
@@ -393,6 +424,17 @@ def policy_file_errors(layout: VaultLayout, policy: Mapping[str, Any]) -> list[s
     allow = policy_layout.default_allow()
     allow.update({k: list(v) for k, v in (data.get("allow") or {}).items()})
     errors += [f"vault policy: {e}" for e in layout_errors(layout, allow)]
+    policy_surface = data.get("triage_surface", "vault")
+    if policy_surface != surface:
+        errors.append(
+            f"triage.json surface '{surface}' differs from the vault policy triage_surface "
+            f"'{policy_surface}': the vault server would read the table from the wrong file"
+        )
+    if surface == "web" and data.get("ui_public_url") != public_url:
+        errors.append(
+            f"ui.json public_url '{public_url}' differs from the vault policy ui_public_url "
+            f"'{data.get('ui_public_url')}': the generated triage page would link to the wrong address"
+        )
     return errors
 
 

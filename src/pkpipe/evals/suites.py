@@ -261,6 +261,9 @@ class DeterministicSuite(Suite):
                 "released": sorted(exp.get("released", [])),
                 "pending": sorted(exp.get("pending", [])),
             }
+            if "proposals" in exp:  # spec 022: items whose override asks for a new category
+                actual["proposals"] = sorted(p["id"] for p in out["proposals"])
+                expected["proposals"] = sorted(exp["proposals"])
         elif kind == "check_category":
             out = check_category(code, inp.get("suggestion")).output
             actual = {"category": out["category"], "valid": out["valid"]}

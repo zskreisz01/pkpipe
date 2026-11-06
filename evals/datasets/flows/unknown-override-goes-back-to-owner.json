@@ -1,7 +1,7 @@
 {
   "id": "unknown-override-goes-back-to-owner",
   "source": "synthetic",
-  "description": "An override naming an unconfigured category is never released; the next evening asks the owner for a configured override even without new items.",
+  "description": "An override that is no plain category name (markup, a sentence) is never released and is no proposal; the next evening asks the owner for a configured override even without new items.",
   "input": {
     "vault": {
       "0-INBOX/cli-tool.md": "---\nsource: https://example.invalid/cli\n---\nA fictional CLI tool for formatting tables.\n"
@@ -26,7 +26,7 @@
       {
         "owner": {
           "override": {
-            "0-INBOX/cli-tool.md": "no-such-category"
+            "0-INBOX/cli-tool.md": "no-such-category!!"
           }
         }
       },
@@ -47,7 +47,7 @@
     "triage": {
       "0-INBOX/cli-tool.md": {
         "ai_suggested_category": "tool",
-        "override": "no-such-category",
+        "override": "no-such-category!!",
         "state": "pending"
       }
     },

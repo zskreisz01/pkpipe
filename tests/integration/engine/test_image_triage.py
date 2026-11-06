@@ -740,9 +740,8 @@ def test_image_rows_show_the_image_as_a_local_embed_and_the_table_stays_intact(w
     assert rows[rid("proj-page.png")]["resource"] == "proj-page.png"  # the plain name, the id is unchanged
     assert rows[rid("proj-page.png")]["embed_width"] == 200
     cells_per_row = {ln.count("|") - ln.count("\\|") for ln in text.splitlines() if ln.startswith("| ")}
-    assert cells_per_row == {
-        10
-    }  # every row (header included) is one cell per column, pipes of embeds escaped
+    # every row (header included) is one cell per column (ten cells, eleven separators), embed pipes escaped
+    assert cells_per_row == {11}
     broken = rows[rid("broken.png")]  # failed and flagged images show it too
     assert broken["needs_owner"] and "![[broken.png\\|200]]" in text
 
@@ -854,3 +853,39 @@ def test_an_answer_that_leaked_the_canary_is_never_salvaged(vault, pack_dir, ove
     w.run()
     assert w.rows[rid("post.jpg")]["needs_owner"] is True  # not described from a leaking answer
     assert not [k for k in w.store.cache if k[0] == digest("post.jpg")]
+
+
+# -- spec 022: the owner's comment column through a triage run ----------------------------------
+
+
+def test_a_triage_run_migrates_an_old_table_keeps_the_comments_and_leaks_nothing(vault, pack_dir, overlay):
+    """The live file is migrated by simply running triage. Spec 023: the comment is owner input (the code
+    steps read it with the rows), but a triage run sends it to no model, notification or span: it is a
+    session input only through the declared ``owner_note`` of a release."""
+    triage = vault / "0-INBOX/Inbox-Triage.md"
+    old = item_id_for("0-INBOX/old.md")
+    triage.write_text(
+        "# Inbox triage\n\n"
+        "| confirm | item | resource | suggested | override | state | kind | needs_owner | topic |\n"
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+        f"| [ ] | {old} | 0-INBOX/old.md | misc |  | suggested |  |  | PRIVATE-OWNER-WORDS |\n",
+        encoding="utf-8",
+    )
+    w = World(vault, pack_dir, overlay)
+    w.run()
+    row = (
+        lists.read_triage(triage)["rows"][0]
+        if False
+        else next(r for r in lists.read_triage(triage)["rows"] if r["item_id"] == old)
+    )
+    assert row["comment"] == "PRIVATE-OWNER-WORDS" and row["topic"] == ""
+    assert "| topic | comment |" in triage.read_text(encoding="utf-8")
+    everything = json.dumps(
+        {
+            "model": [(c["system"], c["user"]) for c in w.model.calls],
+            "notify": [(s.event, s.payload) for s in w.notify.sent],
+            "spans": [(s.name, s.attributes, s.events) for s in w.tracer.spans],
+        },
+        default=str,
+    )
+    assert "PRIVATE-OWNER-WORDS" not in everything
