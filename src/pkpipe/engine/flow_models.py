@@ -122,7 +122,7 @@ class Flow(_Strict):
     )
     data_classes: list[str] = Field(
         default_factory=list,
-        description="Private data handled (journal, context): forces content capture off",
+        description="Private data handled (journal, context, image): local models only, content capture off",
     )
     start: str | None = Field(default=None, description="Entry node; or use edges from START")
     nodes: list[FlowNode]

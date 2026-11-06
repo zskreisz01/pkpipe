@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 # Data classes whose content must never reach a trace backend, whatever the flow config says (FR-004).
-PRIVATE_DATA_CLASSES = frozenset({"journal", "context"})
+from pkpipe.domain.data_classes import PRIVATE_DATA_CLASSES
 
 
 @dataclass(frozen=True)

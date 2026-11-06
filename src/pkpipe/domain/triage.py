@@ -56,6 +56,8 @@ class TriageItem:
     override: str | None = None
     state: ItemState = ItemState.SUGGESTED
     notes: list[str] = field(default_factory=list)
+    #: ``note`` (one INBOX note per item) or an entry kind of the list file (spec 020)
+    kind: str = "note"
 
     @property
     def effective_category(self) -> str:
@@ -83,14 +85,17 @@ def needs_retriage(
     confirm: bool,
     override: str | None,
     valid_categories: frozenset[str] | set[str],
+    needs_owner: bool = False,
 ) -> bool:
     """An open item whose AI suggestion names a category that is no longer configured, and on which the owner
     has not decided yet, is flagged for re-triage (the category was removed from the config).
 
     An item the owner already confirmed is never re-suggested: the confirm tick belongs to the old suggestion
     and would otherwise release a category the owner never saw (constitution VI). See :func:`needs_decision`.
+    An item that ``needs_owner`` (an image: no image input in the model port yet, spec 021) has no
+    suggestion to redo.
     """
-    if state not in (ItemState.SUGGESTED, ItemState.PENDING) or confirm or override:
+    if state not in (ItemState.SUGGESTED, ItemState.PENDING) or confirm or override or needs_owner:
         return False
     return suggested not in valid_categories
 

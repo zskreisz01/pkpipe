@@ -24,6 +24,8 @@ TOOLS = {
     "read_tool_candidates",
     "update_tool_candidates",
     "quarantine_note",
+    "inbox_remove_entries",
+    "read_image",  # spec 021
 }
 
 TRAVERSAL = [
@@ -321,3 +323,38 @@ def test_quarantine_note_over_mcp_moves_the_note_inert_and_guards_the_folder(con
     assert not (synthetic_vault / "0-INBOX/example-tool.md").exists()
     text = (synthetic_vault / "0-INBOX/_quarantine/abc123.md").read_text(encoding="utf-8")
     assert "security_flag:" in text and "```text\n" + original in text
+
+
+def test_read_image_over_mcp_returns_the_bytes_and_refuses_with_stable_codes(tmp_path, synthetic_vault):
+    """Spec 021 FR-004: the real server and the MCP carry the base64 bytes; refusals name the code."""
+    import base64
+
+    png = b"\x89PNG\r\n\x1a\n" + b"synthetic image bytes"
+    att = synthetic_vault / "0-INBOX" / "attachments"
+    att.mkdir(parents=True, exist_ok=True)
+    (att / "pic.png").write_bytes(png)
+    (att / "note.md").write_text("# not an image\n", encoding="utf-8")
+    config = write_policy(tmp_path, synthetic_vault)
+
+    async def go():
+        async with stdio_client(config) as c:
+            return {
+                "ok": await call(c, "read_image", name="pic.png"),
+                "missing": await call(c, "read_image", name="nope.png"),
+                "traversal": await call(c, "read_image", name="../0-INBOX/example-tool.md"),
+                "path": await call(c, "read_image", name="attachments/pic.png"),
+                "type": await call(c, "read_image", name="note.md"),
+            }
+
+    out = run(go())
+    err, data = out["ok"]
+    assert not err and data["media_type"] == "image/png" and data["size"] == len(png)
+    assert base64.b64decode(data["data_base64"]) == png
+    for key, code in (
+        ("missing", "not_found"),
+        ("traversal", "bad_name"),
+        ("path", "bad_name"),
+        ("type", "bad_type"),
+    ):
+        err, message = out[key]
+        assert err and code in message, (key, message)

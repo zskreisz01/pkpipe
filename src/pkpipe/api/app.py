@@ -62,6 +62,11 @@ class RunRequest(BaseModel):
     inputs: dict[str, Any] | None = None
 
 
+class RestoreRequest(BaseModel):
+    apply: bool = False
+    force: bool = False
+
+
 class DecisionRequest(BaseModel):
     category: str | None = None
 
@@ -178,6 +183,15 @@ def create_app(
     @app.post("/api/runs", status_code=202)
     def api_start_run(body: RunRequest):
         return services.start_run(body.flow, trigger="ui", actor="ui", inputs=body.inputs)
+
+    @app.get("/api/snapshots")
+    def api_snapshots():
+        return {"snapshots": services.list_snapshots()}
+
+    @app.post("/api/runs/{run_id}/restore")
+    def api_restore(run_id: str, body: RestoreRequest):
+        """Owner only (agents reach /mcp and /api/health only): the plan, applied with ``apply``."""
+        return services.restore_run(run_id, apply=body.apply, force=body.force, actor="ui")
 
     @app.get("/api/triage")
     def api_triage(state: str | None = None):
@@ -353,7 +367,30 @@ def create_app(
 
     @app.get("/runs/{run_id}", response_class=HTMLResponse)
     def ui_run(request: Request, run_id: str):
-        return render(request, "run.html", run=services.get_run(run_id))
+        return render(
+            request,
+            "run.html",
+            run=services.get_run(run_id),
+            snapshot=services.snapshot_of_run(run_id),
+            plan=None,
+        )
+
+    @app.post("/ui/runs/{run_id}/restore", response_class=HTMLResponse)
+    def ui_restore(request: Request, run_id: str, apply: str = Form(""), force: str = Form("")):
+        plan, message, error = None, None, False
+        try:
+            plan = services.restore_run(run_id, apply=bool(apply), force=bool(force), actor="ui")
+        except (Refused, NotFound) as exc:
+            message, error = str(exc), True
+        return render(
+            request,
+            "_restore.html",
+            run=services.get_run(run_id),
+            snapshot=services.snapshot_of_run(run_id),
+            plan=plan,
+            message=message,
+            error=error,
+        )
 
     @app.get("/config", response_class=HTMLResponse)
     def ui_config(request: Request):

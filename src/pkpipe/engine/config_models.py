@@ -41,6 +41,11 @@ class ModelProfile(_Strict):
     retry_backoff_s: float = Field(default=2.0, ge=0.0, le=60.0)
     api_key: str | None = None
     fallback: str | None = None
+    vision: bool = Field(
+        default=False,
+        description="The model reads images (spec 021): only a profile with vision: true receives images; "
+        "the others refuse them with a stable error",
+    )
 
 
 class ModelsConfig(RootModel[dict[str, ModelProfile]]):
@@ -75,7 +80,7 @@ class McpServer(_Strict):
     egress: bool = Field(
         default=False,
         description="The server sends data off this machine (web search, fetch, hosted backends): flows that "
-        "handle journal data must not call it (spec 015 FR-002, constitution VII)",
+        "handle journal, context or image data must not call it (spec 015 FR-002, constitution VII)",
     )
 
     @model_validator(mode="after")
@@ -92,15 +97,19 @@ class McpServersConfig(RootModel[dict[str, McpServer]]):
 
 
 # channels.json ---------------------------------------------------------------------------------------------
-CHANNEL_TYPES = ("discord_webhook", "teams_webhook", "apprise", "log")
+CHANNEL_TYPES = ("discord_webhook", "discord_bot", "teams_webhook", "apprise", "log")
 
 
 class Channel(_Strict):
     """One notification target. Secrets (webhook URLs, Apprise URLs) are ``env:NAME`` references."""
 
-    type: str = Field(description="discord_webhook | teams_webhook | apprise | log")
+    type: str = Field(description="discord_webhook | discord_bot | teams_webhook | apprise | log")
     url: str | None = Field(
         default=None, description="Webhook URL (discord_webhook, teams_webhook): env:NAME"
+    )
+    token: str | None = Field(default=None, description="Bot token (discord_bot): env:NAME")
+    channel_id: str | None = Field(
+        default=None, description="Target channel (discord_bot): a numeric id or env:NAME"
     )
     urls: list[str] = Field(
         default_factory=list, description="Apprise service URLs (apprise): each an env:NAME reference"
@@ -127,6 +136,11 @@ class Channel(_Strict):
                 raise ValueError(f"channel type '{self.type}' needs 'url' (an env:NAME reference)")
             if not ENV_REF.match(self.url):
                 raise ValueError("webhook URLs are secrets; use an env:NAME reference, not the URL itself")
+        if self.type == "discord_bot":
+            if not self.token or not ENV_REF.match(self.token):
+                raise ValueError("channel type 'discord_bot' needs 'token' (an env:NAME reference)")
+            if not self.channel_id or not (ENV_REF.match(self.channel_id) or self.channel_id.isdigit()):
+                raise ValueError("channel type 'discord_bot' needs 'channel_id' (digits or env:NAME)")
         if self.type == "apprise":
             if not self.urls:
                 raise ValueError("channel type 'apprise' needs 'urls' (env:NAME references)")
@@ -218,9 +232,22 @@ class Category(_Strict):
     id: str
     label: str
     subflow: str
-    para_path: str
+    para_path: str = Field(
+        description="PARA folder of the notes; `{resources_dir}`, `{projects_dir}`, `{areas_dir}`, "
+        "`{inbox_dir}` and `{archive_dir}` follow `layout.json`"
+    )
     triage_hint: str
     sessions: list[Session] = Field(default_factory=list)
+
+    @field_validator("para_path")
+    @classmethod
+    def _para_placeholders(cls, value: str) -> str:
+        allowed = {"inbox_dir", "projects_dir", "areas_dir", "resources_dir", "archive_dir"}
+        unknown = sorted(set(re.findall(r"\{([^{}]*)\}", value)) - allowed)
+        if unknown:
+            raise ValueError(f"unknown placeholder {{{unknown[0]}}} (use {', '.join(sorted(allowed))})")
+        return value
+
     note_session: str | None = Field(
         default=None,
         description="Session whose validated output becomes the stored note (spec 010); default "
@@ -340,7 +367,11 @@ class SecurityConfig(_Strict):
     query_guard: QueryGuard = Field(default_factory=QueryGuard)
     canary: Canary
     url_filter: UrlFilter
-    quarantine_dir: str
+    quarantine_dir: str | None = Field(
+        default=None,
+        deprecated=True,
+        description="Deprecated: the folder is `layout.json` `quarantine_dir`; when set it must equal it",
+    )
 
 
 # telemetry.json --------------------------------------------------------------------------------------------
@@ -469,7 +500,72 @@ class EvalsConfig(_Strict):
     )
 
 
+class SnapshotsConfig(_Strict):
+    """Vault snapshots (spec 019 FR-006): what is kept of the state before each writing run."""
+
+    retention_days: int = Field(
+        default=14,
+        ge=1,
+        le=3650,
+        description="Snapshots older than this are pruned (the newest per flow stays)",
+    )
+    max_bytes: int = Field(
+        default=1024**3,
+        ge=1_000_000,
+        description="Upper bound of all snapshot copies; the oldest go first (the newest per flow stays)",
+    )
+    max_file_bytes: int = Field(
+        default=5 * 1024**2,
+        ge=1024,
+        description="A note larger than this is recorded in the manifest but not copied (a restore skips it)",
+    )
+
+
+# images.json -----------------------------------------------------------------------------------------------
+class ImagesConfig(_Strict):
+    """Image input (spec 021 FR-011, data-model.md ``images.json``): the time budget of the image batch, the
+    preparation of an image and the limits of one description call."""
+
+    time_budget_s: int = Field(
+        default=7200,
+        gt=0,
+        description="The image batch of one cycle stops before an image whose expected end (elapsed + "
+        "running estimate) reaches this; the rest stays in the INBOX list untouched",
+    )
+    estimate_s: float = Field(
+        default=60.0, gt=0, description="Seconds per image before there is any measurement (first run)"
+    )
+    per_image_timeout_s: int = Field(
+        default=300, gt=0, description="Hard limit for the description of one image; it fails alone"
+    )
+    max_side: int = Field(default=1024, ge=64, le=4096, description="Longest side after scaling, in pixels")
+    max_tokens: int = Field(
+        default=1200,
+        gt=0,
+        description="Upper limit of the answer tokens of a description: the vision profile's max_tokens must "
+        "not exceed it",
+    )
+    max_bytes: int = Field(default=10 * 1024 * 1024, gt=0, description="Largest image file that is read")
+    retries: int = Field(
+        default=1, ge=0, le=3, description="Repeated description attempts after an invalid answer"
+    )
+    triage_embed_width: int = Field(
+        default=200,
+        ge=0,
+        le=2000,
+        description="Width in pixels of the image the triage file shows for an image row: the resource cell "
+        "is the local Obsidian embed ![[name|width]] (never a remote URL); 0 writes the plain name",
+    )
+    max_pixels: int = Field(
+        default=40_000_000,
+        gt=0,
+        description="Decoded pixel limit (decompression bomb guard, from the header)",
+    )
+
+
 # registry --------------------------------------------------------------------------------------------------
+from pkpipe.domain.layout import VaultLayout  # noqa: E402  (layout.json is validated by the domain model)
+
 #: config file stem -> model. Order is the order used by the CLI.
 CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "models": ModelsConfig,
@@ -478,6 +574,9 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "schedules": SchedulesConfig,
     "categories": CategoriesConfig,
     "security": SecurityConfig,
+    "layout": VaultLayout,
+    "snapshots": SnapshotsConfig,
+    "images": ImagesConfig,
     "telemetry": TelemetrySettings,
     "evals": EvalsConfig,
 }
@@ -507,6 +606,7 @@ def validate_effective(data: dict[str, Any]) -> list[str]:
             for err in exc.errors():
                 loc = ".".join(str(p) for p in err["loc"])
                 errors.append(f"{name}.json: {loc}: {err['msg']}" if loc else f"{name}.json: {err['msg']}")
+    errors += _layout_errors(data)
     if "flows" in data:
         from pkpipe.engine.flow_models import FlowsConfig
 
@@ -518,4 +618,24 @@ def validate_effective(data: dict[str, Any]) -> list[str]:
                 where = f"flows/{loc[0]}.json" if loc else "flows"
                 rest = ".".join(str(p) for p in loc[1:])
                 errors.append(f"{where}: {rest}: {err['msg']}" if rest else f"{where}: {err['msg']}")
+    return errors
+
+
+def _layout_errors(data: dict[str, Any]) -> list[str]:
+    """Cross-file checks of the vault layout (spec 020 FR-008): the paths sit where the vault tools may use
+    them, and ``security.quarantine_dir`` (deprecated duplicate) agrees with the layout."""
+    from pkpipe.domain.layout import layout_from, layout_structure_errors
+
+    try:
+        layout = layout_from(data.get("layout"))
+    except (ValidationError, TypeError, ValueError):
+        return []  # reported by the model validation above
+    errors = [f"layout.json: {e}" for e in layout_structure_errors(layout)]
+    security = data.get("security")
+    legacy = security.get("quarantine_dir") if isinstance(security, dict) else None
+    if legacy is not None and str(legacy).rstrip("/") != layout.quarantine_dir:
+        errors.append(
+            f"security.json: quarantine_dir '{legacy}' differs from layout.json quarantine_dir "
+            f"'{layout.quarantine_dir}' (drop the security.json key)"
+        )
     return errors

@@ -21,11 +21,24 @@ from pkpipe.engine.registry import load_effective
 from pkpipe.engine.runs import RunService
 from pkpipe.engine.runtime_defaults import SystemClock
 from pkpipe.engine.snapshot import ConfigSnapshot
-from pkpipe.ports import ClassifierPort, ContextStorePort, ModelPort, NotifyPort, SecurityLogPort, ToolPort
+from pkpipe.obsidian.policy import VaultPolicy
+from pkpipe.ports import (
+    ClassifierPort,
+    ContextStorePort,
+    ImagePreparePort,
+    ImageStorePort,
+    ModelPort,
+    NotifyPort,
+    SecurityLogPort,
+    SnapshotPort,
+    ToolPort,
+)
 from pkpipe.steps import StepPorts
 
 DB_ENV = "PKPIPE_DB"
 DATA_DIR_ENV = "PKPIPE_DATA_DIR"
+VAULT_ENV = "PKPIPE_VAULT_DIR"
+VAULT_POLICY_ENV = "PKPIPE_VAULT_POLICY"
 
 
 def default_db_path() -> Path:
@@ -34,6 +47,59 @@ def default_db_path() -> Path:
         return Path(os.environ[DB_ENV]).expanduser()
     base = os.environ.get(DATA_DIR_ENV) or "~/.local/share/pkpipe"
     return Path(base).expanduser() / "pkpipe.db"
+
+
+def snapshots_dir(db_path: Path | None = None) -> Path:
+    """``$PKPIPE_DATA_DIR/snapshots``; without that variable next to the app DB, so a run with an explicit
+    ``--db`` never writes into the home directory (spec 019 FR-006). Never inside the vault or the overlay."""
+    if os.environ.get(DATA_DIR_ENV):
+        return Path(os.environ[DATA_DIR_ENV]).expanduser() / "snapshots"
+    return (db_path.parent if db_path is not None else data_dir()) / "snapshots"
+
+
+def vault_policy_for(snapshot: ConfigSnapshot, vault_dir: Path | None = None) -> VaultPolicy | None:
+    """The vault policy the snapshot scope is derived from (spec 019, spec 020 FR-009): the policy file of
+    ``PKPIPE_VAULT_POLICY`` (the one the vault MCP server runs with) or, without one, the default allowlists
+    of the config's ``layout``. ``None`` when no vault is configured (``--vault`` / ``PKPIPE_VAULT_DIR``)."""
+    from pkpipe.domain.layout import layout_from
+
+    vault = vault_dir or (Path(os.environ[VAULT_ENV]).expanduser() if os.environ.get(VAULT_ENV) else None)
+    if vault is None:
+        return None
+    policy_file = os.environ.get(VAULT_POLICY_ENV)
+    if policy_file:
+        return VaultPolicy.load(Path(policy_file).expanduser(), vault)
+    return VaultPolicy(vault_dir=vault, layout=layout_from(snapshot.data.get("layout")))
+
+
+def make_snapshots(
+    snapshot: ConfigSnapshot, db_path: Path | None = None, vault_dir: Path | None = None
+) -> SnapshotPort | None:
+    """The file snapshot adapter for one pinned config (retention from ``snapshots.json``); ``None`` without a
+    configured vault. Module attribute on purpose: the place a test swaps in a fake."""
+    from pkpipe.adapters.app_store_sqlite import AppStore
+    from pkpipe.adapters.snapshot_files import FileSnapshots
+    from pkpipe.domain.layout import layout_from
+
+    policy = vault_policy_for(snapshot, vault_dir)
+    if policy is None:
+        return None
+    db = db_path or default_db_path()
+    cfg = snapshot.data.get("snapshots") or {}
+
+    def active_runs() -> list[str]:
+        store = SqliteRunStore(db)
+        return [r["run_id"] for status in ("running", "waiting") for r in store.list_runs(status=status)]
+
+    return FileSnapshots(
+        snapshots_dir(db),
+        policy.vault_dir,
+        index=AppStore(db),
+        active_runs=active_runs,
+        policy=policy,
+        expected_layout=layout_from(snapshot.data.get("layout")),
+        **{k: cfg[k] for k in ("retention_days", "max_bytes", "max_file_bytes") if k in cfg},
+    )
 
 
 def make_model(snapshot: ConfigSnapshot, *, timeout_multiplier: float | None = None) -> ModelPort:
@@ -114,11 +180,30 @@ def make_context_store(overlay_dir: Path | None = None) -> ContextStorePort | No
     return FileContextStore(overlay) if overlay is not None else None
 
 
-def ports_for(snapshot: ConfigSnapshot, overlay_dir: Path | None = None) -> StepPorts:
+def make_image_preparer() -> ImagePreparePort:
+    """The Pillow adapter of image preparation (spec 021; the optional extra ``images``: without it an image
+    fails with the reason ``pillow_missing`` and the owner decides its category)."""
+    from pkpipe.adapters.image_pillow import PillowPreparer
+
+    return PillowPreparer()
+
+
+def make_image_store(db_path: Path | None = None) -> ImageStorePort:
+    """The description cache and the timing table of image input: tables of the app DB (spec 021)."""
+    from pkpipe.adapters.app_store_sqlite import AppStore
+
+    return AppStore(db_path or default_db_path())
+
+
+def ports_for(
+    snapshot: ConfigSnapshot, overlay_dir: Path | None = None, db_path: Path | None = None
+) -> StepPorts:
     """Adapters for one pinned config (model profiles and tool servers come from that version)."""
     extra: dict = {
         "classifier": make_classifier(snapshot),
         "security_log": make_security_log(snapshot, overlay_dir),
+        "image_preparer": make_image_preparer(),
+        "image_store": make_image_store(db_path),
     }
     store = make_context_store(overlay_dir)
     if store is not None:
@@ -139,13 +224,15 @@ def build_run_service(
     db_path: Path | None = None,
     *,
     ports: Callable[[ConfigSnapshot], StepPorts] | None = None,
+    snapshots: Callable[[ConfigSnapshot], SnapshotPort | None] | None = None,
 ) -> RunService:
     db = db_path or default_db_path()
     return RunService(
         store=SqliteRunStore(db),
         checkpointer=open_checkpointer(db),
         config=lambda: load_effective(pack_dir, overlay_dir).snapshot(),
-        ports_for=ports or (lambda snapshot: ports_for(snapshot, overlay_dir)),
+        ports_for=ports or (lambda snapshot: ports_for(snapshot, overlay_dir, db)),
+        snapshots_for=snapshots or (lambda snapshot: make_snapshots(snapshot, db)),
     )
 
 

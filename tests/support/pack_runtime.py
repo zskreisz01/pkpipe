@@ -59,8 +59,9 @@ def vault_tools(
     learning: FakeLearning | None = None,
     web: FakeWeb | None = None,
     search: FakeSearch | None = None,
+    policy: VaultPolicy | None = None,
 ) -> FakeTools:
-    vault = Vault(VaultPolicy(vault_dir=vault_dir))
+    vault = Vault(policy or VaultPolicy(vault_dir=vault_dir))
     learning = learning or FakeLearning()
     web, search = web or FakeWeb(), search or FakeSearch()
     return FakeTools(
@@ -82,6 +83,8 @@ def vault_tools(
             "obsidian:read_tool_candidates": lambda: vault.read_tool_candidates(),
             "obsidian:update_tool_candidates": lambda rows: vault.update_tool_candidates(rows),
             "obsidian:quarantine_note": vault.quarantine_note,
+            "obsidian:inbox_remove_entries": lambda entries: vault.inbox_remove_entries(entries),
+            "obsidian:read_image": lambda name: vault.read_image(name),
             "learning:create": learning.create,
             "learning:status": learning.status,
             "learning:link": learning.link,

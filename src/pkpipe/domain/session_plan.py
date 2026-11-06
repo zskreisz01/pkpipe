@@ -28,6 +28,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from pkpipe.domain.layout import DEFAULT_LAYOUT
+
 #: Inputs that are raw, unvalidated text: a session with tools must never receive them (constitution IV).
 RAW_INPUTS = frozenset({"*", "item", "item.text", "item.body", "item.content", "item.raw"})
 EXTRACT_REF = "item.extract"
@@ -246,10 +248,11 @@ def suggestion_of(outputs: Mapping[str, Any], known_ids: set[str]) -> dict[str, 
 
 
 def agent_task_note(
-    suggestion: Mapping[str, str], *, item_id: str, note: str
+    suggestion: Mapping[str, str], *, item_id: str, note: str, folder: str = DEFAULT_LAYOUT.agent_tasks_dir
 ) -> tuple[str, str, dict[str, Any]]:
-    """(path, body, front matter) of the agent task that proposes a new category."""
-    path = f"2-Areas/Agent-Tasks/new-category-{suggestion['id']}-{item_id}.md"
+    """(path, body, front matter) of the agent task that proposes a new category (below ``folder``, the
+    layout's ``agent_tasks_dir``)."""
+    path = f"{folder.rstrip('/')}/new-category-{suggestion['id']}-{item_id}.md"
     body = (
         f"# New category suggestion: {suggestion['name']}\n\n"
         f"- [ ] Decide whether to add the category `{suggestion['id']}` (an entry in `categories.json`).\n\n"

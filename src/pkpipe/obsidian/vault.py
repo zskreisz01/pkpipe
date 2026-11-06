@@ -7,16 +7,19 @@ import functools
 import os
 import re
 import unicodedata
+from collections import Counter
 from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 from typing import Any
 
+from pkpipe.domain.inbox_list import archive_text, remove_entries
 from pkpipe.security import quarantine
 from pkpipe.telemetry import set_span_attributes, tool_span
 
 from . import improvements, lists, tool_candidates
 from .atomic import dir_lock, update_text
-from .errors import NoteExists, NoteNotFound, PathRejected, VaultError
+from .errors import ImageRejected, NoteExists, NoteNotFound, PathRejected, VaultError, WriteConflict
 from .notes import append_text, dump_front_matter, jsonable, parse_note, render_note
 from .policy import VaultPolicy, is_conflict_name
 
@@ -38,6 +41,7 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
                 "upsert_processing_list",
                 "update_improvements",
                 "update_tool_candidates",
+                "inbox_remove_entries",
             ) and isinstance(rows, list):
                 span.set_attribute("pkpipe.vault.rows", len(rows))
                 ids = [r.get("item_id") or r.get("id") for r in rows if isinstance(r, dict)]
@@ -48,13 +52,112 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+IMAGE_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
+
+
+def image_signature_ok(media_type: str, head: bytes) -> bool:
+    """The first bytes of a file say it is the image type its extension claims (no decoding here)."""
+    if media_type == "image/jpeg":
+        return head.startswith(b"\xff\xd8\xff")
+    if media_type == "image/png":
+        return head.startswith(b"\x89PNG\r\n\x1a\n")
+    if media_type == "image/gif":
+        return head.startswith((b"GIF87a", b"GIF89a"))
+    if media_type == "image/webp":
+        return head[:4] == b"RIFF" and head[8:12] == b"WEBP"
+    return False
+
+
 MAX_NOTES = 60
+MAX_ENTRIES = 200
+MAX_REPLANS = 3
+
+
+class _Replan(Exception):
+    """The list changed between planning and the locked rewrite."""
+
+
 ITEM_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 class Vault:
-    def __init__(self, policy: VaultPolicy):
+    def __init__(self, policy: VaultPolicy, *, today: Callable[[], date] = date.today):
         self.policy = policy
+        self._today = today
+
+    # -- images (spec 021) ---------------------------------------------------------------------------------
+
+    @_traced
+    def read_image(self, name: str) -> dict[str, Any]:
+        """Read one embedded image of ``attachments_dir`` (read only, own allowlist entry) by its basename.
+
+        Refusals have a stable code: ``bad_name`` (path segments, hidden or odd names, a symlink),
+        ``bad_type`` (extension not ``jpg jpeg png webp gif`` or content that is not that image type),
+        ``not_found`` and ``too_large`` (``max_image_bytes``). Returns ``{name, media_type, size,
+        data_base64}``; the bytes are untrusted content and never decoded here."""
+        import base64
+
+        if (
+            not isinstance(name, str)
+            or not name.strip()
+            or name != name.strip()
+            or any(c in name for c in ("/", "\\", "\x00", ":"))
+            or name.startswith((".", "~"))
+        ):
+            raise ImageRejected("bad_name", "give the file name only")
+        media_type = IMAGE_TYPES.get(Path(name).suffix.lower())
+        if media_type is None:
+            raise ImageRejected("bad_type", "allowed: " + ", ".join(sorted(IMAGE_TYPES)))
+        try:
+            folder = self.policy.resolve(self.policy.layout.attachments_dir, "read_image", kind="folder")
+        except PathRejected:
+            raise ImageRejected("not_found", "the attachments folder is not readable") from None
+        if not folder.is_dir():
+            raise ImageRejected("not_found", "no such image")
+        target = self._find_image(folder, name)
+        if target is None:
+            raise ImageRejected("not_found", "no such image")
+        if target.is_symlink():
+            raise ImageRejected("bad_name", "symbolic links are not read")
+        try:
+            inside = target.resolve().relative_to(folder.resolve())
+        except ValueError:
+            raise ImageRejected("bad_name", "the file lies outside the attachments folder") from None
+        if unicodedata.normalize("NFC", inside.name) != unicodedata.normalize("NFC", name):
+            raise ImageRejected("bad_name", "the file lies outside the attachments folder")
+        size = target.stat().st_size
+        if size > self.policy.max_image_bytes:
+            raise ImageRejected("too_large", f"limit {self.policy.max_image_bytes} bytes")
+        data = target.read_bytes()
+        if not image_signature_ok(media_type, data[:16]):
+            raise ImageRejected("bad_type", "the content is not the image type of the extension")
+        return {
+            "name": name,
+            "media_type": media_type,
+            "size": len(data),
+            "data_base64": base64.b64encode(data).decode("ascii"),
+        }
+
+    @staticmethod
+    def _find_image(folder: Path, name: str) -> Path | None:
+        """The file called ``name`` directly in ``folder``, else the first match (sorted) in a real subfolder;
+        symbolic links to folders are never followed."""
+        direct = folder / name
+        if direct.is_symlink() or direct.is_file():
+            return direct
+        want = unicodedata.normalize("NFC", name)  # macOS file names may be decomposed (NFD)
+        for root, dirs, files in os.walk(folder, followlinks=False):
+            dirs[:] = sorted(d for d in dirs if not d.startswith(".") and not (Path(root) / d).is_symlink())
+            for f in sorted(files):
+                if unicodedata.normalize("NFC", f) == want:
+                    return Path(root) / f
+        return None
 
     # -- notes -----------------------------------------------------------------------------------------------
 
@@ -63,7 +166,9 @@ class Vault:
         folder = self.policy.resolve(path, "list_folder", kind="folder")
         if not folder.is_dir():
             raise NoteNotFound(f"folder not found: {path}")
-        notes, folders, conflicts = [], [], []
+        notes: list[str] = []
+        folders: list[str] = []
+        conflicts: list[str] = []
         for entry in sorted(folder.iterdir()):
             if entry.name.startswith("."):
                 continue
@@ -151,6 +256,78 @@ class Vault:
             note = parse_note(target.read_text(encoding="utf-8"))
             notes.append({"path": path, "front_matter": jsonable(note.front_matter), "body": note.body})
         return {"notes": notes, "missing": missing}
+
+    @_traced
+    def inbox_remove_entries(self, entries: list[str]) -> dict[str, Any]:
+        """Spec 020 FR-005: remove consumed entries from the declared list file and append them to the dated
+        archive file. The only new write path: it touches nothing but those two files; entries are matched by
+        their raw text (never by line number) and every other byte of the list stays."""
+        layout = self.policy.layout
+        if not layout.inbox_list_file:
+            raise PathRejected("no inbox_list_file is configured in the layout")
+        if not isinstance(entries, list) or not entries or len(entries) > MAX_ENTRIES:
+            raise PathRejected(f"give a list of 1 to {MAX_ENTRIES} raw entries")
+        if not all(isinstance(e, str) and e.strip() for e in entries):
+            raise PathRejected("every entry must be a non-empty string")
+        target = self.policy.resolve(layout.inbox_list_file, "inbox_remove_entries")
+        if is_conflict_name(target.name) or self.policy.in_quarantine(target):
+            raise PathRejected("refusing to rewrite the list file there")
+        if self._is_managed_other_than(target):
+            raise PathRejected("the list file must not be one of the managed files")
+        if not target.is_file():
+            raise NoteNotFound(f"inbox list not found: {layout.inbox_list_file}")
+        config = layout.inbox_list.to_config()
+        day = self._today()  # once per call: one dated archive, one header
+        archive_rel = layout.inbox_archive_path(day)
+        archive = self.policy.resolve(archive_rel, "inbox_remove_entries")
+        if is_conflict_name(archive.name) or self.policy.in_quarantine(archive):
+            raise PathRejected("refusing to write the archive there")
+        if self._is_managed(archive_rel, archive) or _same_file(archive, target):
+            raise PathRejected("the archive must not be the list file or another managed file")
+        # The locked rewrite of the list never removes an entry that is not in the archive: when the list
+        # changed since the plan was made, the plan is redone. Archive first, so a crash leaves an entry in
+        # both files (at least once), never in neither (the snapshot is the net).
+        archived: Counter[str] = Counter()
+        outcome: dict[str, Any] = {}
+        for _ in range(MAX_REPLANS):
+            planned = remove_entries(target.read_text(encoding="utf-8"), entries, config)
+            fresh = list((Counter(planned.removed) - archived).elements())
+            if fresh:
+                update_text(archive, self._archive_appender(fresh, day))
+                archived.update(fresh)
+            outcome.clear()
+
+            def transform(text: str | None) -> str:
+                result = remove_entries(text or "", entries, config)
+                if Counter(result.removed) - archived:  # the list changed: something would go unarchived
+                    raise _Replan
+                outcome["result"] = result
+                return result.text
+
+            try:
+                update_text(target, transform)
+            except _Replan:
+                continue
+            result = outcome["result"]
+            return {
+                "removed": result.removed,
+                "not_found": result.not_found,
+                "list": layout.inbox_list_file,
+                "archive": archive_rel if archived else None,
+            }
+        raise WriteConflict(f"{layout.inbox_list_file} kept changing while removing entries; retry")
+
+    def _archive_appender(self, raws: list[str], day: date) -> Callable[[str | None], str]:
+        return lambda existing: archive_text(existing, raws, day)
+
+    def _is_managed_other_than(self, target: Path) -> bool:
+        """Whether ``target`` is one of the maintained table files (not the list file itself)."""
+        key = _fold(self.policy.rel(target))
+        p = self.policy
+        for managed in (p.triage_file, p.processing_list, p.improvement_file, p.tool_candidates_file):
+            if key == _fold(managed) or _same_file(target, self.policy.root / managed):
+                return True
+        return False
 
     def _writable(self, path: str, tool: str) -> Path:
         target = self.policy.resolve(path, tool)
@@ -311,6 +488,12 @@ class Vault:
     def update_tool_candidates(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
         path = self.policy.resolve(self.policy.tool_candidates_file, "update_tool_candidates")
         return tool_candidates.update_tool_candidates(path, rows)
+
+
+def _same_file(a: Path, b: Path) -> bool:
+    with contextlib.suppress(OSError):
+        return a.exists() and b.exists() and os.path.samefile(a, b)
+    return False
 
 
 def _fold(rel: str) -> str:

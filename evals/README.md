@@ -11,6 +11,7 @@ Datasets, rubrics and recorded model responses for `pkpipe eval` (spec 013, [doc
 | `datasets/flows/*.json` | Flow cases: initial vault, scripted responses, owner decisions -> expected end state |
 | `datasets/security.jsonl`, `datasets/injection.jsonl` | Guard detection and prompt-injection cases |
 | `datasets/output_guard.jsonl` | Session outputs for the output guard (spec 009): clean, injected, harmful, leaked canary (`{canary}` / `{canary_hex}` placeholders) |
+| `datasets/images.jsonl` | Recipes for synthetic images drawn by code (spec 021) -> expected kind, verbatim text, URL, injection flag, topic truth; `cassettes/images.json` is keyed by the recipe of each image |
 | `datasets/deterministic.jsonl` | Code rules: release, category check, state transitions, new-item selection |
 | `rubrics/*.md` | LLM-judge rubrics |
 | `cassettes/<suite>.json` | Responses recorded live (LM Studio, qwen3.5-9b-mlx; judge google/gemma-4-12b) for CI replay |

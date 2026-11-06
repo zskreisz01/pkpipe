@@ -47,5 +47,13 @@ class ToolStep(StepExecutor):
         errors = [f"node '{node.id}': {err}"] if err else []
         return errors, []
 
+    def check_flow(self, flow, node, config: ToolConfig):
+        if config.tool.partition(":")[2] == "read_image" and "image" not in flow.data_classes:
+            return [
+                f"node '{node.id}': '{config.tool}' reads an image, so the flow must declare data class "
+                "'image' (loopback model only, no egress tool, no trace content capture)"
+            ]
+        return []
+
     def run(self, node, config: ToolConfig, ctx: StepContext) -> StepResult:
         return StepResult(output=call_tool(ctx, config.tool, ctx.render(config.arguments)))

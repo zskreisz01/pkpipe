@@ -3,6 +3,10 @@ services:
   searxng:
     image: searxng/searxng:latest
     ports: ["127.0.0.1:8080:8080"]
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?set SEARXNG_SECRET (any long random string)}
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro   # enables the JSON API (spec 017)
   phoenix:
     image: arizephoenix/phoenix:latest
     # UI and OTLP/HTTP on 6006 (/v1/traces), OTLP/gRPC on 4317

@@ -23,10 +23,32 @@ from pkpipe.evals.judge import Judge, JudgeUnavailable
 from pkpipe.evals.models import EvalRun, Level, Status, SuiteReport
 from pkpipe.evals.scoring import check_gate
 from pkpipe.evals.suites import SUITES, SuiteContext
-from pkpipe.ports import ModelPort
+from pkpipe.ports import ModelPort, ModelUnavailable
 from pkpipe.telemetry import attrs
 
 MODES = ("live", "replay", "record", "auto")
+#: ``on`` (default): subject and judge in one pass. ``off``: no judge (record the subject's outputs first).
+#: ``only``: the subject's outputs come from the cassette and only the judge is live, so a judge never has
+#: to share memory with the model under test (record the subject with ``off``, then judge with ``only``).
+JUDGE_MODES = ("on", "off", "only")
+
+
+class _OnlyProfiles:
+    """The real model for the named profiles only: any other profile is refused, so a judge-only pass can
+    never call the model under test (its answer must already be in the cassette)."""
+
+    def __init__(self, inner: ModelPort, profiles: set[str]):
+        self.inner, self.profiles = inner, profiles
+
+    def complete(self, system, user, json_schema=None, profile="default", images=None):
+        if profile not in self.profiles:
+            raise ModelUnavailable(
+                f"judge-only pass: the answer of profile '{profile}' is not in the cassette; record the "
+                "subject first (pkpipe eval --cassette record --judge off)"
+            )
+        if images:
+            return self.inner.complete(system, user, json_schema, profile=profile, images=images)
+        return self.inner.complete(system, user, json_schema, profile=profile)
 
 
 def evals_config(snapshot: ConfigSnapshot) -> EvalsConfig:
@@ -34,12 +56,17 @@ def evals_config(snapshot: ConfigSnapshot) -> EvalsConfig:
 
 
 def llm_profiles(snapshot: ConfigSnapshot) -> set[str]:
-    """Model profiles used by LLM steps (the models under test)."""
+    """Model profiles used by LLM steps (the models under test of the text suites). A vision profile
+    (``vision: true``, spec 021) is the subject of the ``images`` suite only: the text steps' judge may be
+    the same model (the validated pairing judges with gemma while gemma describes images)."""
+    models = snapshot.data.get("models") or {}
     used = set()
     for flow in snapshot.flows().values():
         for node in flow.nodes:
             if node.type in ("llm", "llm_tools"):
-                used.add(node.config.get("profile", "default"))
+                profile = node.config.get("profile", "default")
+                if not (models.get(profile) or {}).get("vision"):
+                    used.add(profile)
     return used
 
 
@@ -81,7 +108,13 @@ class EvalRunner:
         concurrency: int | None = None,
         limit: int | None = None,
         options: dict[str, Any] | None = None,
+        judge_mode: str = "on",
     ):
+        if judge_mode not in JUDGE_MODES:
+            raise ValueError(f"unknown judge mode '{judge_mode}' (use one of {', '.join(JUDGE_MODES)})")
+        if judge_mode == "only" and mode not in ("record", "auto"):
+            raise ValueError("judge mode 'only' needs --cassette record or auto (the subject replays)")
+        self.judge_mode = judge_mode
         if mode not in MODES:
             raise ValueError(f"unknown mode '{mode}' (use one of {', '.join(MODES)})")
         if mode in ("record", "auto") and model is None:
@@ -107,10 +140,13 @@ class EvalRunner:
         if self.mode == "live":
             return self.model
         if suite not in self.cassettes:
+            inner: ModelPort | None = None if self.mode == "replay" else self.model
+            if self.judge_mode == "only" and inner is not None:
+                inner = _OnlyProfiles(inner, {self.config.judge_profile})
             self.cassettes[suite] = CassetteModel(
                 self.paths.cassette(suite),
-                self.mode,  # type: ignore[arg-type]
-                None if self.mode == "replay" else self.model,
+                "auto" if self.judge_mode == "only" else self.mode,  # type: ignore[arg-type]
+                inner,
                 identities=self.identities,
             )
         return self.cassettes[suite]
@@ -142,8 +178,15 @@ class EvalRunner:
         )
         return self.classifier_cassette, None
 
-    def judge_for(self, model: ModelPort | None) -> tuple[Judge | None, str | None]:
+    def judge_for(
+        self, model: ModelPort | None, subjects: set[str] | None = None
+    ) -> tuple[Judge | None, str | None]:
+        """The judge of a suite. ``subjects`` are the profiles under test (default: the profiles of the LLM
+        steps); a suite whose subject is another profile (the vision profile of the ``images`` suite) names
+        it, so the judge is never the model under test."""
         profile = self.config.judge_profile
+        if self.judge_mode == "off":
+            return None, "judge switched off (--judge off)"
         if model is None:
             return None, "no model"
         if profile not in (self.snapshot.data.get("models") or {}):
@@ -151,11 +194,22 @@ class EvalRunner:
         identity = self.identities.get(profile)
         if identity is None:
             return None, f"judge profile '{profile}' cannot be resolved (environment)"
-        subjects = [self.identities[p] for p in llm_profiles(self.snapshot) if p in self.identities]
+        under_test = llm_profiles(self.snapshot) if subjects is None else subjects
+        identities = [self.identities[p] for p in under_test if p in self.identities]
         try:
-            return Judge(model, profile, identity=identity, subject_identities=subjects), None
+            return Judge(model, profile, identity=identity, subject_identities=identities), None
         except JudgeUnavailable as exc:
             return None, str(exc)
+
+    def _subjects(self, names: list[str]) -> set[str]:
+        """The profiles under test of this run: those of the LLM steps, and the subject of a suite that has
+        another one (the vision profile of the ``images`` suite)."""
+        out = set(llm_profiles(self.snapshot))
+        for name in names:
+            suite = SUITES[name]
+            if hasattr(suite, "subject_profiles"):
+                out |= set(suite.subject_profiles(self.snapshot))
+        return out
 
     # -- running ---------------------------------------------------------------------------------------------
     def run(self, names: list[str], *, run_id: str | None = None) -> EvalRun:
@@ -163,7 +217,7 @@ class EvalRunner:
             run_id=run_id or str(uuid.uuid4()),
             config_version=self.snapshot.version,
             mode=self.mode,
-            model=",".join(sorted({self.identities.get(p, p) for p in llm_profiles(self.snapshot)})) or None,
+            model=",".join(sorted({self.identities.get(p, p) for p in self._subjects(names)})) or None,
             judge=self.identities.get(self.config.judge_profile),
         )
         tracer = telemetry.get_telemetry().tracer
@@ -202,7 +256,8 @@ class EvalRunner:
             span.set_attribute(attrs.EVAL_LEVEL, int(suite.level))
             span.set_attribute(attrs.CONFIG_VERSION, self.snapshot.version)
             model = self.model_for(name) if (suite.uses_model or suite.uses_judge) else None
-            judge, judge_error = self.judge_for(model) if suite.uses_judge else (None, None)
+            subjects = suite.subject_profiles(self.snapshot) if hasattr(suite, "subject_profiles") else None
+            judge, judge_error = self.judge_for(model, subjects) if suite.uses_judge else (None, None)
             options = dict(self.options)
             if getattr(suite, "uses_classifier", False):
                 options["classifier"], note = self.classifier_for()

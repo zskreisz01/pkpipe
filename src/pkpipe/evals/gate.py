@@ -33,6 +33,7 @@ from pkpipe.evals.runner import EvalRunner, evals_config
 from pkpipe.evals.suites import (
     SUITES,
     ContextLeakSuite,
+    ImagesSuite,
     ImprovementSuite,
     SessionsSuite,
     TriageSuite,
@@ -52,10 +53,11 @@ GATED_SUITES = (
     "calibration",
     "improvement",
     "context_leak",
+    "images",
     "flows",
     "security",
 )
-LLM_SUITES = ("triage", "sessions", "improvement", "context_leak")
+LLM_SUITES = ("triage", "sessions", "improvement", "context_leak", "images")
 
 
 @dataclass
@@ -123,6 +125,11 @@ def unevaluated_steps(current: ConfigSnapshot | None, draft: ConfigSnapshot, pat
     """LLM steps that are new or changed in the draft but have no eval dataset (constitution IX: every LLM
     step has an eval dataset). Such a change cannot be measured, so it blocks unless overridden."""
     covered = {f"{TriageSuite.flow}.{TriageSuite.node}"} | {t.name for t in session_targets(paths)}
+    # the category session of an image runs the very same prompt, schema and instruction as the triage
+    # session (only its profile differs), so the triage dataset measures it (spec 021)
+    covered.add(f"{ImagesSuite.flow}.suggest")
+    if paths.find(ImagesSuite.dataset) is not None:
+        covered.add(f"{ImagesSuite.flow}.{ImagesSuite.node}")
     if paths.find(ImprovementSuite.dataset) is not None:
         covered.add(f"{ImprovementSuite.flow}.{ImprovementSuite.node}")
     if paths.find(ContextLeakSuite.dataset) is not None:

@@ -578,3 +578,117 @@ def test_system_preflight_timeout_multiplier_scales_the_request_timeout():
     client = httpx.Client(transport=httpx.MockTransport(handler))
     OpenAIModel(MODELS, environ=env, client=client, timeout_multiplier=2.0).complete("s", "u", SCHEMA)
     assert seen == [120, 180, 1200, 120, 240]
+
+
+# -- spec 021: images, vision profiles, max_tokens -----------------------------------------------
+
+from pkpipe.ports import ImageInput, ImagesNotSupported  # noqa: E402
+
+VISION_MODELS = {
+    "default": {"base_url": "http://primary.invalid/v1", "model": "m-text", "max_tokens": 4096},
+    "vision": {
+        "base_url": "http://primary.invalid/v1",
+        "model": "m-vision",
+        "vision": True,
+        "max_tokens": 1200,
+        "fallback": "default",
+    },
+}
+IMG = ImageInput(b"\xff\xd8\xff-not-a-real-jpeg", "image/jpeg")
+
+
+def test_images_become_image_url_data_urls_in_the_user_message():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json=reply('{"category": "tool"}'))
+
+    out = make(handler, VISION_MODELS).complete("sys", "describe", SCHEMA, profile="vision", images=[IMG])
+    assert out == {"category": "tool"}
+    system, user = seen["body"]["messages"]
+    assert system == {"role": "system", "content": "sys"}
+    parts = user["content"]
+    assert parts[0] == {"type": "text", "text": "describe"}
+    assert parts[1]["type"] == "image_url"
+    url = parts[1]["image_url"]["url"]
+    assert url.startswith("data:image/jpeg;base64,")
+    import base64
+
+    assert base64.b64decode(url.split(",", 1)[1]) == IMG.data
+    assert seen["body"]["max_tokens"] == 1200  # the profile's hard limit goes to the server
+
+
+def test_a_request_without_images_is_byte_identical_to_before():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json=reply('{"category": "tool"}'))
+
+    make(handler, VISION_MODELS).complete("sys", "usr", SCHEMA, profile="vision")
+    assert seen["body"]["messages"][1] == {"role": "user", "content": "usr"}
+
+
+def test_images_to_a_profile_without_vision_are_refused_and_nothing_is_sent():
+    sent = []
+
+    def handler(request):
+        sent.append(request)
+        return httpx.Response(200, json=reply('{"category": "tool"}'))
+
+    with pytest.raises(ImagesNotSupported):
+        make(handler, VISION_MODELS).complete("s", "u", SCHEMA, profile="default", images=[IMG])
+    assert sent == []
+    assert issubclass(ImagesNotSupported, ModelError)
+
+
+def test_a_fallback_without_vision_never_receives_the_images():
+    calls = []
+
+    def handler(request):
+        calls.append(str(request.url))
+        raise httpx.ConnectError("down")
+
+    with pytest.raises(ImagesNotSupported):
+        make(handler, VISION_MODELS).complete("s", "u", SCHEMA, profile="vision", images=[IMG])
+    assert len(calls) == 1  # the vision profile was tried, the text fallback refused the images
+
+
+def test_the_schema_retry_keeps_the_images():
+    bodies = []
+
+    def handler(request):
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, json=reply("not json" if len(bodies) == 1 else '{"category": "tool"}'))
+
+    make(handler, VISION_MODELS).complete("s", "u", SCHEMA, profile="vision", images=[IMG])
+    assert len(bodies) == 2
+    assert isinstance(bodies[1]["messages"][1]["content"], list)  # the retry still carries the image
+
+
+def test_the_span_records_image_counts_and_never_the_bytes():
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("test")
+    make(
+        lambda r: httpx.Response(200, json=reply('{"category": "tool"}')), VISION_MODELS, tracer=tracer
+    ).complete("s", "u", SCHEMA, profile="vision", images=[IMG])
+    span = exporter.get_finished_spans()[0]
+    assert span.attributes["pkpipe.model.images"] == 1
+    assert span.attributes["pkpipe.model.image_bytes"] == len(IMG.data)
+    assert IMG.data.decode("latin-1") not in repr(dict(span.attributes))
+
+
+def test_the_image_input_repr_holds_no_bytes_and_has_a_digest():
+    text = repr(IMG)
+    assert "not-a-real-jpeg" not in text and "image/jpeg" in text
+    import hashlib
+
+    assert IMG.sha256 == hashlib.sha256(IMG.data).hexdigest()
+
+
+def test_the_vision_flag_is_a_profile_field_default_false():
+    models = ModelsConfig.model_validate(VISION_MODELS)
+    assert models.root["vision"].vision is True and models.root["default"].vision is False

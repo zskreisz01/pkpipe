@@ -1,0 +1,112 @@
+{
+  "id": "describe_images",
+  "description": "Phase two of the triage cycle (spec 021): describe the new image entries one after the other with the local vision model. Every image is read and prepared once (count and estimate), then a loop decides before each image whether the expected end (elapsed + running estimate) stays inside the time budget; the rest is deferred untouched. Each image is one describe_image_item run; one failing image does not stop the batch. Output: the triage rows and the batch report.",
+  "bpmn": "describe-images",
+  "data_classes": [
+    "image"
+  ],
+  "start": "plan",
+  "max_steps": 3000,
+  "nodes": [
+    {
+      "id": "plan",
+      "type": "code",
+      "bpmn_element": "Count images that need a model call",
+      "config": {
+        "function": "image.plan",
+        "args": {
+          "session": "describe_image_item.describe"
+        }
+      }
+    },
+    {
+      "id": "estimate",
+      "type": "notify",
+      "bpmn_element": "Report the estimate",
+      "config": {
+        "event": "images_estimate",
+        "message": "${plan.message}",
+        "payload": {
+          "count": "${plan.to_describe}"
+        }
+      }
+    },
+    {
+      "id": "next",
+      "type": "code",
+      "bpmn_element": "Images left? expected end < time budget?",
+      "config": {
+        "function": "image.budget"
+      }
+    },
+    {
+      "id": "one",
+      "type": "subflow",
+      "bpmn_element": "Describe one image",
+      "config": {
+        "flow": "describe_image_item"
+      }
+    },
+    {
+      "id": "record",
+      "type": "code",
+      "bpmn_element": "Update estimate",
+      "config": {
+        "function": "image.record"
+      }
+    },
+    {
+      "id": "finish",
+      "type": "code",
+      "bpmn_element": "Write batch report",
+      "config": {
+        "function": "image.finish_batch"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "plan",
+      "to": "estimate",
+      "when": {
+        "path": "plan.to_describe",
+        "gt": 0
+      }
+    },
+    {
+      "from": "plan",
+      "to": "next",
+      "default": true
+    },
+    {
+      "from": "estimate",
+      "to": "next"
+    },
+    {
+      "from": "next",
+      "to": "one",
+      "when": {
+        "path": "next.decision",
+        "eq": "continue"
+      }
+    },
+    {
+      "from": "next",
+      "to": "finish",
+      "default": true
+    },
+    {
+      "from": "one",
+      "to": "record"
+    },
+    {
+      "from": "one",
+      "to": "record",
+      "on": "error"
+    },
+    {
+      "from": "record",
+      "to": "next"
+    }
+  ]
+}

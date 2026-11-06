@@ -19,6 +19,7 @@ from opentelemetry.trace import Status, StatusCode
 from pkpipe import telemetry
 from pkpipe.adapters.notify_apprise import AppriseChannel
 from pkpipe.adapters.notify_discord import DiscordWebhook
+from pkpipe.adapters.notify_discord_bot import DiscordBot
 from pkpipe.adapters.notify_log import LogChannel
 from pkpipe.adapters.notify_teams import TeamsWorkflow
 from pkpipe.adapters.notify_templates import Rendered, render_event
@@ -91,6 +92,9 @@ class ChannelNotifier:
         _without_http_spans(self._client)
         self._factories: dict[str, Callable[[Mapping[str, Any]], ChannelAdapter]] = {
             "discord_webhook": lambda c: DiscordWebhook(self._secret(c["url"]), self._client),
+            "discord_bot": lambda c: DiscordBot(
+                self._secret(c["token"]), self._channel_id(c["channel_id"]), self._client
+            ),
             "teams_webhook": lambda c: TeamsWorkflow(self._secret(c["url"]), self._client),
             "apprise": lambda c: AppriseChannel([self._secret(u) for u in c["urls"]]),
             "log": lambda c: LogChannel(),
@@ -98,6 +102,9 @@ class ChannelNotifier:
 
     def _secret(self, ref: str) -> str:
         return resolve_env(ref, self._environ)
+
+    def _channel_id(self, value: str) -> str:
+        return resolve_env(value, self._environ) if value.startswith("env:") else value
 
     def targets(self, event: str, channels: list[str] | None = None) -> list[str]:
         return list(channels) if channels is not None else list(self._routes.get(event, []))

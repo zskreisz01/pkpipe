@@ -47,7 +47,7 @@ def eval_command(args: argparse.Namespace) -> int:
     try:
         concurrency, multiplier = args.concurrency, None
         if mode != "replay" and args.concurrency is None and not args.no_preflight:
-            pre = _preflight(snapshot, names, tel)
+            pre = _preflight(snapshot, names, tel, args.judge)
             if pre is not None:
                 print(f"preflight: {pre.decision.summary()}", file=sys.stderr)
                 if pre.decision.blocking("system"):
@@ -68,6 +68,7 @@ def eval_command(args: argparse.Namespace) -> int:
             concurrency=concurrency,
             limit=args.limit,
             options={"db": args.db, "vault": args.vault, "fetch_stats": args.fetch_stats},
+            judge_mode=args.judge,
         )
         run = runner.run(names)
     finally:
@@ -85,7 +86,7 @@ def eval_command(args: argparse.Namespace) -> int:
     return 0 if run.ok else 1
 
 
-def _preflight(snapshot, names: list[str], tel):
+def _preflight(snapshot, names: list[str], tel, judge: str = "on"):
     """The system preflight before suites that call a model (docs/operations.md): its decision caps
     ``evals.concurrency`` (production default 1, so it only ever lowers it) and scales model timeouts."""
     from pkpipe.evals.runner import evals_config
@@ -96,7 +97,7 @@ def _preflight(snapshot, names: list[str], tel):
     config = evals_config(snapshot)
     if not config.preflight.enabled or not any(SUITES[n].uses_model or SUITES[n].uses_judge for n in names):
         return None
-    base_url, required = model_targets(snapshot)
+    base_url, required = model_targets(snapshot, judge=judge, vision="images" in names)
     return run_preflight(
         make_probe(base_url),
         config.preflight,
@@ -139,6 +140,14 @@ def add_arguments(ev: argparse.ArgumentParser) -> None:
         "--no-preflight",
         action="store_true",
         help="skip the system preflight (memory, swap, thermal, load, LLM server) before model suites",
+    )
+    ev.add_argument(
+        "--judge",
+        default="on",
+        choices=["on", "off", "only"],
+        help="on = subject and judge in one pass (default); off = no judge: record the model under test "
+        "first; only = the model under test answers from the cassette and only the judge is live "
+        "(needs --cassette record or auto), so the judge never shares memory with it",
     )
     ev.add_argument("--limit", type=int, help="only the first N cases per dataset (smoke run)")
     ev.add_argument("--out", help="report directory (default: $PKPIPE_DATA_DIR/evals)")

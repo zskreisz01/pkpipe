@@ -17,5 +17,17 @@
     "timeout_s": 180,
     "retries": 2,
     "retry_backoff_s": 5
+  },
+  "vision": {
+    "base_url": "env:PKPIPE_MODEL_BASE_URL|http://127.0.0.1:1234/v1",
+    "model": "env:PKPIPE_VISION_MODEL|google/gemma-4-12b",
+    "vision": true,
+    "temperature": 0.0,
+    "max_tokens": 1200,
+    "context": 32768,
+    "timeout_s": 300,
+    "schema_retries": 0,
+    "retries": 1,
+    "retry_backoff_s": 5
   }
 }

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from pkpipe.domain.system import SystemSnapshot
+    from pkpipe.domain.vault_snapshot import RestorePlan, SnapshotInfo
 
 
 class ModelError(Exception):
@@ -27,10 +30,78 @@ class ContextOverflow(ModelError):
     """The prompt does not fit the model context window. Never truncated silently."""
 
 
+class ImagesNotSupported(ModelError):
+    """Images were sent to a model profile that does not declare ``vision: true`` (spec 021 FR-003). Stable
+    error: nothing was sent, and a fallback profile without ``vision`` is refused the same way."""
+
+
+@dataclass(frozen=True)
+class ImageInput:
+    """One image for a vision model (spec 021): the bytes (normally the JPEG made by ``image.prepare``) and
+    their media type. The bytes are private content: they are never part of ``repr``, a log line or a span."""
+
+    data: bytes = field(repr=False)
+    media_type: str = "image/jpeg"
+    #: A stable identity of the image for recordings (eval cassettes): the same rendering recipe gives the
+    #: same ``ref`` on every machine, while the encoded bytes can differ with the imaging library. ``None``:
+    #: the digest of the bytes is the identity.
+    ref: str | None = None
+
+    @property
+    def sha256(self) -> str:
+        return hashlib.sha256(self.data).hexdigest()
+
+    @property
+    def key(self) -> str:
+        """What a cassette keys the image by: ``ref`` when given, else the digest of the bytes."""
+        return self.ref or self.sha256
+
+    def __repr__(self) -> str:
+        return f"ImageInput({self.media_type}, {len(self.data)} bytes)"
+
+
+class ImageError(Exception):
+    """An image cannot be prepared. ``code`` is stable: ``pillow_missing``, ``decode_failed``,
+    ``too_many_pixels``, ``empty``; the message never contains image content or a file name."""
+
+    def __init__(self, code: str, detail: str = ""):
+        self.code = code
+        super().__init__(f"{code}: {detail}" if detail else code)
+
+
+@dataclass(frozen=True)
+class PreparedImage:
+    """The JPEG a vision model gets. ``data`` is private content: never in ``repr``, logs or spans."""
+
+    data: bytes = field(repr=False)
+    sha256: str
+    width: int
+    height: int
+    source_format: str
+    source_bytes: int
+
+    def __repr__(self) -> str:
+        return f"PreparedImage({self.width}x{self.height}, {len(self.data)} bytes, sha256={self.sha256[:12]})"
+
+
+@runtime_checkable
+class ImagePreparePort(Protocol):
+    """Decodes an untrusted image and returns the metadata-free JPEG a vision model gets (spec 021 FR-005):
+    decoded under a pixel limit (a decompression bomb is refused from its header), EXIF orientation applied
+    and all metadata dropped, scaled so the longest side is at most ``max_side`` (never enlarged),
+    re-encoded; ``sha256`` is the digest of the prepared bytes. Raises :class:`ImageError`."""
+
+    def prepare(self, data: bytes, *, max_side: int, max_pixels: int) -> PreparedImage: ...
+
+
 @runtime_checkable
 class ModelPort(Protocol):
     """Structured completions. ``json_schema=None`` returns ``{"text": <reply>}``; otherwise the validated
-    JSON object. ``profile`` names an entry of models.json. Raises :class:`ModelError` subclasses."""
+    JSON object. ``profile`` names an entry of models.json. Raises :class:`ModelError` subclasses.
+
+    ``images`` (spec 021) are attached to the user message; the profile must declare ``vision: true``
+    (:class:`ImagesNotSupported` otherwise). Without images nothing changes: callers pass the argument only
+    when they have images, so a model that predates it keeps working."""
 
     def complete(
         self,
@@ -38,11 +109,32 @@ class ModelPort(Protocol):
         user: str,
         json_schema: dict[str, Any] | None = None,
         profile: str = "default",
+        images: Sequence[ImageInput] | None = None,
     ) -> dict[str, Any]: ...
 
 
 class ClassifierUnavailable(Exception):
     """The injection classifier (model files, runtime) is not usable; callers fail closed."""
+
+
+@runtime_checkable
+class ImageStorePort(Protocol):
+    """Description cache and timing table of image input (spec 021 FR-012, FR-014), in the app DB.
+
+    The cache key is ``(sha256 of the prepared bytes, model, prompt_version)``; the value is the validated
+    description (JSON). Timings are the seconds a model call took per image, the seed of the next run's
+    estimate: ``recent_seconds`` returns the last ``limit`` rows of the model, newest first. Neither holds
+    image bytes."""
+
+    def cache_get(self, sha256: str, model: str, prompt_version: str) -> dict[str, Any] | None: ...
+
+    def cache_put(
+        self, sha256: str, model: str, prompt_version: str, description: dict[str, Any]
+    ) -> None: ...
+
+    def record_timing(self, run_id: str, sha256: str, model: str, seconds: float) -> None: ...
+
+    def recent_seconds(self, model: str, limit: int = 50) -> list[float]: ...
 
 
 @runtime_checkable
@@ -208,3 +300,30 @@ class SystemProbePort(Protocol):
     Process entries carry names only (no arguments, no paths)."""
 
     def snapshot(self, *, include_llm: bool = True) -> SystemSnapshot: ...
+
+
+@runtime_checkable
+class SnapshotPort(Protocol):
+    """Vault snapshots and restore (spec 019). ``take`` saves the files a run can change (scope derived from
+    the vault policy) before its first write and raises when it cannot: a run never starts without a way back.
+    ``finish`` records what the run left behind and returns ``None`` when the run took no snapshot.
+    ``plan_restore`` is the dry run, ``apply_restore`` takes a snapshot of the current state first and never
+    deletes (removed files go to the snapshot's trash folder). A path the owner changed after the run is
+    skipped unless ``force``. Errors are :class:`pkpipe.domain.vault_snapshot.SnapshotError`; their messages
+    never contain a note path or text."""
+
+    def take(self, run_id: str, flow_id: str) -> SnapshotInfo: ...
+
+    def finish(self, run_id: str) -> SnapshotInfo | None: ...
+
+    def plan_restore(self, run_id: str, *, force: bool = False) -> RestorePlan: ...
+
+    def apply_restore(self, run_id: str, *, force: bool = False) -> RestorePlan: ...
+
+    def list(self) -> list[SnapshotInfo]: ...
+
+    def show(self, run_id: str) -> dict[str, Any]: ...
+
+    def prune(self) -> dict[str, Any]: ...
+
+    def summary(self) -> dict[str, Any]: ...

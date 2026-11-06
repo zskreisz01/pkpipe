@@ -1,0 +1,9 @@
+{
+  "time_budget_s": 7200,
+  "estimate_s": 60,
+  "per_image_timeout_s": 300,
+  "max_side": 1024,
+  "max_tokens": 1200,
+  "max_bytes": 10485760,
+  "retries": 1
+}

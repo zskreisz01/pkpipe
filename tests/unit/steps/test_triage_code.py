@@ -32,8 +32,12 @@ def test_select_new_skips_managed_files_and_already_triaged_items():
         "items": [
             {"id": item_id_for("0-INBOX/new.md"), "path": "0-INBOX/new.md", "resource": "0-INBOX/new.md"}
         ],
+        "image_items": [],
+        "owner_items": [],
         "count": 1,
+        "image_count": 0,
         "retriage": 0,
+        "needs_owner": 0,
     }
 
 

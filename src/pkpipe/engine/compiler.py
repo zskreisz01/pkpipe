@@ -26,6 +26,7 @@ from langgraph.graph import StateGraph
 from langgraph.types import Command, Send
 from pydantic import ValidationError
 
+from pkpipe.domain.data_classes import PRIVATE_DATA_CLASSES, is_private
 from pkpipe.engine.expr import MISSING, condition_paths, evaluate, lookup, references_in
 from pkpipe.engine.flow_models import END, START, Flow, FlowNode
 from pkpipe.engine.snapshot import ConfigSnapshot
@@ -47,9 +48,12 @@ class FlowError(Exception):
 class StepFailed(Exception):
     """A step raised and its node has no error edge: the run fails."""
 
-    def __init__(self, flow_id: str, node_id: str, cause: BaseException):
+    def __init__(self, flow_id: str, node_id: str, cause: BaseException, *, content_free: bool = False):
+        """``content_free``: a flow of a private data class (journal, context, image): the message names the
+        type of the cause only, since its text can quote the private content (spec 021 safety review)."""
         self.flow_id, self.node_id, self.cause = flow_id, node_id, cause
-        super().__init__(f"flow '{flow_id}' step '{node_id}' failed: {type(cause).__name__}: {cause}")
+        detail = type(cause).__name__ if content_free else f"{type(cause).__name__}: {cause}"
+        super().__init__(f"flow '{flow_id}' step '{node_id}' failed: {detail}")
 
 
 # -- state --------------------------------------------------------------------------------------------------
@@ -198,7 +202,7 @@ def validate_flow(
 #: page, the sanitized text and the Reader output (which quotes page text as evidence). Sessions with tools
 #: take the secure-fetch verdict's ``extract`` (or ``item.extract``) instead.
 UNVALIDATED_OUTPUT_TYPES = frozenset(
-    {"tool", "wait", "llm_tools", "fetch", "sanitize", "reader", "subflow", "session_plan"}
+    {"tool", "wait", "llm_tools", "fetch", "sanitize", "reader", "subflow", "session_plan", "vision"}
 )
 
 
@@ -215,8 +219,13 @@ def _unvalidated_source(flow: Flow, ref: str, registry: StepRegistry) -> bool:
 
 
 #: Data classes whose flows stay on this machine: local model, no tool that sends data away (spec 015 FR-002
-#: for journals, spec 011 for the context packs: the enterprise notes are summarized by the local model only).
-LOCAL_ONLY_CLASSES = frozenset({"journal", "context"})
+#: for journals, spec 011 for the context packs: the enterprise notes are summarized by the local model only,
+#: spec 021 for images: screenshots of messages and profiles).
+LOCAL_ONLY_CLASSES = PRIVATE_DATA_CLASSES
+
+
+#: Step types that are one model session (in a local-only flow their profile and fallbacks must be loopback).
+SESSION_TYPES = ("llm", "llm_tools", "reader", "vision")
 
 
 def _is_loopback(url: str) -> bool:
@@ -303,7 +312,7 @@ def private_data_errors(
         found: list[tuple[str, dict[str, Any]]] = []
         for inner in flows[target].get("nodes") or []:
             inner_cfg = inner.get("config") or {}
-            if inner.get("type") in ("llm", "llm_tools", "reader"):
+            if inner.get("type") in SESSION_TYPES:
                 found.append((f"{target}.{inner.get('id')}", inner_cfg))
             sub = inner_cfg.get("flow")
             if inner.get("type") == "subflow" and isinstance(sub, str) and "${" not in sub:
@@ -312,7 +321,7 @@ def private_data_errors(
 
     for node in flow.nodes:
         cfg = node.config
-        if node.type in ("llm", "llm_tools", "reader"):
+        if node.type in SESSION_TYPES:
             profile_errors(node.id, str(cfg.get("profile", "default")))
         sub_target = cfg.get("flow")
         if (
@@ -554,7 +563,14 @@ class FlowCompiler:
                 except GraphBubbleUp:
                     raise  # LangGraph control flow (interrupts, parent commands), not a step failure
                 except Exception as exc:  # noqa: BLE001 - routed or re-raised below
-                    failure = {"node": node.id, "type": type(exc).__name__, "message": str(exc)[:500]}
+                    # the error text of a model session can quote the private content (a schema violation
+                    # names the offending value); a tool or code error comes from our own code and stays
+                    private = is_private(flow.data_classes) and node.type in SESSION_TYPES
+                    failure = {
+                        "node": node.id,
+                        "type": type(exc).__name__,
+                        "message": "" if private else str(exc)[:500],
+                    }
                     if node.for_each and node.on_item_error == "continue":
                         span.fail(type(exc).__name__)
                         entry = {"item": item, "status": "failed", "error": failure}
@@ -572,7 +588,7 @@ class FlowCompiler:
                         )
                     if isinstance(exc, StepFailed):
                         raise
-                    raise StepFailed(flow.id, node.id, exc) from exc
+                    raise StepFailed(flow.id, node.id, exc, content_free=private) from exc
                 if result.pending is not None:
                     return Command(update={"waits": {node.id: result.pending}}, goto=node.id)
                 new_item = {**(item or {}), **(result.item or {})} if (item or result.item) else None

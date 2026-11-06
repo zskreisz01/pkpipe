@@ -79,7 +79,9 @@ def make_ports(*, model=None, tools=None, notify=None, clock=None, tracer=None, 
     )
 
 
-def make_service(config, ports: StepPorts, *, store=None, checkpointer=None, registry=None) -> RunService:
+def make_service(
+    config, ports: StepPorts, *, store=None, checkpointer=None, registry=None, snapshots_for=None
+) -> RunService:
     provider = config if callable(config) else (lambda: config)
     return RunService(
         store=store or InMemoryRunStore(),
@@ -87,4 +89,6 @@ def make_service(config, ports: StepPorts, *, store=None, checkpointer=None, reg
         config=provider,
         ports_for=lambda snapshot: ports,
         registry=registry,
+        snapshots_for=snapshots_for,
+        unsnapshotted_writes=snapshots_for is None,
     )

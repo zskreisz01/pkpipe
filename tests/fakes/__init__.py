@@ -4,28 +4,36 @@ from tests.fakes.classifier import FakeClassifier
 from tests.fakes.clock import FakeClock
 from tests.fakes.config import InMemoryConfig
 from tests.fakes.context_store import FakeContextStore
+from tests.fakes.image_preparer import FakePreparer
+from tests.fakes.image_store import FakeImageStore
 from tests.fakes.learning import FakeLearningBackend
 from tests.fakes.model import FakeModel
 from tests.fakes.notify import FakeNotify
 from tests.fakes.runs import InMemoryRunStore
 from tests.fakes.security_log import FakeSecurityLog
+from tests.fakes.snapshots import FakeSnapshots
 from tests.fakes.state import InMemoryState
 from tests.fakes.system import FakeSystemProbe
 from tests.fakes.tools import FakeTools
 from tests.fakes.tracer import RecordedSpan, RecordingTracer
+from tests.fakes.vision import FakeVisionModel
 from tests.fakes.web import FakeSearch, FakeWeb
 
 __all__ = [
     "FakeClassifier",
     "FakeClock",
     "FakeContextStore",
+    "FakeImageStore",
     "FakeLearningBackend",
     "FakeModel",
     "FakeNotify",
+    "FakePreparer",
     "FakeSearch",
     "FakeSecurityLog",
+    "FakeSnapshots",
     "FakeSystemProbe",
     "FakeTools",
+    "FakeVisionModel",
     "FakeWeb",
     "InMemoryConfig",
     "InMemoryRunStore",

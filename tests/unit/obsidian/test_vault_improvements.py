@@ -162,7 +162,13 @@ def test_the_backlog_is_a_managed_file_generic_tools_cannot_touch(vault):
 def test_backlog_path_stays_inside_the_tools_allowlist(tmp_path):
     root = tmp_path / "v"
     (root / "0-INBOX").mkdir(parents=True)
-    bad = Vault(VaultPolicy(vault_dir=root, improvement_file="0-INBOX/Improvement-Backlog.md"))
+    # spec 020 FR-008: the layout is validated against the allowlists when the policy is built ...
+    with pytest.raises(ValueError, match="improvement_file.*read_improvements"):
+        VaultPolicy(vault_dir=root, improvement_file="0-INBOX/Improvement-Backlog.md")
+    # ... and the resolver still refuses the path at run time (defence in depth)
+    ok = VaultPolicy(vault_dir=root)
+    moved = ok.layout.model_copy(update={"improvement_file": "0-INBOX/Improvement-Backlog.md"})
+    bad = Vault(ok.model_copy(update={"layout": moved}))
     with pytest.raises(PathRejected, match="allowlist"):
         bad.read_improvements()
 

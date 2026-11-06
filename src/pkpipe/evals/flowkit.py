@@ -15,18 +15,19 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from pkpipe.domain.layout import DEFAULT_LAYOUT
 from pkpipe.domain.triage import item_id_for
 from pkpipe.obsidian.policy import VaultPolicy
 from pkpipe.obsidian.vault import Vault
 from pkpipe.ports import Delivery, ModelError, ModelUnavailable, SchemaError
 
-TRIAGE_FILE = "0-INBOX/Inbox-Triage.md"
-PROCESSING_LIST = "0-INBOX/Manual-Resource-Processing-List.md"
+TRIAGE_FILE = DEFAULT_LAYOUT.triage_file
+PROCESSING_LIST = DEFAULT_LAYOUT.processing_list
 _ID_REF = re.compile(r"\{id:([^}]+)\}")
 
 
 def expand_ids(text: str) -> str:
-    """``{id:0-INBOX/x.md}`` -> the triage item id of that resource (cases name files, not hashes)."""
+    """``{id:<resource>}`` -> the triage item id of that resource (cases name files, not hashes)."""
     return _ID_REF.sub(lambda m: item_id_for(m.group(1)), text)
 
 
@@ -203,7 +204,9 @@ class ScriptedModel:
             return False
         return True
 
-    def complete(self, system: str, user: str, json_schema=None, profile: str = "default") -> dict[str, Any]:
+    def complete(
+        self, system: str, user: str, json_schema=None, profile: str = "default", images=None
+    ) -> dict[str, Any]:
         self.calls += 1
         for rule in self.rules:
             if self._matches(rule, system, user, json_schema):

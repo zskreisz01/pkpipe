@@ -22,6 +22,7 @@ PACK_DIR = Path(__file__).resolve().parents[2] / "packs" / "learning-inbox"
 DEFAULT_BASE_URL = "http://127.0.0.1:1234/v1"
 DEFAULT_MODEL = "qwen3.5-9b-mlx"
 DEFAULT_JUDGE_MODEL = "google/gemma-4-12b"
+DEFAULT_VISION_MODEL = "google/gemma-4-12b"
 #: The most eval requests in flight in live tests: LM Studio serves them with parallel predictions
 #: (``scripts/lmstudio-test-setup.sh`` loads both models with ``--parallel 4``). The session's system
 #: preflight may lower it (:func:`eval_concurrency`). Production runs default to ``evals.concurrency`` = 1.
@@ -80,6 +81,21 @@ def _lmstudio() -> str | None:
         return f"LM Studio not reachable at {model_base_url()}"
     if model_name() not in models:
         return f"model '{model_name()}' is not loaded in LM Studio (have: {', '.join(models)})"
+    return None
+
+
+def vision_model_name() -> str:
+    """The model of the pack's ``vision`` profile (spec 021): ``PKPIPE_VISION_MODEL``, else gemma-4-12b."""
+    return os.environ.get("PKPIPE_VISION_MODEL", DEFAULT_VISION_MODEL)
+
+
+def _vision() -> str | None:
+    """LM Studio serves the vision model (image description, spec 021)."""
+    models = lmstudio_models()
+    if not models:
+        return f"LM Studio not reachable at {model_base_url()}"
+    if vision_model_name() not in models:
+        return f"vision model '{vision_model_name()}' is not loaded in LM Studio (have: {', '.join(models)})"
     return None
 
 
@@ -193,6 +209,7 @@ PROBES: dict[str, Callable[[], str | None]] = {
     "open_notebook": _open_notebook,
     "lmstudio": _lmstudio,
     "judge": _judge,
+    "vision": _vision,
     "docker": _docker,
     "lightpanda": _lightpanda,
     "browser": _browser,

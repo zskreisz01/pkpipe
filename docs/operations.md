@@ -8,7 +8,7 @@ title: Operations
 
 | Trigger | Flow | Notes |
 | --- | --- | --- |
-| `0 20 * * *` | `triage` | Categorize new INBOX items, notify |
+| `0 20 * * *` | `triage` | Categorize new INBOX items (phase one, text model), describe new image entries (phase two, vision model, time-boxed), notify |
 | `0 6 * * *` | `process_released` | Process confirmed or overridden items |
 | `0 19 * * 0` | `context_refresh` | Rebuild context packs |
 | `30 21 * * *` | `improvement_extract` | Optional, enabled by an overlay `schedules.json` entry: journal extraction ([cycle](process/self-improvement-cycle.md)) |
@@ -32,11 +32,58 @@ The app DB is one SQLite file: `$PKPIPE_DB`, else `$PKPIPE_DATA_DIR/pkpipe.db`, 
 
 A resumed run uses the config version it started with, even if a newer one was published. See [Flows](flows.md) for the flow format.
 
+## Vault snapshots and restore
+
+Before the first node of every run whose flow can write to the vault (a tool call of `write_note`, `append_note`, `move_note`, `update_triage`, `upsert_processing_list`, `update_improvements`, `update_tool_candidates`, `quarantine_note` or `inbox_remove_entries`, also through a subflow) the run service saves a snapshot (spec 019); a flow that only reads takes none. The unit is the run: "restore the state before run X". If the snapshot cannot be written (disk full, permissions) the run fails before it starts and the error names the cause: writing without a way back is not allowed. The run's end (done or failed) records the hash of every file it left different, which is what a later restore compares with.
+
+**Scope.** Derived from the vault policy, so it follows any layout and names no folder of the pack: the managed files, every `.md` file below the folders of the writing tools' allow lists, the layout's write places (`VaultLayout.snapshot_roots()`, spec 020 FR-009) and the quarantine folder. The journal folder is never copied; attachments (images) are out of scope, the pipeline never writes them. Symlinks and hidden folders are not followed, sync-conflict copies are listed but never restored over or removed, a note over `snapshots.max_file_bytes` is recorded in the manifest only (a restore skips it and says so).
+
+**Where.** `$PKPIPE_DATA_DIR/snapshots/<run id>/` (next to the app DB when `PKPIPE_DATA_DIR` is not set), mode 0700, never in the vault, the overlay or a repository: `manifest.json`, `post.json`, `files/<path>` (the bytes before the run), `trash/<path>` (what a restore moved out of the vault). It is plain files: no git needed, no interference with the owner's own commits. The engine process that runs flows needs the vault to build the scope: set `PKPIPE_VAULT_DIR` and, when the vault server runs with a policy file, `PKPIPE_VAULT_POLICY` (the same file); without a vault a flow that can write does not start (the run fails with "no vault is configured for snapshots"): writing without a way back is not allowed. When the policy file is used, its layout must equal `layout.json` (the snapshot refuses otherwise), and the process that runs the flows must see the same vault folder as the vault server; a note the writer puts outside the scope is neither copied nor restorable, and the restore plan prints the scope it knows (`snapshot scope: ...`).
+
+**Overlapping runs.** Each run records what the vault looks like when it ends, so two writing runs that overlap in time (or an owner edit during a run) record each other's writes. A restore of a run skips every path that an overlapping run changed too (`overlapping_run:<run>`), without `--force`; restore in reverse order or force it knowingly (the safety snapshot still makes it undoable). A run that is still running or waiting overlaps every restore whose span it touches: its paths are skipped the same way, and a restore of an active run is refused. Pruning keeps the snapshot of every active run (and the newest of each flow); a resumed run whose snapshot is gone fails before its next node instead of writing with no way back. A restore keeps its snapshot out of pruning until it ends (one `.restoring.<token>` marker per restore, refreshed after every step) and saves the bytes it overwrites in `trash/` (also without `--force`, so a file that grew past `max_file_bytes` during the run stays recoverable). Each step looks at its file again right before it writes or removes it, and skips (`changed_during_restore`) instead of overwriting an Obsidian autosave. A note over `max_file_bytes` is listed but not copied: the log and the `snapshot.take` span say how many, `pkpipe snapshot show` lists them, and a restore skips them (`not_copied`).
+
+| Command | Effect |
+| --- | --- |
+| `pkpipe snapshot list [--json]` | Run, flow, time, size, files, status (`kept`, `restored`, `pruned`) |
+| `pkpipe snapshot show <run>` | Scope, what the run changed, notes that were not copied |
+| `pkpipe snapshot prune` | Remove snapshots past `snapshots.retention_days` and, while over `snapshots.max_bytes`, the oldest; the newest snapshot of each flow stays. Also runs after every new snapshot |
+| `pkpipe restore <run>` | **Dry run**: the plan with four verbs (`restore`, `remove`, `move_back`, `skip` with its reason); nothing changes |
+| `pkpipe restore <run> --apply` | Do it: first a snapshot of the current state (`restore-<run>-<time>-<n>`, so a restore is undoable too), then the plan. Exit 2 when a step was skipped |
+| `--force` | Also overwrite what changed since the run, after saving the current bytes in the snapshot's `trash/` |
+
+`<run>` is the run id or a unique prefix of at least 6 characters. A restore never deletes: a file the run created moves to `trash/`, and a file the owner edited after the run ended (its hash is neither the pre-run nor the run's post hash) is a conflict and is skipped, so an edit in Obsidian is never overwritten without `--force`. Applied twice, a restore plans nothing the second time. A run that is still `running` or `waiting` is refused. Restoring a run that is not the newest to touch a file reports that file as a conflict, and two flows that run at the same time record each other's writes in their post manifests (the engine allows one active run per flow), so restore in reverse order.
+
+The same restore is an owner action of the UI (the run page: plan, apply, force) and of the app MCP server (`restore_run`, owner token only, audit-logged with counts and the safety snapshot, never paths; note paths in the tool result are datamarked). Nothing about a restore is sent anywhere: spans (`snapshot.take`, `snapshot.finish`, `snapshot.restore`) carry the run id, file counts and byte totals, never paths or note text.
+
+**Not covered, by design.** The app DB (run records, drafts), the learning gateway's job store, Open Notebook content and messages already sent. A restored run keeps its run record; the `snapshots` table marks it `restored` with `reverted = 1`. `pkpipe doctor` prints the snapshot directory: number, size against the limit, free disk space and the newest snapshot.
+
+```mermaid
+flowchart LR
+    r[Run starts<br/>flow can write] --> t[Take snapshot<br/>scope from VaultPolicy] --> f[Flow runs] --> p[Record post manifest<br/>done or failed]
+    p -. owner: restore dry run .-> d[Plan: restore, remove,<br/>move back, skip]
+    d -. apply .-> s[Snapshot current state] --> a[Apply steps<br/>nothing deleted]
+```
+
 ## Learning gateway and Open Notebook
 
 `uv run python -m pkpipe.learning.server` serves `learning:create|status|link|audio` on `127.0.0.1:8703` (loopback only, launchd/systemd like the vault server). Jobs live in `$PKPIPE_DATA_DIR/learning/jobs.db` and survive a restart; downloaded podcasts are in `.../learning/audio`. A failed job keeps its reason (`select job_id, item_id, status, json_extract(data, '$.reason') from notebook_jobs`). Items whose service was down stay `released` and are retried by the next 06:00 run; a URL the gateway refuses (deny list, a host that resolves to a private address) quarantines the item like the first URL check; failed or timed-out generations are listed as `failed` in the processing list.
 
 The default backend is Open Notebook with Speaches (Kokoro voice): `cd deploy/open-notebook && cp .env.example .env`, fill the three values, `docker compose up -d`, then `uv run python -m pkpipe.learning.open_notebook_setup` (idempotent; downloads the voice model once, registers LM Studio and Speaches, creates the `pkpipe_overview` / `pkpipe_duo` profiles). Images are pinned by digest; update tag and digest together. A 3 segment overview takes about 10 minutes on a CPU with a 12B model (outline and transcript are written by `google/gemma-4-12b`, not Qwen3.5, whose reasoning breaks the JSON). Live tests: `PKPIPE_REQUIRE_LIVE=1 uv run pytest tests/integration/learning/test_open_notebook_live.py` (starts the stack when it is down and stops it afterwards; notebook, link, Kokoro speech, failure and filter checks take seconds). The full generation of a short podcast is opt-in with `PKPIPE_LIVE_AUDIO=1` because a thinking model writing the transcript takes 10 to 40 minutes on CPU.
+
+## Web search
+
+`uv run python -m pkpipe.websearch.server` serves `websearch:search(query, max_results)` on `127.0.0.1:8702` (loopback only; `deploy/launchd/io.pkpipe.web-search.plist.example`). Backend: SearXNG at `--searxng-url` / `PKPIPE_SEARXNG_URL` (default `http://127.0.0.1:8080`; `deploy/docker-compose.yml` starts one with the JSON API enabled, `SEARXNG_SECRET` required) or `--backend brave` with `BRAVE_API_KEY`. Results are `{title, url, snippet}`; a result with a non-http(s) URL, credentials, a private host or a deny-listed domain is dropped, text is stripped of tags and invisible characters and capped, at most 10 results. A failing backend returns `{"results": [], "error": "<code>"}`. The server never logs queries; the query guard runs in the engine before the call.
+
+## Image input
+
+Image entries of the INBOX list are described by a local vision model ([Image input](configuration.md#image-input), [Describe Images](process/describe-images.md)). What to know to run it:
+
+- **Two model phases, one switch.** The `triage` run first categorizes the text items on the `default` profile (`qwen3.5-9b-mlx`), then describes the images and categorizes their descriptions on the `vision` profile (`google/gemma-4-12b`). The profiles are never interleaved: the text model is not needed after the first phase, and the run logs a hint (`Image phase: ... may be unloaded now`) when the second starts, so a setup that keeps one model in memory can unload the text model then. The judge model is used by the evals and the publish gate only, never by a production run, so it does not compete for memory at night. `gemma-4-12b` is not used for the text steps: in two live runs its text sessions failed the code checks of the `sessions` suite and the security gate once (research in `specs/021-image-input/research.md`).
+- **Model memory and context.** Load both models with a context of 32768 (`scripts/lmstudio-test-setup.sh` does it with 4 parallel predictions; a load at 8192 is too small for the text sessions). The `vision` profile sets `context: 32768`; a prompt that cannot fit is refused, never truncated. Qwen3.5 always reasons through LM Studio and spends its token budget before the answer, which is why it is not the vision model.
+- **Time budget.** `images.time_budget_s` (default 7200, two hours) bounds the image batch of a cycle, counted from the start of the cycle: before every image the guard stops when `elapsed + running estimate` reaches it. The images left stay in the INBOX list untouched (no triage row, no removal) and are first in line the next day. At the start the run counts the images that need a model call (cached ones are free) and reports `count x estimate` (the log, and the event `images_estimate` to the channels routed in `channels.json`); the estimate is seeded from the median of the last 50 durations (table `image_timing` of the app DB) or `images.estimate_s` (60) on the first run, and replaced by the mean of this run's calls after every image. The notification at the end says how many images were described, taken from the cache, failed, quarantined and deferred. Measured: about 53 s per image on the Mac Mini under memory pressure (median, slowest 197 s; 42 images about 40 minutes), about 13 s per image on an idle machine (12 synthetic images in 153 s). The estimate is the control, not these numbers.
+- **One stuck image cannot spend the budget.** A description that takes longer than `images.per_image_timeout_s` (300) fails alone; the image goes to the owner (`needs_owner`) and the batch goes on. The abandoned request keeps running in LM Studio until the profile's own `timeout_s` (300), so keep that at or below the image timeout.
+- **Cache and DB.** The app DB holds the description cache (`image_cache`: hash of the prepared bytes, model, prompt version, the validated description) and the timing table. The same image twice, or an image that comes back after a restart, costs no model call; a changed prompt, schema or model is a new key. A restart in the middle of the batch loses nothing but the model call in flight (the prepared images are held in memory and prepared again).
+- **Images are read only.** `attachments_dir` is not a write destination and not part of a vault snapshot; the vault tool `read_image` reads one file by name.
 
 ## Evals
 
@@ -102,7 +149,7 @@ flowchart LR
     p -. rollback criteria .-> r[Previous git tag]
 ```
 
-Rollback when the override or quarantine rate exceeds twice the weekly average, or on any context leak.
+Rollback when the override or quarantine rate exceeds twice the weekly average, or on any context leak. A rollback of the code or config does not undo what a run already wrote to the vault: `pkpipe restore <run>` does ([Vault snapshots and restore](#vault-snapshots-and-restore)); check it with the dry run first.
 
 ## Observability
 
@@ -131,7 +178,7 @@ Telemetry is configured only from standard `OTEL_*` variables and exports OTLP h
 No core change is needed (constitution I, X).
 
 **Content capture:** off by default. A flow opts in through
-`telemetry.json` (`{"capture_content": {"flows": ["<flow-id>"]}}`, validated by `pkpipe validate`); flows handling the `journal` or `context` data class are forced off.
+`telemetry.json` (`{"capture_content": {"flows": ["<flow-id>"]}}`, validated by `pkpipe validate`); flows handling the `journal`, `context` or `image` data class are forced off (also the nested flows of a flow that has capture on).
 A scrubbing exporter strips prompt/response attributes (OpenInference `input.*`, `output.*`, `llm.*_messages`, ...),
 exception messages and status descriptions from every span of a flow with capture off, so a backend never sees them.
 Security flags are recorded as `security.flag` span events with detector, action and reason code only.

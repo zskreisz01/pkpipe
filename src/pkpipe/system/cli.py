@@ -83,6 +83,33 @@ def format_text(snapshot: SystemSnapshot, decision: PreflightDecision, required:
     return "\n".join(lines) + "\n"
 
 
+def snapshot_section(snapshot) -> tuple[dict, list[str]]:
+    """The vault snapshot directory (spec 019 FR-009): free space, number, size and newest snapshot, with a
+    warning when the disk cannot hold ``snapshots.max_bytes`` more."""
+    from pkpipe import app
+    from pkpipe.adapters.snapshot_files import directory_summary
+
+    cfg = snapshot.data.get("snapshots") or {}
+    info = directory_summary(
+        app.snapshots_dir(None),
+        **{k: cfg[k] for k in ("retention_days", "max_bytes") if k in cfg},
+    )
+    newest = info["newest"]
+    lines = [
+        f"snapshots   {info['directory']}: {info['snapshots']} kept, {info['bytes'] / _MiB:,.0f} MiB "
+        f"(limit {info['max_bytes'] / _MiB:,.0f} MiB, {info['retention_days']} days), "
+        f"{_gib(info['free_bytes'])} free"
+        + (
+            f", newest {newest['run_id'][:8]} ({newest['flow_id']}) {newest['taken_at'][:19]}"
+            if newest
+            else ""
+        )
+    ]
+    if info["free_bytes"] < info["max_bytes"]:
+        lines.append("  - [warn] snapshot_disk_low: less free disk than snapshots.max_bytes")
+    return info, lines
+
+
 def doctor_command(args: argparse.Namespace) -> int:
     from pkpipe import app
     from pkpipe.system.preflight import model_targets, preflight_settings, run_preflight
@@ -114,10 +141,12 @@ def doctor_command(args: argparse.Namespace) -> int:
         )
     finally:
         tel.shutdown()
+    snap_info, snap_lines = snapshot_section(snapshot)
     if args.json:
-        print(json.dumps(pre.to_dict(), indent=2))
+        print(json.dumps({**pre.to_dict(), "snapshots": snap_info}, indent=2))
     else:
         print(format_text(pre.snapshot, pre.decision, pre.required_models), end="")
+        print("\n".join(snap_lines))
     return 1 if pre.decision.blocked else 0
 
 
@@ -139,4 +168,4 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--json", action="store_true", help="machine readable output")
 
 
-__all__ = ["add_arguments", "doctor_command", "format_text", "make_probe"]
+__all__ = ["add_arguments", "doctor_command", "format_text", "make_probe", "snapshot_section"]

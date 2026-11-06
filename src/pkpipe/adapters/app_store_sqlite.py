@@ -45,6 +45,33 @@ CREATE TABLE IF NOT EXISTS audit (
     target TEXT,
     detail TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS snapshots (
+    run_id TEXT PRIMARY KEY,
+    flow_id TEXT NOT NULL,
+    taken_at TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    files INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('kept', 'restored', 'pruned')),
+    reverted INTEGER NOT NULL DEFAULT 0,
+    restored_at TEXT
+);
+CREATE TABLE IF NOT EXISTS image_cache (
+    sha256 TEXT NOT NULL,
+    model TEXT NOT NULL,
+    prompt_version TEXT NOT NULL,
+    description TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (sha256, model, prompt_version)
+);
+CREATE TABLE IF NOT EXISTS image_timing (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    model TEXT NOT NULL,
+    seconds REAL NOT NULL,
+    at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS image_timing_model ON image_timing (model, seq);
 """
 
 
@@ -167,6 +194,72 @@ class AppStore:
     def mark_reverted(self, publish_id: str, by: str) -> None:
         with self._conn() as c:
             c.execute("UPDATE publishes SET reverted_by = ? WHERE publish_id = ?", (by, publish_id))
+
+    # -- vault snapshots (spec 019 FR-008): the index of ``$PKPIPE_DATA_DIR/snapshots/`` ---------------------
+    SNAPSHOT_FIELDS = frozenset(
+        {"flow_id", "taken_at", "bytes", "files", "status", "reverted", "restored_at"}
+    )
+
+    def snapshot_upsert(self, row: dict[str, Any]) -> None:
+        with self._conn() as c:
+            c.execute(
+                "INSERT INTO snapshots "
+                "(run_id, flow_id, taken_at, bytes, files, status, reverted, restored_at) "
+                "VALUES (:run_id, :flow_id, :taken_at, :bytes, :files, :status, :reverted, :restored_at) "
+                "ON CONFLICT(run_id) DO UPDATE SET flow_id = excluded.flow_id, taken_at = excluded.taken_at, "
+                "bytes = excluded.bytes, files = excluded.files, status = excluded.status",
+                {"status": "kept", "reverted": 0, "restored_at": None, **row},
+            )
+
+    def snapshot_get(self, run_id: str) -> dict[str, Any] | None:
+        with self._conn() as c:
+            row = c.execute("SELECT * FROM snapshots WHERE run_id = ?", (run_id,)).fetchone()
+        return dict(row) if row else None
+
+    def snapshot_list(self) -> list[dict[str, Any]]:
+        with self._conn() as c:
+            return [dict(r) for r in c.execute("SELECT * FROM snapshots ORDER BY taken_at DESC, run_id")]
+
+    def snapshot_update(self, run_id: str, **fields: Any) -> None:
+        bad = set(fields) - self.SNAPSHOT_FIELDS
+        if bad:
+            raise ValueError(f"snapshot fields {sorted(bad)} cannot be set")
+        if not fields:
+            return
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        with self._conn() as c:
+            c.execute(f"UPDATE snapshots SET {sets} WHERE run_id = ?", [*fields.values(), run_id])
+
+    # -- image input (spec 021 FR-012, FR-014): ImageStorePort ---------------------------------------------
+    def cache_get(self, sha256: str, model: str, prompt_version: str) -> dict[str, Any] | None:
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT description FROM image_cache WHERE sha256 = ? AND model = ? AND prompt_version = ?",
+                (sha256, model, prompt_version),
+            ).fetchone()
+        return json.loads(row["description"]) if row else None
+
+    def cache_put(self, sha256: str, model: str, prompt_version: str, description: dict[str, Any]) -> None:
+        with self._conn() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO image_cache (sha256, model, prompt_version, description, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (sha256, model, prompt_version, json.dumps(description, ensure_ascii=False), _now()),
+            )
+
+    def record_timing(self, run_id: str, sha256: str, model: str, seconds: float) -> None:
+        with self._conn() as c:
+            c.execute(
+                "INSERT INTO image_timing (run_id, sha256, model, seconds, at) VALUES (?, ?, ?, ?, ?)",
+                (run_id, sha256, model, float(seconds), _now()),
+            )
+
+    def recent_seconds(self, model: str, limit: int = 50) -> list[float]:
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT seconds FROM image_timing WHERE model = ? ORDER BY seq DESC LIMIT ?", (model, limit)
+            ).fetchall()
+        return [float(r["seconds"]) for r in rows]
 
     # -- audit ----------------------------------------------------------------------------------------------
     def audit(self, actor: str, action: str, target: str | None = None, **detail: Any) -> None:

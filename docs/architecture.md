@@ -92,7 +92,7 @@ C4Container
         ContainerDb(db, "App DB", "SQLite (WAL)", "Runs, config snapshots, checkpoints, jobs, drafts, publishes, audit")
         ContainerDb(cfg, "Config", "git: JSON + Markdown", "Public pack + private overlay")
         Container(mvault, "obsidian-vault :8701", "FastMCP, pkpipe.obsidian", "Notes, triage and processing lists, improvements, tool candidates, quarantine")
-        Container(msearch, "web-search :8702", "MCP, not in this repo", "SearXNG or Brave")
+        Container(msearch, "web-search :8702", "MCP, pkpipe.websearch", "SearXNG or Brave")
         Container(mfetch, "web-fetch :8704", "FastMCP, pkpipe.webfetch", "fetch_page only: URL policy, filtering proxy, Lightpanda, Chromium fallback")
         Container(browsers, "Headless browsers", "child processes", "Lightpanda, Playwright + Chromium")
         Container(mlearn, "learning-gateway :8703", "FastMCP, pkpipe.learning", "create, status, link, audio; SQLite job store")
@@ -182,9 +182,9 @@ Dependencies point inwards: inbound adapters call the core, the core knows only 
 | Component | Module (main classes) | Depends on | Replacing it affects |
 | --- | --- | --- | --- |
 | REST + UI router | `pkpipe.api.app.create_app`, `pkpipe.api.services.AppServices`, `RunLauncher`, `pkpipe.api.workspace.ConfigWorkspace`, `pkpipe.api.security.GuardMiddleware` | Run service, Config registry, App store, Publish gate | UI only |
-| App MCP server | `pkpipe.mcp.server.build_app_mcp` (`run_flow`, `get_run`, `list_triage`, `confirm_item`, `override_item`, `release_quarantine`) | `pkpipe.api.services.AppServices`, Triage domain | MCP clients only |
+| App MCP server | `pkpipe.mcp.server.build_app_mcp` (`run_flow`, `get_run`, `list_triage`, `confirm_item`, `override_item`, `release_quarantine`, `restore_run`) | `pkpipe.api.services.AppServices`, Triage domain | MCP clients only |
 | Scheduler | `pkpipe.scheduler.FlowScheduler` | Run service, APScheduler SQLite job store | Nothing |
-| CLI | `pkpipe.cli.main`, `pkpipe.candidates_cli`, `pkpipe.system.cli`, `pkpipe.evals.cli` | Run service, Preflight service, Evals | – |
+| CLI | `pkpipe.cli.main`, `pkpipe.candidates_cli`, `pkpipe.snapshot_cli`, `pkpipe.system.cli`, `pkpipe.evals.cli` | Run service, Snapshot restore, Preflight service, Evals | – |
 | Run service | `pkpipe.engine.runs.RunService` | Flow compiler, RunStorePort, checkpointer | – |
 | Flow compiler | `pkpipe.engine.compiler.FlowCompiler`, `validate_flow`, `validate_config_flows` | Step executors, Config registry | – |
 | Config registry | `pkpipe.engine.registry.load_effective`, `EffectiveConfig`, `pkpipe.engine.snapshot.ConfigSnapshot`, `pkpipe.engine.config_models` | Files of the pack and overlay | – |
@@ -196,6 +196,8 @@ Dependencies point inwards: inbound adapters call the core, the core knows only 
 | Triage domain | `pkpipe.domain.triage`, `pkpipe.steps.triage_code` | Nothing (pure Python) | – |
 | Context packs | `pkpipe.domain.context_pack`, `pkpipe.steps.context_code` | ContextStorePort | – |
 | Improvements, tool candidates | `pkpipe.domain.improvement`, `pkpipe.domain.tool_candidate`, `pkpipe.steps.improvement_code`, `pkpipe.evals.ab` | Vault tools (MCP) | – |
+| Image input | `pkpipe.domain.images` (`ImageDescription`, `ImageBuffer`), `pkpipe.domain.image_batch` (the time guard as pure functions over a dict), `pkpipe.steps.image_code` (`vision` session, `image.*` code functions), flows `describe_images` and `describe_image_item`, vault tool `read_image` | ModelPort with `images`, ImagePreparePort (`pkpipe.adapters.image_pillow`, optional extra `images`), ImageStorePort (`AppStore`: description cache, timing table), ToolPort (`read_image`), ClockPort | Data class `image` (spec 021) |
+| Vault snapshots | `pkpipe.domain.vault_snapshot` (manifests, restore plan rules, which flows write), `pkpipe.obsidian.scope.derive_scope` (scope from `VaultPolicy`), `pkpipe.engine.restore.restore_run` | SnapshotPort (the run service takes the snapshot before a writing flow) | – |
 | System preflight policy | `pkpipe.domain.system` (`SystemSnapshot`, `PreflightDecision`) | Nothing (pure Python, `evals.preflight` thresholds) | – |
 | System preflight service | `pkpipe.system.preflight.run_preflight`, `pkpipe.system.sampler.SystemSampler` | SystemProbePort, `pkpipe.telemetry` | `pkpipe doctor`, `pkpipe eval`, live-test sampler |
 | Evals + publish gate | `pkpipe.evals` (`gate.PublishGate`, `runner.EvalRunner`, `suites`, `judge.Judge`, `cassette.CassetteModel`) | ModelPort (default + judge profile), ClassifierPort | Gates every UI publish |
@@ -210,6 +212,7 @@ Dependencies point inwards: inbound adapters call the core, the core knows only 
 | SQLite repo | `pkpipe.adapters.state_sqlite.SqliteRunStore`, `open_checkpointer` | `langgraph-checkpoint-sqlite` | RunStorePort; can move to Postgres |
 | Tracer | `pkpipe.adapters.tracer_otel.OtelTracer` | `pkpipe.telemetry` (OpenTelemetry) | TracerPort; the core never imports OpenTelemetry |
 | System clock | `pkpipe.engine.runtime_defaults.SystemClock` | stdlib | ClockPort |
+| Snapshot files | `pkpipe.adapters.snapshot_files.FileSnapshots` | `$PKPIPE_DATA_DIR/snapshots/` (mode 0700), the `snapshots` table of the app DB | SnapshotPort |
 | System probe | `pkpipe.adapters.system_probe.MacOSSystemProbe`, `LinuxSystemProbe` | `sysctl`, `vm_stat`, `pmset`, `ps`, `/proc`, LM Studio REST / `lms` | SystemProbePort; another OS = another probe |
 | Composition root | `pkpipe.app` (`ports_for`, `build_run_service`, `make_*`), `pkpipe.serve.build_services` | All adapters | Chooses the adapter per port |
 
@@ -306,7 +309,7 @@ The code level names the classes that carry each component; the tables above giv
 | | `OutputGuardStep` (`output_guard`) | `pkpipe.steps.output_guard` |
 | | `SessionPlanStep` (`session_plan`) | `pkpipe.steps.session_plan` |
 | Code functions (`@register_code`) | triage, context, improvement, learning, security, category | `pkpipe.steps.triage_code`, `context_code`, `improvement_code`, `learning_code`, `security_code`, `session_plan` |
-| Ports | `ModelPort`, `ToolPort`, `NotifyPort`, `ClassifierPort`, `SecurityLogPort`, `ContextStorePort`, `RunStorePort`, `TracerPort`, `SpanPort`, `ClockPort`, `SystemProbePort`, `StatePort`, `ConfigPort` | `pkpipe.ports.ports` |
+| Ports | `ModelPort`, `ToolPort`, `NotifyPort`, `ClassifierPort`, `SecurityLogPort`, `ContextStorePort`, `SnapshotPort`, `RunStorePort`, `TracerPort`, `SpanPort`, `ClockPort`, `SystemProbePort`, `StatePort`, `ConfigPort` | `pkpipe.ports.ports` |
 | web-fetch | `SecureFetcher`, `FilteringProxy`, `LightpandaBrowser`, `ChromiumBrowser`, `Browser` | `pkpipe.webfetch.service`, `.proxy`, `.browsers` |
 | learning-gateway | `LearningGateway`, `JobStore`, `LearningBackend`, `OpenNotebookBackend`, `NotebookLMBrowserBackend`, `FakeBackend`, `check_url` | `pkpipe.learning.gateway`, `.store`, `.backend`, `.backends`, `.urlcheck` |
 | obsidian-vault | `Vault`, `VaultPolicy`, `TableFile`, `TriageRow`, `ProcessingListRow` | `pkpipe.obsidian.vault`, `.policy`, `.tables`, `.models` |

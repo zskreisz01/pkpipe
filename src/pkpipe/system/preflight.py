@@ -39,27 +39,41 @@ class Preflight:
 
 
 def model_targets(
-    snapshot: Any, environ: Mapping[str, str] | None = None
+    snapshot: Any,
+    environ: Mapping[str, str] | None = None,
+    *,
+    judge: str = "on",
+    vision: bool = False,
 ) -> tuple[str | None, tuple[str, ...]]:
     """The LLM server URL (``default`` profile) and the models a run needs on it: the model under test and,
-    when it is served by the same server, the eval judge (``evals.judge_profile``)."""
+    when it is served by the same server, the eval judge (``evals.judge_profile``). ``judge="off"`` needs no
+    judge, ``judge="only"`` only the judge (the subject answers from a cassette, spec 021); ``vision`` adds
+    the model of the ``vision`` profile (the ``images`` suite)."""
     from pkpipe.adapters.model_openai import ProfileError, resolve_profile
     from pkpipe.engine.config_models import EvalsConfig, ModelsConfig
 
     env = os.environ if environ is None else environ
     models = ModelsConfig.model_validate(snapshot.data.get("models") or {})
-    judge = EvalsConfig.model_validate(snapshot.data.get("evals") or {}).judge_profile
+    judge_profile = EvalsConfig.model_validate(snapshot.data.get("evals") or {}).judge_profile
     try:
         default = resolve_profile("default", models, env)
     except ProfileError:
         return None, ()
-    names = [default.model]
-    try:
-        j = resolve_profile(judge, models, env)
-        if j.base_url == default.base_url:
-            names.append(j.model)
-    except ProfileError:
-        pass
+    names = [] if judge == "only" else [default.model]
+    if vision:
+        try:
+            v = resolve_profile("vision", models, env)
+            if v.base_url == default.base_url and judge != "only":
+                names.append(v.model)
+        except ProfileError:
+            pass
+    if judge != "off":
+        try:
+            j = resolve_profile(judge_profile, models, env)
+            if j.base_url == default.base_url:
+                names.append(j.model)
+        except ProfileError:
+            pass
     return default.base_url, tuple(dict.fromkeys(names))
 
 
