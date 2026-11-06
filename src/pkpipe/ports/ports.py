@@ -139,7 +139,7 @@ class ImageStorePort(Protocol):
 
 @runtime_checkable
 class ProposalAttemptsPort(Protocol):
-    """Failed evaluations of new-category proposals (spec 022 FR-014), in the app DB.
+    """Failed evaluations of new-category proposals (spec 022 FR-009), in the app DB.
 
     Counted per item and requested category name: ``get`` is 0 for another name (the owner changed the
     override), ``bump`` adds one failed evaluation and returns the new count, ``clear`` forgets the item

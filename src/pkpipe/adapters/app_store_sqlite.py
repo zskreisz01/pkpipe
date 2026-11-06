@@ -267,7 +267,7 @@ class AppStore:
             ).fetchall()
         return [float(r["seconds"]) for r in rows]
 
-    # -- new-category proposals (spec 022 FR-014): ProposalAttemptsPort -------------------------------
+    # -- new-category proposals (spec 022 FR-009): ProposalAttemptsPort -------------------------------
     def get(self, item_id: str, requested: str) -> int:
         with self._conn() as c:
             row = c.execute(

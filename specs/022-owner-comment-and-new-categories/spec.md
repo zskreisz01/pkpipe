@@ -34,6 +34,8 @@ updated: 2026-11-06
 
 7. **Status: Completed (2026-11-06).** Gate 2: tasks done, suite green, docs and BPMN (drawio, PNG, Mermaid) updated. Decisions taken while implementing: the triage table always has the full header (a note-only file is no longer byte-identical after the first write: the owner needs the `comment` column), the UI override form stays strict (a configured category), `awaiting_category` rows are skipped by the release until the override names a configured category, the evening message notifies only for a **new** proposal, and a failed evaluation leaves the item as it was so the next 06:00 run retries.
 
+8. **Retry cap (2026-11-06, owner decision).** Clarification 7 let a failed evaluation retry at every 06:00 run without end. It is now capped at 3 failed evaluations per item and requested name, counted in the app DB (not in the vault: the triage table keeps its columns). After the cap the item is `pending`, listed as given up in the evening message (it notifies and counts as waiting for the owner) with the advice to change the override or add the category by hand. Changing the override to another name resets the count; a successful proposal clears it.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - The owner writes comments that stay (Priority: P1)
@@ -59,7 +61,6 @@ updated: 2026-11-06
 4. **Given** an injection in the item, **Then** the guard flags it and the item is quarantined, no note is written
 5. **Given** open proposals, **Then** the 20:00 backlog says "N item(s) propose a new category: children, ..." and the 06:00 summary counts them
 
-8. **Retry cap (2026-11-06, owner decision).** Clarification 7 let a failed evaluation retry at every 06:00 run without end. It is now capped at 3 failed evaluations per item and requested name, counted in the app DB (not in the vault: the triage table keeps its columns). After the cap the item is `pending`, listed as given up in the evening message (it notifies and counts as waiting for the owner) with the advice to change the override or add the category by hand. Changing the override to another name resets the count; a successful proposal clears it.
 
 ## Requirements *(mandatory)*
 

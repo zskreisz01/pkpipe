@@ -64,7 +64,7 @@ def _attempts(ctx: StepContext, item_id: str, requested: str) -> int:
 
 @register_code("category.proposal_failed")
 def proposal_failed(ctx: StepContext) -> StepResult:
-    """BPMN: Propose new category, evaluation failed (spec 022 FR-014). The item keeps its state; the
+    """BPMN: Propose new category, evaluation failed (spec 022 FR-009). The item keeps its state; the
     failed evaluation is counted per item and requested name, and :func:`release_items` stops proposing
     after :data:`~pkpipe.domain.triage.MAX_PROPOSAL_ATTEMPTS` of them."""
     item = ctx.item or {}
@@ -317,7 +317,7 @@ def backlog(
         if override and state in (ItemState.SUGGESTED, ItemState.PENDING, ItemState.AWAITING_CATEGORY):
             kind, found = resolve_category(override, cats)
             if kind == "new" and _attempts(ctx, str(r.get("item_id")), found or "") >= MAX_PROPOSAL_ATTEMPTS:
-                gave_up += 1  # the evaluation failed repeatedly: the owner has to act (spec 022 FR-014)
+                gave_up += 1  # the evaluation failed repeatedly: the owner has to act (spec 022 FR-009)
                 if found not in gave_up_names:
                     gave_up_names.append(found or "")
                 continue
