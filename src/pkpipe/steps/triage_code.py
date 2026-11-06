@@ -314,9 +314,9 @@ def backlog(
     if proposed_rows:
         shown = ", ".join(proposed_names[:5]) + (", ..." if len(proposed_names) > 5 else "")
         message += (
-            f" {proposed_rows} item(s) propose a new category: {shown}. A proposal note with a "
-            f"categories.json draft is in {layout_of(ctx).proposals_dir}; add the category through a "
-            "config draft and the item is released."
+            f" {proposed_rows} item(s) propose a new category: {shown}. The next release run (06:00) "
+            f"writes a proposal note with a categories.json draft below {layout_of(ctx).proposals_dir}; "
+            "add the category through a config draft and the item is released."
         )
     if invalid:
         message += (
