@@ -1,1 +1,2 @@
-{{ message }}
+{% if title %}**{{ title }}**
+{% endif %}{{ message }}

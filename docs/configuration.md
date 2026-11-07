@@ -121,6 +121,22 @@ With `inbox_list_file` set, triage reads that file instead of the notes of `inbo
 
 After an item is processed, its entries (duplicates included) are removed from the list file by the vault tool `inbox_remove_entries` and appended to the dated archive file; entries are matched by their text, never by line number, and every other byte of the list stays. Quarantined and failed items stay in the list.
 
+### The run report and the journal todo block (`report.json`)
+
+```json
+{"enabled": true, "tool_category": "tool", "journal_todos": {"enabled": false, "heading": "## pkpipe todo"}}
+```
+
+After every triage and release run the pipeline sends one report as the `daily_summary` notification (see [Flows](flows.md)); `enabled: false` returns to the earlier one-line messages. `tool_category` names the category whose evaluation notes count as the todo "Read tool evaluations": a note counts until its front matter has `reviewed: true`.
+
+`journal_todos` writes the todo lines of the report into the daily journal (`layout.journal_pattern`): `- 2026-11-07 - Review triage decisions - 14 items - [triage UI](http://...)`, one line per open todo, replaced as a whole by every run of the day (the 20:00 run writes today's journal, the 06:00 run the new day's). It needs two things: `enabled: true` here, and a grant in the vault policy file, because the journal is the most sensitive note of the vault and the tool is off by default:
+
+```json
+{"allow": {"write_journal_todos": ["DailyJournals"]}}
+```
+
+`pkpipe validate` reports a grant that does not cover the journal pattern. The block sits between `<!-- pkpipe-todo:begin -->` and `<!-- pkpipe-todo:end -->` below the heading; text outside is never read back or changed (a note without the markers gets the heading and the block at its end, below an identical heading when there is one; a note that does not exist is created with `type: journal`). Add the heading to your daily note template if you want the section in a fixed place. The tool writes only for today and yesterday.
+
 ## Notifications
 `channels.json` defines channels and routes events to them; `NotifyPort.send(event, payload)` delivers to every channel routed for the event (a `notify` step, or `channels` to override the route). Every delivery is a `notify.send` span with `notify.event`, `notify.channel`, `notify.channel_type` and the flow, step and item attributes of the sending step. One failing channel never stops the others; the failure sets that span to error status and is listed in the step output.
 
@@ -146,6 +162,8 @@ After an item is processed, its entries (duplicates included) are removed from t
 | `log` | Writes to the log (development) | none |
 
 Webhook and Apprise URLs contain secrets, so the config accepts only `env:NAME` references; they are resolved when sending, never logged, and the notifier's HTTP client is excluded from httpx auto-instrumentation so tokens do not reach traces. Redirects are not followed.
+
+**Run report (spec 024).** The `daily_summary` event carries the run report of both flows: the Markdown `message` (its first line is the run line, the template adds the `title` such as "Triage run" or "Release run"), and the payload `title`, `awaiting`, `pending`, `todos`, `new`, `processed`, `quarantined`, `failed`, `evaluations`, `notebooks`, `podcasts`. Routes for `daily_summary` therefore also deliver the report after the 20:00 triage; the `triage_ready` route is only used when `report.enabled` is false.
 
 **Templates** are Jinja2 files `templates/<event>.<channel type>.md|json` in the pack or overlay (an overlay file replaces the pack file). The step payload is the template context: `message` plus the step's `payload` keys. A `.json` template is the channel-native body and must write values as `{{ value | tojson }}`. Without a template the `message` is sent; a broken template falls back to plain text with a span event. Text beyond the channel limit (Discord 2000, others 4000 characters) is truncated and ends with `ui_url`. The pack ships `triage_ready`, `daily_summary`, `security_flag` and `weekly_review` for Discord, Teams and Apprise.
 

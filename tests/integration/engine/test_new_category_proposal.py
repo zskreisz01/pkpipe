@@ -107,7 +107,7 @@ def test_the_evening_message_names_the_proposed_category_and_does_not_nag_every_
     assert (
         quiet.ok and quiet.outputs["backlog"]["proposed"] == 1 and quiet.outputs["backlog"]["notify"] is False
     )
-    assert len(world.notify.sent) == sent  # an unchanged awaiting item sends no evening mail
+    assert len(world.notify.sent) == sent + 1  # spec 024: the report goes out after every run
 
 
 def test_an_injection_in_the_item_quarantines_it_and_no_proposal_is_written(synthetic_vault, pack_dir):

@@ -13,12 +13,14 @@ The owner decides in the web UI (spec 023), the primary surface: image thumbnail
 
 With an `inbox_list_file` in the layout the INBOX is one list: Parse INBOX list turns every bullet entry (link, image embed, text with a link, plain text) into one item, identified by its normalised resource; image entries are described by Describe Images (spec 021) and then categorized like text items. After the item is processed, Remove processed entry from INBOX list moves its entries into the dated archive file and leaves the rest of the list as it was.
 
+After every run, the 20:00 triage and the 06:00 release, the sub-process Send run report (spec 024) builds one report from counts, category ids, run ids and note links only (never item text or a URL from the INBOX): what the run did (new suggestions, or items processed per category), what it created (evaluations, notebooks, podcasts), what waits for the owner in the triage, and the todos with counts: triage decisions to review, notebook materials and podcasts still to process, tool evaluations to read. It is sent as the `daily_summary` notification (Discord, Teams, Apprise); a failure of the report never fails the run. With `report.journal_todos` on and the vault policy granting the journal folder, the same todo lines (`date - todo - item count - link`) are written into the day's daily journal between two comment markers below a configurable heading; nothing else of the journal is read or changed, and the journal block is deliberately outside the vault snapshots.
+
 ![Process Inbox Items](../img/bpmn/process-inbox-items.png)
 
 ```mermaid
 flowchart LR
     inb[(INBOX notes or list file)] -.-> read
-    s((20:00)) --> read[Read new INBOX items<br/>vault port, code<br/>notes, or Parse INBOX list] --> cat[Categorize each text item<br/>isolated session, no tools, run canary<br/>+ output guard] --> di[[Describe images<br/>after the text items, time budget]] --> ntf[Notify: triage ready] --> par{{+}}
+    s((20:00)) --> read[Read new INBOX items<br/>vault port, code<br/>notes, or Parse INBOX list] --> cat[Categorize each text item<br/>isolated session, no tools, run canary<br/>+ output guard] --> di[[Describe images<br/>after the text items, time budget]] --> ntf[Send run report<br/>new suggestions, awaiting, todos with counts<br/>todo block in the daily journal] --> par{{+}}
     cat -. security flag .-> tq[[Handle security flag]] --> tqe((Quarantined))
     par --> tm((06:00)) --> sel[Select confirmed /<br/>overridden items]
     sel -- unknown override --> pn[Propose new category<br/>misc evaluation, proposal note with<br/>categories.json draft, max 3 tries] --> pe((Awaiting category,<br/>nothing filed))
@@ -33,6 +35,6 @@ flowchart LR
         cl -. security flag .-> hq[[Handle security flag]]
         co -. security flag .-> hq
     end
-    mi --> rm[Remove processed entry from INBOX list<br/>entry moves to the dated archive; failed and quarantined items stay; a missing entry is reported as not_found] --> sum[Notify: daily summary] --> e((Done))
+    mi --> rm[Remove processed entry from INBOX list<br/>entry moves to the dated archive; failed and quarantined items stay; a missing entry is reported as not_found] --> sum[Send run report<br/>processed per category, created evaluations / notebooks / podcasts, todos with counts<br/>todo block in the daily journal] --> e((Done))
     sum --> wk[Owner: work through processing list] --> qr[Owner: review quarantine]
 ```

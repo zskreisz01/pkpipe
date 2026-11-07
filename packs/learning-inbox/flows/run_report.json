@@ -1,0 +1,120 @@
+{
+  "id": "run_report",
+  "description": "Spec 024: the report after every triage and release run. Reads the triage table as it is now and counts the tool evaluation notes the owner has not marked reviewed (read-only vault tools), builds ONE report from counts, category ids and note links (code, no model; no item text or URL), sets the todo block of today's daily journal when report.journal_todos is on (the vault tool writes only between its two markers) and sends the report as the daily_summary notification. A failing journal write or count never stops the report; the calling flow ignores a failure of this subflow.",
+  "bpmn": "process-inbox-items",
+  "start": "triage_now",
+  "nodes": [
+    {
+      "id": "triage_now",
+      "type": "tool",
+      "bpmn_element": "Send run report",
+      "config": {
+        "tool": "obsidian:read_triage"
+      }
+    },
+    {
+      "id": "tool_notes",
+      "type": "tool",
+      "bpmn_element": "Send run report",
+      "config": {
+        "tool": "obsidian:unreviewed_notes",
+        "arguments": {
+          "folder": "${item.tool_folder}",
+          "category": "${item.tool_category}"
+        }
+      }
+    },
+    {
+      "id": "report",
+      "type": "code",
+      "bpmn_element": "Send run report",
+      "config": {
+        "function": "report.run_summary",
+        "args": {
+          "triage": "${triage_now}"
+        }
+      }
+    },
+    {
+      "id": "journal",
+      "type": "tool",
+      "bpmn_element": "Send run report",
+      "config": {
+        "tool": "obsidian:write_journal_todos",
+        "arguments": {
+          "day": "${report.date}",
+          "lines": "${report.lines}",
+          "heading": "${report.heading}"
+        }
+      }
+    },
+    {
+      "id": "notify",
+      "type": "notify",
+      "bpmn_element": "Send run report",
+      "config": {
+        "event": "daily_summary",
+        "message": "${report.text}",
+        "payload": {
+          "title": "${report.title}",
+          "awaiting": "${report.awaiting}",
+          "pending": "${report.awaiting}",
+          "todos": "${report.todos}",
+          "new": "${report.new}",
+          "processed": "${report.processed}",
+          "quarantined": "${report.quarantined}",
+          "failed": "${report.failed}",
+          "evaluations": "${report.evaluations}",
+          "notebooks": "${report.notebooks}",
+          "podcasts": "${report.podcasts}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "triage_now",
+      "to": "tool_notes",
+      "when": {
+        "path": "item.tool_folder",
+        "exists": true
+      }
+    },
+    {
+      "from": "triage_now",
+      "to": "report",
+      "default": true
+    },
+    {
+      "from": "tool_notes",
+      "to": "report"
+    },
+    {
+      "from": "tool_notes",
+      "to": "report",
+      "on": "error"
+    },
+    {
+      "from": "report",
+      "to": "journal",
+      "when": {
+        "path": "report.write_journal",
+        "truthy": true
+      }
+    },
+    {
+      "from": "report",
+      "to": "notify",
+      "default": true
+    },
+    {
+      "from": "journal",
+      "to": "notify"
+    },
+    {
+      "from": "journal",
+      "to": "notify",
+      "on": "error"
+    }
+  ]
+}

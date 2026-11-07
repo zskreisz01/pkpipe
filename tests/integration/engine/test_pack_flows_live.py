@@ -77,4 +77,4 @@ def test_live_triage_then_process_released_with_the_local_model(
         "run_sessions.synthesize",
     } <= steps
     assert "run_sessions.fit_personal" not in steps  # no context pack: skipped
-    assert notify.sent and notify.sent[-1].message.startswith("Processed ")
+    assert notify.sent and "**Processed (" in notify.sent[-1].message

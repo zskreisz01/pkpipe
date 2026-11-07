@@ -101,6 +101,16 @@ Vault snapshots (spec 019) hold copies of the notes a writing run can change. Th
 
 The enterprise pack is the only text derived from client work that later sessions see, so code decides what it may contain, not the model: the names the notes declare (front matter, labelled lines, titles), the names the local session reports and the owner's blocked terms are replaced in the generated text and checked with the query guard's matching; a line that still names one is dropped, and a summary that trips the injection heuristics is not written. The same names, in every form, go to the query guard's terms file, so a web query that names a client or project is refused before it leaves the machine. The leak eval (`context_leak.jsonl`, gate 0 leaks) measures this on synthetic notes with the same code. A name that is only in the prose and that the session neither hides nor reports cannot be known to code; the eval measures how often that happens (`names_known_rate`), and the owner reviews the diff of every refresh (the review note and the notification never contain a name).
 
+## The journal todo block (spec 024)
+
+The journal is the most sensitive note of the vault (private data below), so the one thing the pipeline writes into it is small and mechanical:
+
+- `write_journal_todos` is a vault tool that is **off** unless the vault policy file grants the journal folder (`allow.write_journal_todos`); `pkpipe validate` checks the grant against the journal pattern.
+- It replaces only the text between the two `pkpipe-todo` markers below a heading and changes no other byte; damaged or duplicated markers stop the write instead of being repaired. The path comes from the layout and a date (today or yesterday), never from an argument.
+- It never reads the journal out: its answer is the path, a line count and whether the note was created. No model sees the journal in this flow: the lines are built by code from counts and links (the report contains no item text and no URL from the INBOX), and the tool's spans carry no text.
+- Lines are plain one-line `- ...` text: no line breaks, no HTML comments, so a line cannot close the block or add markup. Note names in links are reduced to plain characters; a name that is not plain is dropped.
+- The block is outside every vault snapshot (the journal folder is never copied); each run regenerates it.
+
 ## UI and app MCP access
 
 The config UI and the app MCP server (spec 014) can publish config and release triage items, so they are guarded like a local admin console:

@@ -344,6 +344,7 @@ def backlog(
         message = f"Triage ready: {new} new item(s) to confirm or override in {triage_file}."
     else:
         message = f"Triage: no new items in {triage_file}."
+    first_sentence = message
     owner_new = sum(1 for r in new_rows or [] if r.get("needs_owner") and r["item_id"] in fresh)
     if owner_new:
         message += f" {owner_new} image item(s) need a category from you (write it into override)."
@@ -373,6 +374,9 @@ def backlog(
         )
     return {
         "new": new,
+        # the sentences after the first one (image items, deferred images, proposals, invalid decisions,
+        # quarantine): plain counts, slugs and paths. The run report (spec 024) keeps them as its notes
+        "attention": message[len(first_sentence) :].strip(),
         "quarantined": len(quarantined),
         "backlog": older,
         "invalid": invalid,

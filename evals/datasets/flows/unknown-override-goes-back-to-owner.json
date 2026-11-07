@@ -55,9 +55,9 @@
       "0-INBOX/cli-tool.md": null
     },
     "notify_contains": [
-      "Triage ready: 1 new item(s)",
-      "1 item(s) still pending",
-      "Triage: no new items",
+      "New suggestions (1)",
+      "Waiting for you:** 1 decision(s)",
+      "New suggestions (0)",
       "1 item(s) name a category that is no longer configured"
     ]
   }

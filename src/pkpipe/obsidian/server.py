@@ -116,6 +116,19 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         return _run(vault.read_image, name)
 
     @mcp.tool
+    def unreviewed_notes(folder: str, category: str) -> dict:
+        """Count the notes the pipeline wrote for a category below a folder that the owner has not marked
+        `reviewed: true` in the front matter; returns `{count, newest}` (a path). No text is returned."""
+        return _run(vault.unreviewed_notes, folder, category)
+
+    @mcp.tool
+    def write_journal_todos(day: str, lines: list[str], heading: str = "## pkpipe todo") -> dict:
+        """Set the pkpipe todo block (between the pkpipe-todo markers, below the heading) of the daily
+        journal of today or yesterday. Replaces only that block, never reads the journal out, refused unless
+        the policy grants the journal folder. Returns `{path, lines, created}`."""
+        return _run(vault.write_journal_todos, day, lines, heading)
+
+    @mcp.tool
     def quarantine_note(
         item_id: str,
         path: str | None = None,

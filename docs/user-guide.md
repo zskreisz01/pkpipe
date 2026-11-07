@@ -18,7 +18,7 @@ flowchart LR
 1. **Capture** anything you want to look at later into your INBOX: a link, a note, a thought, an image. In the default setup the INBOX is a folder of notes in your Obsidian vault (one note per item); a vault can also keep one list file whose bullet entries are the items (`inbox_list_file`).
 2. **20:00, triage.** pkpipe reads the new items and, for each, a local model *suggests* a category (`tool`, `marketing`, `learning-material`, `misc`, or any category you added). Images are described by a local vision model first (see [Images](#images-and-the-two-hour-budget)). Everything is written into the **triage table**, and you get a notification: "Triage ready: N new item(s)".
 3. **You decide.** Open the web UI (`/triage`) and, per item, confirm the suggestion, pick another category, propose a new one, or add a comment. Items you leave alone stay *pending*: nothing happens to them.
-4. **06:00, processing.** pkpipe releases only the items you confirmed or overrode and processes each one: it fetches and checks the page, runs the sessions of the category, writes a note into the right PARA folder, and updates your processing list. You get a daily summary.
+4. **06:00, processing.** pkpipe releases only the items you confirmed or overrode and processes each one: it fetches and checks the page, runs the sessions of the category, writes a note into the right PARA folder, and updates your processing list. You get the run report (see [The run report and your todos](#the-run-report-and-your-todos)).
 5. **Read the results** in your vault (the note, the notebook, the tool evaluation) and the processing list.
 
 If you skip step 3 nothing is lost: pending items come back in every triage notification ("N older item(s) still wait for your decision").
@@ -105,6 +105,19 @@ If the evaluation fails (for example the model is down), the next 06:00 run trie
 To switch: set `triage.json` `surface`, add `ui.json` `public_url` (for `web`), mirror `triage_surface` and `ui_public_url` in the vault policy file, run `pkpipe validate --vault-policy <file>`, and restart `pkpipe serve` and the vault server. The **next triage run** moves the table, lossless, in either direction: every row and cell is moved as text (checkboxes, image embeds, comments, odd header variants); it is idempotent, the vault snapshot of the run is taken first (`pkpipe restore` undoes it), and the log names the plan (direction, number of rows) before anything is moved. Until then the UI keeps working on the file that still holds the table. Going back to `vault` leaves a short note in the data file; nothing is deleted.
 
 If you use the `vault` surface and edit the file in Obsidian while a UI action writes it, writes are atomic and locked: a change made in Obsidian in between is detected and the write is retried on the fresh file, so neither side overwrites the other. A sync conflict copy of the file (`... (conflict).md`) is never read or merged; the UI points it out.
+
+## The run report and your todos
+
+After **every** run, the 20:00 triage and the 06:00 processing, pkpipe sends one report to your notification channel (Discord, Teams or any Apprise service; the `daily_summary` route):
+
+- what the run did: the new suggestions per category after triage, or the items processed per category after processing, with quarantined and failed counts;
+- what it created: evaluations (notes of the category sessions), notebooks and podcasts;
+- what waits for you in the triage;
+- your **todos with counts**: *Review triage decisions* (items you still have to confirm or override), *Process notebook materials and podcasts* (learning items you decided that the next 06:00 run turns into a notebook and a podcast), *Read tool evaluations* (evaluation notes of the `tool` category you have not marked as read). A todo with a zero count is left out.
+
+The report only contains counts, category ids, run ids and links to your own notes, never the text or the URL of an item. To mark a tool evaluation as read, add `reviewed: true` to the note's front matter; the todo drops it at the next run.
+
+**Todos in your daily journal.** With `report.journal_todos.enabled` in your overlay (and the vault policy granting the journal folder to `write_journal_todos`, see [Configuration](configuration.md)), the same todos are written into the day's journal under the heading `## pkpipe todo`, one line each: `- 2026-11-07 - Review triage decisions - 14 items - [triage UI](http://...)`. pkpipe only ever replaces the block between its two comment markers; the rest of the journal is never read or changed, and a later run on the same day replaces the lines instead of adding them. You can put the heading and the two markers into your daily note template to decide where the section sits. With `report.enabled: false` you get the earlier short messages instead.
 
 ## Restore and snapshots
 

@@ -120,4 +120,4 @@ def test_the_evening_message_points_to_the_web_ui_on_the_web_surface(old_page, p
     assert w.svc.start("triage").ok
     messages = [s.payload for s in w.notify.sent] + [getattr(s, "message", "") for s in w.notify.sent]
     text = repr(messages)
-    assert "the web UI" in text and PAGE not in text.replace("\\\\", "")
+    assert "triage UI" in text and PAGE not in text.replace("\\\\", "")

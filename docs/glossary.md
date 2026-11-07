@@ -21,4 +21,6 @@ title: Glossary
 | Quarantine | Inert storage of flagged content plus URL log and deny-list |
 | Learning gateway | MCP server hiding the learning backend (Open Notebook, NotebookLM, fake) |
 | Eval gate | Required green eval before a change is published |
+| Run report | The summary the pipeline sends after every triage and release run (counts, created evaluations / notebooks / podcasts, todos); spec 024 |
+| Todo block | The generated lines between the `pkpipe-todo` markers in the daily journal: `date - todo - item count - link` |
 | Owner | The single user of a pkpipe installation |

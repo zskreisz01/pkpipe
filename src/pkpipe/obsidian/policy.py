@@ -35,6 +35,8 @@ TOOLS = (
     "quarantine_note",
     "inbox_remove_entries",
     "read_image",
+    "unreviewed_notes",
+    "write_journal_todos",
 )
 #: ``read_image`` size limit (spec 021 FR-004); a policy file may lower or raise it.
 DEFAULT_MAX_IMAGE_BYTES = 10 * 1024 * 1024

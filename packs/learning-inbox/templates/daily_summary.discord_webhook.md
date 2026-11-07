@@ -1,2 +1,2 @@
-**Daily summary**
+**{{ title | default("Daily summary") }}**
 {{ message }}
