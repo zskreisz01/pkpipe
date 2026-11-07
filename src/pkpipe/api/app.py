@@ -7,10 +7,13 @@ CSRF/Origin for cookie requests, security headers). The routes are thin: the rul
 
 from __future__ import annotations
 
+import json
+import os
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
@@ -19,6 +22,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from pkpipe.adapters.app_store_sqlite import RevisionConflict
+from pkpipe.api import forms
 from pkpipe.api.security import (
     SESSION_COOKIE,
     GuardMiddleware,
@@ -74,6 +78,13 @@ class DecisionRequest(BaseModel):
 
 class CommentRequest(BaseModel):
     comment: str = ""
+
+
+class RetryRequest(BaseModel):
+    """The bulk retry of failed items needs the explicit ``confirm`` (spec 027)."""
+
+    confirm: bool = False
+    item_ids: list[str] | None = None
 
 
 class BulkConfirmRequest(BaseModel):
@@ -236,6 +247,20 @@ def create_app(
     def api_release(item_id: str):
         return services.release_quarantine(item_id, actor="ui")
 
+    @app.get("/api/triage/failed")
+    def api_failed():
+        return services.failed_summary()
+
+    @app.post("/api/triage/retry-failed")
+    def api_retry_failed(body: RetryRequest):
+        if not body.confirm:
+            raise Refused("retrying every failed item needs confirm: true")
+        return services.retry_failed(actor="ui", item_ids=body.item_ids)
+
+    @app.post("/api/triage/{item_id}/retry")
+    def api_retry(item_id: str):
+        return services.retry_item(item_id, actor="ui")
+
     # -- JSON API: config drafts and publishes --------------------------------------------------------------
     @app.get("/api/config/files")
     def api_files():
@@ -355,7 +380,12 @@ def create_app(
 
     @app.get("/triage", response_class=HTMLResponse)
     def ui_triage(
-        request: Request, state: str = "", category: str = "", needs_owner: str = "", bulk: str = ""
+        request: Request,
+        state: str = "",
+        category: str = "",
+        needs_owner: str = "",
+        bulk: str = "",
+        retried: str = "",
     ):
         filters = triage_filters(state, category, needs_owner)
         try:
@@ -366,10 +396,12 @@ def create_app(
             request,
             "triage.html",
             categories=sorted(services.categories()),
+            failed=services.failed_summary() if info else {},
             states=[s.value for s in ItemState],
             filters={"state": state, "category": category, "needs_owner": needs_owner},
             info=info,
             bulk=bulk,
+            retried=retried,
             **triage_ctx(**filters),
         )
 
@@ -411,6 +443,21 @@ def create_app(
         )
         return Response(status_code=200, headers={"HX-Redirect": f"/triage?{query}"})
 
+    @app.post("/ui/triage/retry-failed", response_class=HTMLResponse)
+    def ui_retry_failed(request: Request, confirm: str = Form("")):
+        if confirm != "yes":
+            raise Refused("retrying every failed item needs the confirm step")
+        result = services.retry_failed(actor="ui")
+        from urllib.parse import urlencode
+
+        note = f"{result['retried']} failed item(s) go through the next release run"
+        if result["capped"]:
+            note += f", {result['capped']} reached the retry limit"
+        return Response(
+            status_code=200,
+            headers={"HX-Redirect": "/triage?" + urlencode({"state": "released", "retried": note})},
+        )
+
     @app.get("/ui/triage/{item_id}/image")
     def ui_triage_image(item_id: str):
         return image_response(services.item_image(item_id))
@@ -436,6 +483,15 @@ def create_app(
     def ui_comment(request: Request, item_id: str, comment: str = Form("")):
         return triage_action(
             request, item_id, lambda: services.comment_item(item_id, comment, actor="ui"), "comment saved"
+        )
+
+    @app.post("/ui/triage/{item_id}/retry", response_class=HTMLResponse)
+    def ui_retry(request: Request, item_id: str):
+        return triage_action(
+            request,
+            item_id,
+            lambda: services.retry_item(item_id, actor="ui"),
+            "released again for the next run",
         )
 
     @app.post("/ui/triage/{item_id}/release", response_class=HTMLResponse)
@@ -500,6 +556,7 @@ def create_app(
             publishes=services.store.list_publishes(),
             flows=services.flows(),
             result=None,
+            form_paths={f["path"] for f in services.workspace.list_files() if forms.stem_of(f["path"])},
         )
 
     @app.get("/config/edit", response_class=HTMLResponse)
@@ -510,7 +567,14 @@ def create_app(
         if draft and path in draft["files"] and draft["files"][path]["content"] is not None:
             content = draft["files"][path]["content"]
         return render(
-            request, "edit.html", info=info, content=content, draft=draft, message=None, error=False
+            request,
+            "edit.html",
+            info=info,
+            content=content,
+            draft=draft,
+            message=None,
+            error=False,
+            form_link=forms.stem_of(path) is not None,
         )
 
     @app.post("/ui/config/save", response_class=HTMLResponse)
@@ -558,6 +622,181 @@ def create_app(
         except (Refused, Conflict, RevisionConflict, WorkspaceError, NotFound) as exc:
             message, error = str(exc), True
         return draft_panel(request, draft_id, message=message, error=error)
+
+    # -- config forms (spec 026) ----------------------------------------------------------------------
+    def form_hints() -> dict[str, Any]:
+        data = services.runs.config().data
+        chan = data.get("channels") or {}
+        env_names = sorted(
+            {
+                v[4:]
+                for ch in (chan.get("channels") or {}).values()
+                for v in ([ch.get("url"), ch.get("token"), ch.get("channel_id")] + list(ch.get("urls") or []))
+                if isinstance(v, str) and forms.ENV_REF.match(v)
+            }
+        )
+        return {
+            "flows": services.flows(),
+            "categories": sorted(services.categories()),
+            "channels": sorted((chan.get("channels") or {}).keys()),
+            "events": sorted(set(forms.KNOWN_EVENTS) | set((chan.get("routes") or {}).keys())),
+            "env": env_names,
+        }
+
+    def asset_links(root: forms.Node) -> dict[str, str]:
+        """Field name -> editable text file for the ``instruction`` / ``system`` / ``context`` properties."""
+        existing = {f["path"] for f in services.workspace.list_files()}
+        links: dict[str, str] = {}
+
+        def walk(n: forms.Node) -> None:
+            prop = n.name.rsplit(".", 1)[-1]
+            if n.widget == "asset" and isinstance(n.value, str) and n.value:
+                rel = forms.asset_path(prop, n.value)
+                if rel in existing:
+                    links[n.name] = rel
+            for c in n.children:
+                walk(c)
+
+        walk(root)
+        return links
+
+    def form_context(
+        stem: str, data: Any, draft: dict, info: dict, errors: dict[str, str] | None = None, **extra: Any
+    ):
+        root = forms.build_form(stem, data)
+        if errors:
+            forms.apply_errors(root, errors)
+        return dict(
+            root=root,
+            hints=form_hints(),
+            env_status={n: bool(os.environ.get(n)) for n in form_hints()["env"]},
+            assets=asset_links(root),
+            draft=draft,
+            path=info["path"],
+            source=info["source"],
+            base_hash=draft["files"][info["path"]]["base_hash"]
+            if info["path"] in draft["files"]
+            else info["base_hash"],
+            message=extra.get("message"),
+            error=extra.get("error", False),
+            saved=extra.get("saved", False),
+            problems=extra.get("problems", []),
+        )
+
+    def current_data(path: str, draft: dict) -> tuple[dict, Any]:
+        info = services.workspace.read(path)
+        content = info["content"]
+        if path in draft["files"] and draft["files"][path]["content"] is not None:
+            content = draft["files"][path]["content"]
+        try:
+            return info, json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise Refused(
+                f"'{path}' is not valid JSON ({exc.msg}, line {exc.lineno}): fix it in the JSON view"
+            ) from None
+
+    @app.get("/config/form", response_class=HTMLResponse)
+    def ui_form(request: Request, path: str):
+        stem = forms.stem_of(path)
+        if stem is None:
+            return RedirectResponse(f"/config/edit?path={quote(path)}", status_code=303)
+        if not services.workspace.editable:
+            return render(request, "config_form.html", path=path, draft=None)
+        draft = services.open_draft()
+        try:
+            info, data = current_data(path, draft)
+        except (Refused, WorkspaceError) as exc:
+            return render(request, "config_form.html", 422, path=path, draft=None, error_text=str(exc))
+        return render(request, "config_form.html", **form_context(stem, data, draft, info))
+
+    async def posted(request: Request) -> tuple[dict[str, str], dict[str, str]]:
+        form = await request.form()
+        items = [(k, str(v)) for k, v in form.multi_items()]
+        meta = {k: v for k, v in items if not k.startswith(forms.PREFIX + ".") and k != forms.PREFIX}
+        return meta, forms.flat_of(items)
+
+    @app.post("/ui/config/form/action", response_class=HTMLResponse)
+    async def ui_form_action(request: Request):
+        meta, flat = await posted(request)
+        path, draft_id = meta.get("path", ""), meta.get("draft_id", "")
+        stem = forms.stem_of(path)
+        draft = services.store.get_draft(draft_id)
+        if stem is None or draft is None:
+            raise NotFound("unknown form or draft")
+        try:
+            flat = forms.apply_action(stem, flat, meta.get("act", ""))
+        except forms.FormError as exc:
+            raise Refused(str(exc)) from None
+        parsed = forms.parse_form(stem, flat)
+        info = services.workspace.read(path)
+        return render(request, "_form.html", **form_context(stem, parsed.data, draft, info))
+
+    @app.post("/ui/config/form/save", response_class=HTMLResponse)
+    async def ui_form_save(request: Request):
+        meta, flat = await posted(request)
+        path, draft_id = meta.get("path", ""), meta.get("draft_id", "")
+        stem = forms.stem_of(path)
+        draft = services.store.get_draft(draft_id)
+        if stem is None or draft is None:
+            raise NotFound("unknown form or draft")
+        info = services.workspace.read(path)
+        parsed = forms.parse_form(stem, flat)
+        errors = forms.validate_parsed(stem, parsed, base=services.workspace.pack_json(path))
+        if errors:
+            ctx = form_context(
+                stem,
+                parsed.data,
+                draft,
+                info,
+                errors,
+                message=f"{len(errors)} field(s) need attention",
+                error=True,
+            )
+            return render(request, "_form.html", **ctx)
+        value = parsed.data
+        if info["source"] == "pack" and path not in draft["files"]:
+            value = forms.minimize(stem, json.loads(info["content"]), value)
+            if value in ({}, []):
+                ctx = form_context(stem, parsed.data, draft, info, message="nothing changed", error=False)
+                return render(request, "_form.html", **ctx)
+        try:
+            services.edit_file(
+                draft_id,
+                path,
+                forms.dumps(value),
+                base_hash=meta.get("base_hash"),
+                rev=int(meta.get("rev", "0")),
+            )
+        except (Refused, Conflict, RevisionConflict, WorkspaceError, NotFound) as exc:
+            ctx = form_context(stem, parsed.data, draft, info, message=str(exc), error=True)
+            return render(request, "_form.html", **ctx)
+        saved = services.store.get_draft(draft_id)
+        if saved is None:
+            raise NotFound(f"unknown draft '{draft_id}'")
+        check = services.validate_draft(draft_id)
+        problems = [] if check["ok"] else [e for e in check["errors"]]
+        ctx = form_context(
+            stem,
+            parsed.data,
+            saved,
+            services.workspace.read(path),
+            message="saved to the draft"
+            if not problems
+            else "saved to the draft, but the draft is not valid yet",
+            error=bool(problems),
+            saved=True,
+            problems=problems,
+        )
+        return render(request, "_form.html", **ctx)
+
+    @app.get("/ui/config/cron-preview", response_class=HTMLResponse)
+    def ui_cron_preview(request: Request):
+        expr = next((v for k, v in request.query_params.items() if k.startswith(forms.PREFIX + ".")), "")
+        result = forms.cron_preview(expr)
+        if result["ok"]:
+            text = "next: " + "; ".join(result["times"])
+            return HTMLResponse(f'<span class="ok">{_esc(text)}</span>')
+        return HTMLResponse(f'<span class="err">{_esc(str(result["error"]))}</span>')
 
     def draft_panel(request: Request, draft_id: str, **extra: Any):
         draft = services.store.get_draft(draft_id)

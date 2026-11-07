@@ -16,7 +16,7 @@ Owner token (bearer) or login session; the agent token only reaches `/mcp` and `
 | --- | --- |
 | `GET /api/health` | liveness (no auth) |
 | `GET /api/flows`, `GET /api/runs`, `GET /api/runs/{id}`, `POST /api/runs {flow, inputs?}` | runs (202, background) |
-| `GET /api/triage`, `POST /api/triage/{id}/confirm`, `.../override {category}`, `.../release-quarantine` | owner decisions |
+| `GET /api/triage`, `POST /api/triage/{id}/confirm`, `.../override {category}`, `.../release-quarantine` | owner decisions; spec 027 adds `GET /api/triage/failed`, `POST /api/triage/{id}/retry` and `POST /api/triage/retry-failed` (see `specs/027-retry-failed-items/contracts/retry.md`) |
 | `GET /api/config/files`, `GET /api/config/file?path=` | editable files; effective text and overlay hash |
 | `POST /api/drafts`, `GET /api/drafts[/{id}]`, `DELETE /api/drafts/{id}` | drafts |
 | `PUT /api/drafts/{id}/files {path, content, base_hash?, rev?}` | save a file into the draft (409 on conflict) |
@@ -26,5 +26,5 @@ Owner token (bearer) or login session; the agent token only reaches `/mcp` and `
 | `GET /api/publishes`, `GET /api/publishes/{id}/diff`, `POST /api/publishes/{id}/rollback` | history, diff, rollback |
 | `GET /api/audit` | owner action log |
 
-Browser pages: `/`, `/triage`, `/runs`, `/runs/{id}`, `/config`, `/config/edit?path=`, `/publishes/{id}`,
-`/audit`, `/login`. HTMX fragments live under `/ui/...` and need the `X-CSRF-Token` header.
+Browser pages: `/`, `/triage`, `/runs`, `/runs/{id}`, `/config`, `/config/edit?path=`, `/config/form?path=` (schema-driven form, spec 026), `/publishes/{id}`,
+`/audit`, `/login`. HTMX fragments live under `/ui/...` and need the `X-CSRF-Token` header; spec 026 adds `/ui/config/form/save`, `/ui/config/form/action` and `/ui/config/cron-preview`.

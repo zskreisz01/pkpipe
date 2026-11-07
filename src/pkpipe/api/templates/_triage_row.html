@@ -16,6 +16,12 @@
     {% if r.proposal_note %}<div class="muted" data-testid="proposal-note">proposal note: <code>{{ r.proposal_note }}</code></div>{% endif %}
   </td>
   <td>
+    {% if r.failed %}
+      <div class="warn" data-testid="failed-result">processing failed{% if r.retries %} · retried {{ r.retries }}&times;{% endif %}</div>
+      {% if r.retryable %}
+      <button hx-post="/ui/triage/{{ r.item_id }}/retry" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML" data-testid="retry">Retry</button>
+      {% else %}<div class="muted" data-testid="retry-limit">retry limit reached: fix the cause or process it by hand</div>{% endif %}
+    {% endif %}
     {% if r.state == "quarantined" %}
       <button hx-post="/ui/triage/{{ r.item_id }}/release" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML">Release from quarantine</button>
     {% elif r.state in ("suggested", "pending", "released", "awaiting_category") %}

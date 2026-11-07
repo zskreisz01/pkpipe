@@ -203,7 +203,9 @@ class _Guarded:
 @register_code("category.plan")
 def plan(ctx: StepContext, note: dict[str, Any]) -> StepResult:
     """What ``other_resource`` runs for this item: ``status`` ``ok``, ``no_plan`` (no such category or no
-    sessions) or ``no_url`` (a session reads the page extract but the note names no URL). ``needs_fetch``
+    sessions), ``no_url`` (a session reads the page extract but the note names no URL) or
+    ``discover`` (the same,
+    and ``source_discovery`` searches for the source of this category, spec 025). ``needs_fetch``
     routes through secure fetch; the URL is kept on the item as ``source_url`` (never as ``resource``)."""
     category = categories_of(ctx).get((ctx.item or {}).get("category") or "")
     if category is None or not category.get("sessions"):
@@ -218,7 +220,10 @@ def plan(ctx: StepContext, note: dict[str, Any]) -> StepResult:
         "sessions": list(info.sessions),
     }
     if info.needs_fetch and not url:
-        out["status"] = "no_url"
+        # spec 025: a category that opted in searches for the source instead of failing the item
+        from pkpipe.steps.discovery_code import discovery_applies
+
+        out["status"] = "discover" if discovery_applies(ctx, category, ctx.item) else "no_url"
     return StepResult(output=out, item={"source_url": url} if url else None)
 
 

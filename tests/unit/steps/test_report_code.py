@@ -207,3 +207,21 @@ def test_a_good_report_section_validates():
         "journal_todos": {"enabled": True, "heading": "### My todo"},
     }
     assert validate_effective({"report": ok}) == []
+
+
+def test_only_processed_rows_with_a_failed_line_count_as_retryable():
+    """Spec 027: a quarantined or finished row never counts; ids and states only."""
+    from pkpipe.steps.report_code import failed_to_retry
+
+    rows = [
+        {"item_id": "a", "state": "processed"},
+        {"item_id": "b", "state": "quarantined"},
+        {"item_id": "c", "state": "processed"},
+        {"item_id": "d", "state": "released"},
+    ]
+    failed = {
+        "count": 3,
+        "items": [{"item_id": "a", "category": "tool"}, {"item_id": "b", "category": "tool"}],
+    }
+    assert failed_to_retry(rows, failed) == 1
+    assert failed_to_retry(rows, {}) == 0

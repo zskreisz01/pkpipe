@@ -129,3 +129,15 @@ def test_external_links_are_only_the_owners_own_http_address():
     )
     for bad in (None, "", "javascript:alert(1)", "http://x/ y", "http://x/)[evil](http://y", "http://x/<b>"):
         assert rr.external_link("l", bad) is None
+
+
+def test_the_retry_todo_comes_last_has_the_owners_line_format_and_is_omitted_at_zero():
+    """Spec 027 FR-007."""
+    todos = rr.build_todos(
+        1, 0, 0, {"retry": "[failed items](http://ui.example/triage?state=processed)"}, retry=2
+    )
+    assert [t.key for t in todos] == ["approval", "retry"]
+    assert todos[-1].line("2026-11-07") == (
+        "- 2026-11-07 - Retry failed items - 2 items - [failed items](http://ui.example/triage?state=processed)"
+    )
+    assert [t.key for t in rr.build_todos(0, 0, 0, {}, retry=0)] == []

@@ -1,0 +1,53 @@
+{
+  "id": "load_image_description",
+  "bpmn": "process-other-resource",
+  "data_classes": [
+    "image"
+  ],
+  "start": "prepare",
+  "description": "Spec 025: a released image item has no description in its run (the triage cycle described it earlier). Read and prepare the image again (code, same preparation as the triage), look the prepared bytes up in the description cache and hand the validated description to the item (the same checks as the triage: an address that fails the URL policy or a suspected injection is a security flag). A cache miss or a failed read leaves the item without a description; the model is never called here.",
+  "nodes": [
+    {
+      "id": "prepare",
+      "type": "code",
+      "bpmn_element": "Load image description from the cache (image items; no model call)",
+      "config": {
+        "function": "image.prepare",
+        "args": {
+          "session": "describe_image_item.describe"
+        }
+      }
+    },
+    {
+      "id": "finish",
+      "type": "code",
+      "bpmn_element": "Load image description from the cache (image items; no model call)",
+      "config": {
+        "function": "image.finish",
+        "args": {
+          "describe": "describe",
+          "prepare": "prepare"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "prepare",
+      "to": "finish",
+      "when": {
+        "path": "prepare.cached",
+        "truthy": true
+      }
+    },
+    {
+      "from": "prepare",
+      "to": "END",
+      "default": true
+    },
+    {
+      "from": "finish",
+      "to": "END"
+    }
+  ]
+}

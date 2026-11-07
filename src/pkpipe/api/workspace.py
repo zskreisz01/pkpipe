@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from pkpipe.api.forms import literal_secrets
 from pkpipe.engine.config_models import CONFIG_MODELS
 from pkpipe.engine.registry import ConfigError, EffectiveConfig, load_effective
 from pkpipe.engine.snapshot import ASSET_DIRS, ASSET_SUFFIXES, ConfigSnapshot, safe_asset_path
@@ -123,6 +124,16 @@ class ConfigWorkspace:
             raise WorkspaceError(f"'{rel}' is larger than {MAX_FILE_BYTES // 1024} KiB")
         return target.read_text(encoding="utf-8")
 
+    def pack_json(self, rel: str) -> Any:
+        """The parsed pack file ``rel`` (``None`` when the pack has none or it is not JSON)."""
+        text = self._read_layer(self.pack_dir, editable_path(rel))
+        if text is None:
+            return None
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return None
+
     def overlay_text(self, rel: str) -> str | None:
         return self._read_layer(self.overlay_dir, editable_path(rel))
 
@@ -147,6 +158,16 @@ class ConfigWorkspace:
             raise WorkspaceError(f"'{rel}' is larger than {MAX_FILE_BYTES // 1024} KiB")
         if "\x00" in content:
             raise WorkspaceError("binary content is not allowed")
+        if rel == "channels.json":  # spec 026 FR-006: a secret is only ever an env:NAME reference
+            try:
+                bad = literal_secrets("channels", json.loads(content))
+            except json.JSONDecodeError:
+                bad = []
+            if bad:
+                where = ", ".join(sorted(bad)[:3])
+                raise WorkspaceError(
+                    f"{where}: only env:NAME references are accepted, never the secret itself"
+                )
 
     def with_file(
         self, files: dict[str, Any], rel: str, content: str | None, base_hash: str | None

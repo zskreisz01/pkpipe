@@ -6,8 +6,9 @@
 <p class="card err">No private overlay is configured (<code>PKPIPE_OVERLAY_DIR</code>): the config is read-only here.</p>
 {% endif %}
 <h2>Files</h2>
-<table id="files"><thead><tr><th>File</th><th>Source</th></tr></thead><tbody>
-{% for f in files %}<tr><td><a href="/config/edit?path={{ f.path|urlencode }}">{{ f.path }}</a></td><td class="muted">{{ f.source }}</td></tr>{% endfor %}
+<table id="files"><thead><tr><th>File</th><th>Source</th><th>Edit as</th></tr></thead><tbody>
+{% for f in files %}<tr><td><a href="/config/edit?path={{ f.path|urlencode }}">{{ f.path }}</a></td><td class="muted">{{ f.source }}</td>
+  <td>{% if f.path in form_paths %}<a href="/config/form?path={{ f.path|urlencode }}" data-testid="form-link">form</a> · {% endif %}<a href="/config/edit?path={{ f.path|urlencode }}">{{ "text" if f.path.endswith(".md") else "JSON" }}</a></td></tr>{% endfor %}
 </tbody></table>
 {% if draft %}
 <div id="draft">{% include "_draft.html" %}</div>

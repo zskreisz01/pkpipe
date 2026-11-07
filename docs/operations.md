@@ -47,6 +47,7 @@ Before the first node of every run whose flow can write to the vault (a tool cal
 | `pkpipe snapshot list [--json]` | Run, flow, time, size, files, status (`kept`, `restored`, `pruned`) |
 | `pkpipe snapshot show <run>` | Scope, what the run changed, notes that were not copied |
 | `pkpipe snapshot prune` | Remove snapshots past `snapshots.retention_days` and, while over `snapshots.max_bytes`, the oldest; the newest snapshot of each flow stays. Also runs after every new snapshot |
+| `pkpipe retry [--all \| ITEM ...] [--json]` | Spec 027, the owner's retry of failed items: without arguments only lists the failed items and their retries (`retried 1x`, `(limit)`); `--all` or item ids sends them through the next release run again (audit actor `cli`); exit 2 for `--all` with ids |
 | `pkpipe restore <run>` | **Dry run**: the plan with four verbs (`restore`, `remove`, `move_back`, `skip` with its reason); nothing changes |
 | `pkpipe restore <run> --apply` | Do it: first a snapshot of the current state (`restore-<run>-<time>-<n>`, so a restore is undoable too), then the plan. Exit 2 when a step was skipped |
 | `--force` | Also overwrite what changed since the run, after saving the current bytes in the snapshot's `trash/` |
@@ -252,7 +253,7 @@ PKPIPE_OVERLAY_DIR=~/pkpipe-overlay PKPIPE_VAULT_DIR=~/Vault uv run pkpipe serve
 
 **Tokens.** On first start `tokens.json` (mode 0600) is created in the data directory with an **owner** token and an **agent** token; `PKPIPE_TOKEN` / `PKPIPE_AGENT_TOKEN` (24+ characters) override them. Log into the UI with the owner token. Without `PKPIPE_OVERLAY_DIR` the config pages are read-only.
 
-**App MCP** is `http://127.0.0.1:8787/mcp` with `Authorization: Bearer <token>`. The agent token can `run_flow`, `get_run` and `list_triage`; `confirm_item`, `override_item` and `release_quarantine` are owner actions and need the owner token (give it only to a chat agent you trust to act for you). Every owner action and `run_flow` lands in the audit log (UI page `/audit`, `GET /api/audit`). Contract: `specs/014-config-ui-and-app-mcp/contracts/`.
+**App MCP** is `http://127.0.0.1:8787/mcp` with `Authorization: Bearer <token>`. The agent token can `run_flow`, `get_run` and `list_triage`; `confirm_item`, `override_item`, `release_quarantine` and `retry_items` are owner actions and need the owner token (give it only to a chat agent you trust to act for you). Every owner action and `run_flow` lands in the audit log (UI page `/audit`, `GET /api/audit`). Contract: `specs/014-config-ui-and-app-mcp/contracts/`.
 
 **Reaching the UI over Tailscale** (spec 023). Two supported setups, both private to your tailnet, **never Tailscale Funnel** (it publishes the UI to the internet):
 

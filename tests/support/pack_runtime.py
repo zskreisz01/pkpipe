@@ -79,6 +79,7 @@ def vault_tools(
             "obsidian:upsert_processing_list": lambda rows: vault.upsert_processing_list(rows),
             "obsidian:read_notes": lambda paths: vault.read_notes(paths),
             "obsidian:unreviewed_notes": lambda folder, category: vault.unreviewed_notes(folder, category),
+            "obsidian:failed_items": lambda: vault.failed_items(),
             "obsidian:write_journal_todos": lambda day, lines, heading="## pkpipe todo": (
                 vault.write_journal_todos(day, lines, heading)
             ),

@@ -1,6 +1,6 @@
 [project]
 name = "pkpipe"
-version = "0.1.5"
+version = "0.1.6"
 description = "Personal Knowledge Pipeline – local-first agent pipeline: Obsidian INBOX -> triage -> guarded LLM sessions -> curated notes"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -104,6 +104,8 @@ files = [
   "src/pkpipe/domain/data_classes.py",
   "src/pkpipe/steps/image_code.py",
   "src/pkpipe/adapters/image_pillow.py",
+  # spec 026
+  "src/pkpipe/api/forms.py",
 ]
 ignore_missing_imports = true
 follow_imports = "silent"

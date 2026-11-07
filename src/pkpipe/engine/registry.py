@@ -55,6 +55,17 @@ CORE_DEFAULTS: dict[str, Any] = {
         "tool_category": "tool",
         "journal_todos": {"enabled": False, "heading": "## pkpipe todo"},
     },
+    #: spec 025: web search for the source of an item that names no URL (opt-in: a query leaves the machine)
+    "source_discovery": {
+        "enabled": False,
+        "categories": ["tool"],
+        "from_images": True,
+        "from_notes": True,
+        "max_candidates": 2,
+        "max_results": 5,
+        "max_query_chars": 120,
+        "query_template": "{topic} {text}",
+    },
     "channels": {"channels": {}, "routes": {}},
     "telemetry": {"capture_content": {"flows": []}},
     # Code-only levels are all-or-nothing (docs/evaluation.md); LLM gates come from the pack.

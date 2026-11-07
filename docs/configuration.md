@@ -25,7 +25,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
 | `images.json` | Image input: the time budget of the image batch, the per-image estimate and timeout, scaling and size limits ([Image input](#image-input)) |
-| `triage.json` | `surface`: `vault` (default; the triage table is in the triage file) or `web` (the table lives in a data file, the triage file is a generated summary page; [below](#triage-surface-vault-or-web)) |
+| `triage.json` | `retry_max`: how often the owner may retry one failed item (1 to 20, default 3; spec 027). `surface`: `vault` (default; the triage table is in the triage file) or `web` (the table lives in a data file, the triage file is a generated summary page; [below](#triage-surface-vault-or-web)) |
 | `ui.json` | How the web UI is reached: `public_url` (linked from the generated triage page) and `allowed_hosts` (extra `Host` names: the MagicDNS name, the Tailscale IP) ([operations](operations.md#config-ui-and-app-mcp)) |
 | `layout.json` | The vault layout: every folder and file the flows and steps name ([Vault layout](#vault-layout)) |
 | `snapshots.json` | Retention of the vault snapshots taken before writing runs: `retention_days` (14), `max_bytes` (1 GiB), `max_file_bytes` (5 MiB; a larger note is manifest-only) ([operations](operations.md#vault-snapshots-and-restore)) |
@@ -136,6 +136,26 @@ After every triage and release run the pipeline sends one report as the `daily_s
 ```
 
 `pkpipe validate` reports a grant that does not cover the journal pattern. The block sits between `<!-- pkpipe-todo:begin -->` and `<!-- pkpipe-todo:end -->` below the heading; text outside is never read back or changed (a note without the markers gets the heading and the block at its end, below an identical heading when there is one; a note that does not exist is created with `type: journal`). Add the heading to your daily note template if you want the section in a fixed place. The tool writes only for today and yesterday.
+
+### Source discovery (`source_discovery.json`)
+
+```json
+{"enabled": false, "categories": ["tool"], "from_images": true, "from_notes": true, "max_candidates": 2, "max_results": 5, "max_query_chars": 120, "query_template": "{topic} {text}"}
+```
+
+An item that a category's sessions need a page for but that names no URL (a screenshot, a text without a link) fails with "no source URL in the note". With `enabled: true` the pipeline searches for the source instead (spec 025): one query from the validated image description (`{topic}`, `{text}` = visible text) or from the owner's text, checked by `security.query_guard`, sent to `websearch:search`; the first `max_candidates` result URLs that pass the URL policy are fetched by secure fetch in order and the category's own sessions (`categories.json`, the evaluation stays configuration) evaluate the first clean page. An address shown in an image is used without a search.
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `enabled` | The switch. Off by default: a search query leaves the machine | `false` |
+| `categories` | Category ids that search. Only categories whose `subflow` is `other_resource` can; `learning-material` is not supported (a found URL would go to the notebook service) | `["tool"]` |
+| `from_images`, `from_notes` | Which kinds of item are searched for. An image needs a cached description (the triage described it) | `true`, `true` |
+| `max_candidates` | Pages fetched, in order, until one is clean (1 to 5) | `2` |
+| `max_results` | Results asked from the search tool (1 to 10) | `5` |
+| `max_query_chars` | Longest query, cut after a whole word (20 to 300) | `120` |
+| `query_template` | Only the placeholders `{topic}` and `{text}`; no model builds the query | `{topic} {text}` |
+
+The category needs the `websearch` server (`mcp_servers.json`, `allow` includes `search`) and the web-fetch server of secure fetch. Put client and project names into `security.query_guard` (`blocked_terms` or `terms_file`): a blocked term refuses the query. A failed item says why in the processing list ("no source found by web search; add a link to the entry and release it again", and the reasons in [the data model of spec 025](https://github.com/zskreisz01/pkpipe/blob/dev/specs/025-find-and-evaluate-urlless-items/data-model.md)).
 
 ## Notifications
 `channels.json` defines channels and routes events to them; `NotifyPort.send(event, payload)` delivers to every channel routed for the event (a `notify` step, or `channels` to override the route). Every delivery is a `notify.send` span with `notify.event`, `notify.channel`, `notify.channel_type` and the flow, step and item attributes of the sending step. One failing channel never stops the others; the failure sets that span to error status and is listed in the step output.
@@ -367,6 +387,21 @@ What the flow does for a scope ([Refresh Project Contexts](process/refresh-proje
 6. **Notify** (`context_review` event) with counts and the review note paths only: never pack text, a diff or a name.
 
 The flows handle the data class `context` ([Flows](flows.md)): they validate and run on a loopback model only (a remote profile, fallback, environment value, egress tool or session with tools is refused), their traces carry no prompt or response content, and a flow that drops the data class fails validation.
+
+## Editing config in the UI: forms and JSON
+
+Every config section (`categories`, `schedules`, `channels`, `triage`, `ui`, `report`, `images`, `layout`, `security`, `snapshots`, `telemetry`, `evals`, `models`, `mcp_servers`) has two views in the UI (spec 026): a **form** and the **JSON** text. Both edit the same draft, so an edit saved in one view is what the other opens. Flows (`flows/<id>.json`) and text files keep the text editor.
+
+The forms are generated from the JSON Schema of the config models (`pkpipe schema`), so a new section or field has a form without UI code. What you see:
+
+- **Fields by type**: text, numbers (with their limits), enums as lists, booleans as *default / true / false* (leave *default* to keep a key out of the file), lists of values one per line, and **rows** for lists of objects and maps (a name per row) with *add*, *remove*, *move up* and *move down*. A shape without a widget appears as a JSON field in the same form.
+- **Categories**: each category with its `sessions` as rows (order is the run order). `instruction`, `system` and `context` of a session link to the text file they name (`instructions/<value>`, `prompts/system/<value>.md`, `contexts/<value>.md`); the text editor of an instruction shows about how many tokens it is, against the 800 token budget (a hint, not a gate). An `evaluate` session of a category is one more row with the same fields.
+- **Schedules**: the cron field shows the next three runs, or why the expression is invalid.
+- **Channels and routes**: a secret field (`url`, `urls`, `token`) takes an **`env:NAME` reference only**, in the form and in the JSON view; it shows whether the variable is set, never its value, and a literal secret that already sits in a file is not shown. Route events, channel names and the `env:` names already in use are offered as lists.
+- **Errors** appear at the field. They come from the section's model validated **merged onto the pack file** (an overlay file may name only what it changes), so a route to a channel of the pack is valid; the draft as a whole is validated again after every save and the form says if it is not valid yet.
+- **A pack section without an overlay file** saves only what you changed into a new overlay file instead of copying the pack file (a copy would shadow later pack updates). A pack entry cannot be removed that way; set `enabled: false` on it. A form that changes nothing writes nothing.
+
+Saving only changes the draft. Validate, smoke eval and publish below are unchanged.
 
 ## Publishing a change
 

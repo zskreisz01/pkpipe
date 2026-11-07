@@ -93,13 +93,21 @@ class ScriptedWeb:
     """``webfetch:fetch_page`` and ``websearch:search`` of flow cases.
 
     ``pages`` maps a URL to its HTML (the web-fetch MCP result shape, so the real secure-fetch steps run on
-    it), a URL without a page is an HTTP 404 and ``down`` makes the server unreachable. ``resolve`` is the
-    ``resolver`` port: every host of a page resolves to a public address, any other host does not resolve (no
+    it), a URL without a page is an HTTP 404 and ``down`` makes the server unreachable; ``search_results``
+    scripts what the search returns (default: one fixed result). ``resolve`` is the ``resolver`` port: every
+    host of a page resolves to a public address, any other host does not resolve (no
     real DNS in an eval)."""
 
-    def __init__(self, pages: dict[str, str] | None = None, down: bool = False):
+    def __init__(
+        self,
+        pages: dict[str, str] | None = None,
+        down: bool = False,
+        search_results: list[dict[str, str]] | None = None,
+    ):
         self.pages = dict(pages or {})
         self.down = down
+        self.search_results = search_results
+        self.queries: list[str] = []
 
     def resolve(self, host: str) -> list[str]:
         known = {url.split("/")[2].split(":")[0] for url in self.pages if "//" in url}
@@ -124,6 +132,9 @@ class ScriptedWeb:
         }
 
     def search(self, query: str, max_results: int = 5) -> dict[str, Any]:
+        self.queries.append(query)
+        if self.search_results is not None:  # a case that scripts the results (spec 025)
+            return {"results": list(self.search_results)[:max_results]}
         return {
             "results": [{"title": "Example", "url": "https://example.org/result", "snippet": "synthetic"}]
         }

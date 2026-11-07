@@ -48,6 +48,7 @@ READ_ONLY_VAULT_TOOLS = frozenset(
         "read_tool_candidates",
         "read_image",
         "unreviewed_notes",
+        "failed_items",  # spec 027
     }
 )
 

@@ -51,7 +51,7 @@ The pipeline never guesses blindly. An **image** that could not be described (th
 | `suggested` | New: a category was suggested, you have not decided |
 | `pending` | Seen at 06:00 without a decision from you: waits, nothing is processed |
 | `released` | You decided and the 06:00 run took the item; a failed run leaves it here and the next run tries again |
-| `processed` | Done: the note is filed, the processing list updated |
+| `processed` | Done: the note is filed, the processing list updated. If the processing **failed** (the page could not be fetched, the learning service was down or over quota), the row is `processed` with a `failed` line in the processing list and a **Retry** button (see below) |
 | `quarantined` | A security check flagged the item (for example an injection in the text). Its note was moved into the quarantine folder, inert. You can **release** it from quarantine if it was a false positive: it becomes `pending` again |
 | `awaiting_category` | You asked for a new category that does not exist yet; a proposal note was written; the item waits until you add the category (see below) |
 
@@ -66,6 +66,7 @@ Open `https://<your address>/triage` (see [Reaching the UI](#reaching-the-ui-fro
 - **Comment**: write your words and press Save; it is stored exactly as you typed it.
 - **Filters** at the top narrow the page by state, category or "needs you". **Confirm all suggested in this set** confirms every waiting row of the filtered set that has a configured suggestion; rows with an override, images that need you and rows without a valid suggestion are left alone.
 - **Release from quarantine** appears on quarantined rows.
+- **Retry** appears on processed rows whose processing failed; **Retry all failed (N)** at the top of the page asks for a confirmation with the counts. A retry sends the item through the next 06:00 run again (or a manual `process_released` run); your confirm or override stays. Each item can be retried `triage.retry_max` times (default 3); after that the row says *retry limit reached*: fix the cause (for example the web-fetch server, or wait for the NotebookLM quota window) or process it by hand. The same action is the app MCP tool `retry_items` (owner token) and the command `pkpipe retry` (lists the failed items; `--all` or item ids retries them). A quarantined item is never retried; release it from quarantine first.
 
 The rules are enforced on the server, not in the page: an override is a configured category or a valid new name, a confirm works only on rows in an allowed state, and every decision is logged on the **Audit** page (the log keeps what you decided, never your comment text).
 
@@ -83,6 +84,14 @@ A category is configuration (its sessions, its folder, its instructions), so pkp
 2. At 06:00 pkpipe evaluates the item with the `misc` session (it sees the name you asked for and your comment) and writes a **proposal note** into your vault (the folder `proposals_dir`): the evaluation and a ready-to-paste `categories.json` entry. The row becomes `awaiting_category`, nothing is filed, the INBOX entry stays. The UI shows the path of the note, and the notification says "N item(s) propose a new category: children".
 If the evaluation fails (for example the model is down), the next 06:00 run tries again, at most 3 times. After the third failure the item stays `pending` and the evening message says "The proposal for 'children' failed 3 times and is not retried": change the override (a new name starts a fresh count) or add the category by hand.
 3. You add the category through a **config draft** in the UI (`/config`): validate, run the evals, publish. Then the next 06:00 run releases the item like any other. You can change the override to an existing category at any time instead.
+
+## Editing the configuration in forms
+
+`/config` lists every config file with **form** and **JSON** links. The form edits categories (and their sessions: add, remove, reorder), schedules (with a preview of the next runs), channels and routes, and every other section as fields with checks at the field. A session's instruction is one click away (`edit text`) with a token estimate against 800.
+
+- Secrets (webhook URLs, bot tokens) are written as `env:NAME`; the real value lives in the environment. A literal is refused.
+- You can add an `evaluate` session to a category here; spec 025's source discovery settings get their form the same way.
+- *Save to draft* changes nothing live. Review the diff, **validate**, run the **smoke eval** and **publish** on the Config page, as before. A pack section you did not change before is saved as a small overlay file (only your changes).
 
 ## Your comment
 
@@ -106,6 +115,10 @@ To switch: set `triage.json` `surface`, add `ui.json` `public_url` (for `web`), 
 
 If you use the `vault` surface and edit the file in Obsidian while a UI action writes it, writes are atomic and locked: a change made in Obsidian in between is detected and the write is retried on the fresh file, so neither side overwrites the other. A sync conflict copy of the file (`... (conflict).md`) is never read or merged; the UI points it out.
 
+## Items without a link
+
+A screenshot or a note without a link used to fail with "no source URL in the note" in the processing list. If you switch `source_discovery` on (`overlay/source_discovery.json`, `{"enabled": true}`, the Tool category by default), the 06:00 run searches the web for it: from the image description (topic and the visible text) or from your note text, one query, checked against your blocked names. The first clean found page is fetched and the category's evaluation runs on it; the note shows the page as its `Source`, so you can see where it came from and delete a wrong match. If nothing is found the item stays `failed` and says why; the fix is a link in its INBOX entry. An address that is visible in an image is used directly, without a search. Images need their description from the triage ("the image has no cached description; triage it again" means the vision model changed since).
+
 ## The run report and your todos
 
 After **every** run, the 20:00 triage and the 06:00 processing, pkpipe sends one report to your notification channel (Discord, Teams or any Apprise service; the `daily_summary` route):
@@ -113,7 +126,7 @@ After **every** run, the 20:00 triage and the 06:00 processing, pkpipe sends one
 - what the run did: the new suggestions per category after triage, or the items processed per category after processing, with quarantined and failed counts;
 - what it created: evaluations (notes of the category sessions), notebooks and podcasts;
 - what waits for you in the triage;
-- your **todos with counts**: *Review triage decisions* (items you still have to confirm or override), *Process notebook materials and podcasts* (learning items you decided that the next 06:00 run turns into a notebook and a podcast), *Read tool evaluations* (evaluation notes of the `tool` category you have not marked as read). A todo with a zero count is left out.
+- your **todos with counts**: *Review triage decisions* (items you still have to confirm or override), *Process notebook materials and podcasts* (learning items you decided that the next 06:00 run turns into a notebook and a podcast), *Read tool evaluations* (evaluation notes of the `tool` category you have not marked as read), *Retry failed items* (processed items whose processing failed, see the Triage page). A todo with a zero count is left out.
 
 The report only contains counts, category ids, run ids and links to your own notes, never the text or the URL of an item. To mark a tool evaluation as read, add `reviewed: true` to the note's front matter; the todo drops it at the next run.
 
