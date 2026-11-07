@@ -10,6 +10,7 @@ from typing import Any
 
 from pkpipe.domain.inbox_list import EntryKind, list_items, parse_list
 from pkpipe.domain.triage import (
+    MAX_PROPOSAL_ATTEMPTS,
     ItemState,
     TriageItem,
     clean_owner_note,
@@ -51,6 +52,40 @@ def cycle_start(ctx: StepContext) -> dict[str, Any]:
 @register_code("item.set")
 def item_set(ctx: StepContext, **fields: Any) -> StepResult:
     """Set fields on the current item (for example ``state: quarantined``)."""
+    return StepResult(output=fields, item=fields)
+
+
+def _attempts(ctx: StepContext, item_id: str, requested: str) -> int:
+    """Failed evaluations of this proposal so far (0 without the port or for another requested name)."""
+    ports = getattr(ctx, "ports", None)  # the deterministic eval hands in a bare snapshot context
+    port = ports.extra.get("proposal_attempts") if ports is not None else None
+    return port.get(item_id, requested) if port is not None else 0
+
+
+@register_code("category.proposal_failed")
+def proposal_failed(ctx: StepContext) -> StepResult:
+    """BPMN: Propose new category, evaluation failed (spec 022 FR-009). The item keeps its state; the
+    failed evaluation is counted per item and requested name, and :func:`release_items` stops proposing
+    after :data:`~pkpipe.domain.triage.MAX_PROPOSAL_ATTEMPTS` of them."""
+    item = ctx.item or {}
+    port = ctx.ports.extra.get("proposal_attempts")
+    count = port.bump(str(item.get("id")), str(item.get("requested_category"))) if port is not None else 0
+    fields = {
+        "processing_status": "failed",
+        "failure_reason": "the new category could not be evaluated",
+        "proposal_attempts": count,
+    }
+    return StepResult(output=fields, item=fields)
+
+
+@register_code("category.proposal_recorded")
+def proposal_recorded(ctx: StepContext) -> StepResult:
+    """BPMN: Propose new category, note written (spec 022). The item awaits its category; a later change
+    of the override starts a fresh count."""
+    port = ctx.ports.extra.get("proposal_attempts")
+    if port is not None:
+        port.clear(str((ctx.item or {}).get("id")))
+    fields = {"state": ItemState.AWAITING_CATEGORY.value, "processing_status": "proposed"}
     return StepResult(output=fields, item=fields)
 
 
@@ -268,6 +303,8 @@ def backlog(
     older = invalid = proposed_new = 0
     proposed_names: list[str] = []  # slugs of new categories the owner asks for (plain slugs only)
     proposed_rows = 0
+    gave_up = 0
+    gave_up_names: list[str] = []  # slugs whose proposal failed MAX_PROPOSAL_ATTEMPTS times
     cats = _categories(ctx)
     for r in (triage or {}).get("rows", []):
         try:
@@ -279,6 +316,11 @@ def backlog(
         confirm, override = bool(r.get("confirm")), r.get("override") or None
         if override and state in (ItemState.SUGGESTED, ItemState.PENDING, ItemState.AWAITING_CATEGORY):
             kind, found = resolve_category(override, cats)
+            if kind == "new" and _attempts(ctx, str(r.get("item_id")), found or "") >= MAX_PROPOSAL_ATTEMPTS:
+                gave_up += 1  # the evaluation failed repeatedly: the owner has to act (spec 022 FR-009)
+                if found not in gave_up_names:
+                    gave_up_names.append(found or "")
+                continue
             if kind == "new":  # the owner asks for a new category: a proposal, not a dead end (spec 022)
                 proposed_rows += 1
                 proposed_new += state is not ItemState.AWAITING_CATEGORY
@@ -318,6 +360,8 @@ def backlog(
             f"writes a proposal note with a categories.json draft below {layout_of(ctx).proposals_dir}; "
             "add the category through a config draft and the item is released."
         )
+    if gave_up:
+        message += _gave_up_sentence(gave_up_names, MAX_PROPOSAL_ATTEMPTS)
     if invalid:
         message += (
             f" {invalid} item(s) name a category that is no longer configured: write a configured category"
@@ -332,15 +376,32 @@ def backlog(
         "quarantined": len(quarantined),
         "backlog": older,
         "invalid": invalid,
-        "awaiting": new + older + invalid + proposed_rows,
+        "awaiting": new + older + invalid + proposed_rows + gave_up,
         "message": message,
         # New suggestions or a decision that can never be released need the owner; an unchanged backlog of
         # unreviewed items alone does not send a mail every evening (it is in the 06:00 summary).
-        "notify": bool(new or invalid or quarantined or deferred or proposed_new),
+        "notify": bool(new or invalid or quarantined or deferred or proposed_new or gave_up),
         "proposed": proposed_rows,
         "proposed_names": proposed_names,
+        "proposal_gave_up": gave_up,
+        "proposal_gave_up_names": gave_up_names,
         "images_deferred": deferred,
     }
+
+
+def _gave_up_sentence(names: list[str], attempts: int) -> str:
+    """The sentence about proposals that are no longer retried (plain slugs only)."""
+    shown = ", ".join(f"'{n}'" for n in names[:5]) + (", ..." if len(names) > 5 else "")
+    return (
+        f" The proposal for {shown} failed {attempts} times and is not retried: change the override or "
+        "add the category by hand."
+    )
+
+
+def _gave_up_note(gave_up: list[dict[str, Any]]) -> str:
+    if not gave_up:
+        return ""
+    return _gave_up_sentence(sorted({g["requested_category"] for g in gave_up}), MAX_PROPOSAL_ATTEMPTS)
 
 
 def _proposal_note(proposals: list[dict[str, Any]]) -> str:
@@ -400,10 +461,14 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
     before = {i.id: originals[i.id] for i in items}
     released, pending = release(items)
     unknown = [i for i in released if i.effective_category not in cats]
-    proposals = []
+    proposals: list[dict[str, Any]] = []
+    gave_up: list[dict[str, Any]] = []
     for i in unknown:  # also a ``released`` item left over from a failed run: never stuck
         kind, slug = resolve_category(i.override, cats) if i.override else ("invalid", None)
-        if kind == "new":  # the owner's own words only: a removed suggestion is no proposal
+        if kind == "new" and _attempts(ctx, i.id, slug or "") >= MAX_PROPOSAL_ATTEMPTS:
+            gave_up.append({"id": i.id, "requested_category": slug})  # no third try: the owner acts
+            i.state = ItemState.PENDING
+        elif kind == "new":  # the owner's own words only: a removed suggestion is no proposal
             proposals.append(
                 {
                     "id": i.id,
@@ -417,8 +482,9 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
         else:
             i.state = ItemState.PENDING
     proposed_ids = {p["id"] for p in proposals}
+    gave_up_ids = {g["id"] for g in gave_up}
     released = [i for i in released if i.effective_category in cats]
-    pending = pending + [i for i in unknown if i.id not in proposed_ids]
+    pending = pending + [i for i in unknown if i.id not in proposed_ids]  # gave-up items included
     rows = [
         {"item_id": i.id, "state": i.state.value} for i in released + pending if before[i.id] is not i.state
     ]
@@ -439,13 +505,15 @@ def release_items(ctx: StepContext, triage: dict[str, Any]) -> dict[str, Any]:
         "released": out_items,
         "proposals": proposals,
         "pending": [i.id for i in pending],
-        "unknown_category": [i.id for i in unknown if i.id not in proposed_ids],
+        "unknown_category": [i.id for i in unknown if i.id not in proposed_ids and i.id not in gave_up_ids],
+        "proposal_gave_up": gave_up,
+        "count_gave_up": len(gave_up),
         "rows": rows,
         "count_released": len(out_items),
         "count_pending": len(pending),
         "count_proposals": len(proposals),
         "count_awaiting": awaiting,
-        "proposal_note": _proposal_note(proposals),
+        "proposal_note": _proposal_note(proposals) + _gave_up_note(gave_up),
     }
 
 

@@ -23,3 +23,14 @@ def test_the_run_service_hands_its_db_to_the_image_store(pack_dir, tmp_path):
     service = app.build_run_service(pack_dir, None, db)
     ports = service.ports_for(service.config())
     assert ports.extra["image_store"].path == db
+
+
+def test_the_proposal_attempts_are_counted_per_item_and_name_in_the_app_db(tmp_path):
+    from pkpipe import app
+
+    store = app.make_proposal_attempts(tmp_path / "app.db")
+    assert store.get("i", "kids") == 0 and store.bump("i", "kids") == 1 and store.bump("i", "kids") == 2
+    assert store.get("i", "children") == 0  # another requested name: a fresh count
+    assert app.make_proposal_attempts(tmp_path / "app.db").get("i", "kids") == 2  # the same DB file
+    store.clear("i")
+    assert store.get("i", "kids") == 0

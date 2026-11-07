@@ -379,3 +379,54 @@ def test_the_notifications_never_quote_a_comment():
     assert "CANARY-NOTE" not in repr(out)
     rel = CODE["triage.release"](_ctx(), triage={"rows": rows})
     assert "CANARY-NOTE" not in rel["proposal_note"]
+
+
+def _ctx_attempts(counts):
+    from tests.fakes import FakeProposalAttempts
+
+    ctx = _ctx()
+    ctx.ports.extra["proposal_attempts"] = FakeProposalAttempts(counts)
+    return ctx
+
+
+def test_release_does_not_propose_again_after_the_cap_and_names_it_as_gave_up():
+    rows = [_row("d", override="Children"), _row("f", override="Kids")]
+    ctx = _ctx_attempts({"d": ("children", 3), "f": ("kids", 2)})
+    out = CODE["triage.release"](ctx, triage={"rows": rows})
+    assert [p["id"] for p in out["proposals"]] == ["f"]  # two failures so far: one more try
+    assert out["proposal_gave_up"] == [{"id": "d", "requested_category": "children"}]
+    assert out["count_gave_up"] == 1 and out["pending"] == ["d"] and out["unknown_category"] == []
+    assert "'children' failed 3 times and is not retried" in out["proposal_note"]
+    assert out["rows"] == [{"item_id": "d", "state": "pending"}]
+
+
+def test_the_cap_counts_per_requested_name_so_a_changed_override_is_proposed():
+    out = CODE["triage.release"](
+        _ctx_attempts({"d": ("children", 3)}), triage={"rows": [_row("d", override="Kids")]}
+    )
+    assert [p["requested_category"] for p in out["proposals"]] == ["kids"] and out["count_gave_up"] == 0
+
+
+def test_backlog_counts_a_gave_up_proposal_for_the_owner_and_notifies():
+    rows = [_row("d", override="children", state="pending")]
+    out = CODE["triage.backlog"](_ctx_attempts({"d": ("children", 3)}), triage={"rows": rows}, new_rows=[])
+    assert out["proposal_gave_up"] == 1 and out["proposed"] == 0 and out["awaiting"] == 1 and out["notify"]
+    assert "'children' failed 3 times and is not retried" in out["message"]
+
+
+def test_the_failed_and_recorded_steps_count_and_clear_the_attempts():
+    from tests.fakes import FakeProposalAttempts
+
+    ctx = _ctx({"id": "d", "requested_category": "children"})
+    ctx.ports.extra["proposal_attempts"] = store = FakeProposalAttempts()
+    assert CODE["category.proposal_failed"](ctx).item["proposal_attempts"] == 1
+    assert CODE["category.proposal_failed"](ctx).item["proposal_attempts"] == 2
+    assert CODE["category.proposal_recorded"](ctx).item["state"] == "awaiting_category"
+    assert store.counts == {}
+
+
+def test_without_the_port_the_steps_still_work_and_nothing_is_capped():
+    ctx = _ctx({"id": "d", "requested_category": "children"})
+    assert CODE["category.proposal_failed"](ctx).item["processing_status"] == "failed"
+    out = CODE["triage.release"](_ctx(), triage={"rows": [_row("d", override="Children")]})
+    assert len(out["proposals"]) == 1

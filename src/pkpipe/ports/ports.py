@@ -138,6 +138,21 @@ class ImageStorePort(Protocol):
 
 
 @runtime_checkable
+class ProposalAttemptsPort(Protocol):
+    """Failed evaluations of new-category proposals (spec 022 FR-009), in the app DB.
+
+    Counted per item and requested category name: ``get`` is 0 for another name (the owner changed the
+    override), ``bump`` adds one failed evaluation and returns the new count, ``clear`` forgets the item
+    (the proposal succeeded)."""
+
+    def get(self, item_id: str, requested: str) -> int: ...
+
+    def bump(self, item_id: str, requested: str) -> int: ...
+
+    def clear(self, item_id: str) -> None: ...
+
+
+@runtime_checkable
 class ClassifierPort(Protocol):
     """Prompt-injection / jailbreak / harm classifier (spec 008 FR-004, spec 009 FR-002); in the reference
     deployment Qwen3Guard-Gen combined with ProtectAI's DeBERTa injection classifier (docs/decisions/0001).

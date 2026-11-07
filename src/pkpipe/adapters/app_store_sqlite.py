@@ -72,6 +72,12 @@ CREATE TABLE IF NOT EXISTS image_timing (
     at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS image_timing_model ON image_timing (model, seq);
+CREATE TABLE IF NOT EXISTS proposal_attempts (
+    item_id TEXT PRIMARY KEY,
+    requested TEXT NOT NULL,
+    attempts INTEGER NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
@@ -260,6 +266,29 @@ class AppStore:
                 "SELECT seconds FROM image_timing WHERE model = ? ORDER BY seq DESC LIMIT ?", (model, limit)
             ).fetchall()
         return [float(r["seconds"]) for r in rows]
+
+    # -- new-category proposals (spec 022 FR-009): ProposalAttemptsPort -------------------------------
+    def get(self, item_id: str, requested: str) -> int:
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT attempts FROM proposal_attempts WHERE item_id = ? AND requested = ?",
+                (item_id, requested),
+            ).fetchone()
+        return int(row["attempts"]) if row else 0
+
+    def bump(self, item_id: str, requested: str) -> int:
+        count = self.get(item_id, requested) + 1
+        with self._conn() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO proposal_attempts (item_id, requested, attempts, updated_at) "
+                "VALUES (?, ?, ?, ?)",
+                (item_id, requested, count, _now()),
+            )
+        return count
+
+    def clear(self, item_id: str) -> None:
+        with self._conn() as c:
+            c.execute("DELETE FROM proposal_attempts WHERE item_id = ?", (item_id,))
 
     # -- audit ----------------------------------------------------------------------------------------------
     def audit(self, actor: str, action: str, target: str | None = None, **detail: Any) -> None:

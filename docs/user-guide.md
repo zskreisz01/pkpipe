@@ -81,6 +81,7 @@ A category is configuration (its sessions, its folder, its instructions), so pkp
 
 1. In the web UI type a name into **propose a new category** (for example `children`; letters, digits, blanks and hyphens; a name that is only a variant of an existing category, like `Misc`, is simply that category).
 2. At 06:00 pkpipe evaluates the item with the `misc` session (it sees the name you asked for and your comment) and writes a **proposal note** into your vault (the folder `proposals_dir`): the evaluation and a ready-to-paste `categories.json` entry. The row becomes `awaiting_category`, nothing is filed, the INBOX entry stays. The UI shows the path of the note, and the notification says "N item(s) propose a new category: children".
+If the evaluation fails (for example the model is down), the next 06:00 run tries again, at most 3 times. After the third failure the item stays `pending` and the evening message says "The proposal for 'children' failed 3 times and is not retried": change the override (a new name starts a fresh count) or add the category by hand.
 3. You add the category through a **config draft** in the UI (`/config`): validate, run the evals, publish. Then the next 06:00 run releases the item like any other. You can change the override to an existing category at any time instead.
 
 ## Your comment

@@ -34,6 +34,8 @@ updated: 2026-11-06
 
 7. **Status: Completed (2026-11-06).** Gate 2: tasks done, suite green, docs and BPMN (drawio, PNG, Mermaid) updated. Decisions taken while implementing: the triage table always has the full header (a note-only file is no longer byte-identical after the first write: the owner needs the `comment` column), the UI override form stays strict (a configured category), `awaiting_category` rows are skipped by the release until the override names a configured category, the evening message notifies only for a **new** proposal, and a failed evaluation leaves the item as it was so the next 06:00 run retries.
 
+8. **Retry cap (2026-11-06, owner decision).** Clarification 7 let a failed evaluation retry at every 06:00 run without end. It is now capped at 3 failed evaluations per item and requested name, counted in the app DB (not in the vault: the triage table keeps its columns). After the cap the item is `pending`, listed as given up in the evening message (it notifies and counts as waiting for the owner) with the advice to change the override or add the category by hand. Changing the override to another name resets the count; a successful proposal clears it.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - The owner writes comments that stay (Priority: P1)
@@ -59,6 +61,7 @@ updated: 2026-11-06
 4. **Given** an injection in the item, **Then** the guard flags it and the item is quarantined, no note is written
 5. **Given** open proposals, **Then** the 20:00 backlog says "N item(s) propose a new category: children, ..." and the 06:00 summary counts them
 
+
 ## Requirements *(mandatory)*
 
 - **FR-001**: `TriageRow.comment` and the table column `comment` (last column, owner-owned); `update_triage` refuses a changed or new `comment`; every other write path keeps it byte for byte
@@ -69,6 +72,7 @@ updated: 2026-11-06
 - **FR-006**: Row state `awaiting_category` (`ItemState`), transitions and owner decision rules; excluded from the release unless the override now names a configured category
 - **FR-007**: Flow `propose_category` (misc `evaluate` session with the requested name as input, output guard, proposal note below `layout.proposals_dir`, state row) called by `process_released` for the proposals of `triage.release`
 - **FR-008**: Backlog and daily summary messages for proposals; `invalid` keeps its meaning for non-slug values
+- **FR-009**: A failed proposal evaluation is counted per item and requested name (`ProposalAttemptsPort`, app DB); after `MAX_PROPOSAL_ATTEMPTS` (3) `triage.release` no longer proposes it: the item stays `pending`, the release and evening messages name it (`proposal_gave_up`), and a changed override starts a fresh count; a success clears it, a quarantine is no failed evaluation
 
 ## Success Criteria
 

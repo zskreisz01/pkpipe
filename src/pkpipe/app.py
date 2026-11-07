@@ -29,6 +29,7 @@ from pkpipe.ports import (
     ImageStorePort,
     ModelPort,
     NotifyPort,
+    ProposalAttemptsPort,
     SecurityLogPort,
     SnapshotPort,
     ToolPort,
@@ -200,6 +201,13 @@ def make_image_store(db_path: Path | None = None) -> ImageStorePort:
     return AppStore(db_path or default_db_path())
 
 
+def make_proposal_attempts(db_path: Path | None = None) -> ProposalAttemptsPort:
+    """The failed new-category evaluations per item: a table of the app DB (spec 022)."""
+    from pkpipe.adapters.app_store_sqlite import AppStore
+
+    return AppStore(db_path or default_db_path())
+
+
 def ports_for(
     snapshot: ConfigSnapshot, overlay_dir: Path | None = None, db_path: Path | None = None
 ) -> StepPorts:
@@ -209,6 +217,7 @@ def ports_for(
         "security_log": make_security_log(snapshot, overlay_dir),
         "image_preparer": make_image_preparer(),
         "image_store": make_image_store(db_path),
+        "proposal_attempts": make_proposal_attempts(db_path),
     }
     store = make_context_store(overlay_dir)
     if store is not None:

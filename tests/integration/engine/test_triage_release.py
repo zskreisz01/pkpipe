@@ -15,7 +15,7 @@ import pytest
 from pkpipe.domain.triage import item_id_for
 from pkpipe.engine.registry import load_effective
 from pkpipe.obsidian import lists
-from tests.fakes import FakeClock, FakeModel, FakeNotify, RecordingTracer
+from tests.fakes import FakeClock, FakeModel, FakeNotify, FakeProposalAttempts, RecordingTracer
 from tests.support.flows import make_ports, make_service
 from tests.support.pack_runtime import (
     PACK_ROUTES,
@@ -44,7 +44,9 @@ class World:
         self.notify = FakeNotify(routes=PACK_ROUTES)
         self.tracer = RecordingTracer()
         web = synthetic_web()
+        self.attempts = FakeProposalAttempts()
         ports = make_ports(
+            proposal_attempts=self.attempts,
             tools=vault_tools(vault, FakeLearning(polls_until_ready=0), web),
             resolver=web.resolve,
             model=self.model,

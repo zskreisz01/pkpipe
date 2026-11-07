@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4 – 2026-11-06
+- Spec 022 FR-009: a new-category proposal whose evaluation fails is retried at most 3 times per item and requested name (counted in the app DB); then the item stays pending, the evening message says so, and a changed override starts a fresh count.
+- Version number of the package aligned with the tag (0.1.3 shipped with metadata 0.1.2).
+
+## 0.1.3 – 2026-11-06
+- Specs 022 and 023: owner comment, new-category proposals, web triage surface (see the specs).
+
 ## 0.1.2 – 2026-11-06
 - Fix: the triage confirm checkbox tolerates stray blanks from hand edits (`[ x]`, `[x ]`, `[  ]`, `[]`); a single odd cell no longer fails the whole `update_triage` call.
 

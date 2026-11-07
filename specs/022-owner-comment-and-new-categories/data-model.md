@@ -17,4 +17,6 @@ updated: 2026-11-06
 
 **Proposal note** (below `layout.proposals_dir`, `new-category-<slug>-<item id>.md`): front matter `type: agent_task`, `kind: new_category`, `status: proposed`, `category_id`, `pkpipe_item`; body: the requested name, the title and note of the `misc.evaluate` session (neutralised), a `categories.json` entry draft in a code block, how to publish it.
 
+**proposal_attempts** (app DB table, FR-009): `item_id` (primary key), `requested` (slug), `attempts` (failed evaluations), `updated_at`. `get` is 0 for another requested name; `bump` after a failed evaluation; `clear` after a written note. `MAX_PROPOSAL_ATTEMPTS = 3` (`domain/triage.py`).
+
 **Vault tool `update_triage`**: `rows: []` is the maintenance call (migration only). A row naming `comment` is refused (existing rows: a changed value; new rows: any value).

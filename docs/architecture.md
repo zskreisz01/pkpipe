@@ -203,7 +203,7 @@ Dependencies point inwards: inbound adapters call the core, the core knows only 
 | Evals + publish gate | `pkpipe.evals` (`gate.PublishGate`, `runner.EvalRunner`, `suites`, `judge.Judge`, `cassette.CassetteModel`) | ModelPort (default + judge profile), ClassifierPort | Gates every UI publish |
 | Telemetry | `pkpipe.telemetry` (`runtime.Telemetry`, `export.ScrubbingExporter`, `ResilientExporter`) | OpenTelemetry, OpenInference | OTLP backend: environment only |
 | Owner vault channel | `pkpipe.obsidian.vault.Vault` (`owner_decide`, `owner_release_quarantine`) | Vault files | – |
-| App store | `pkpipe.adapters.app_store_sqlite.AppStore` | SQLite | Drafts, publishes, owner audit log |
+| App store | `pkpipe.adapters.app_store_sqlite.AppStore` | SQLite | Drafts, publishes, owner audit log, failed new-category proposals (`ProposalAttemptsPort`) |
 | OpenAI client | `pkpipe.adapters.model_openai.OpenAIModel` | `langchain-openai` | Model server: URL only |
 | MCP client | `pkpipe.adapters.tools_mcp.McpTools` | FastMCP client | Tool backend: `mcp_servers.json` only |
 | Notifiers | `pkpipe.adapters.notify_router.ChannelNotifier` → `notify_discord.DiscordWebhook`, `notify_teams.TeamsWorkflow`, `notify_apprise.AppriseChannel`, `notify_log.LogChannel` | `httpx`, `apprise`, `notify_templates` | New channel = new adapter |
