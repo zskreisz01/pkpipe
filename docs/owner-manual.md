@@ -70,7 +70,7 @@ flowchart LR
 - **How**, one of:
   - **Web UI (primary, spec 023):** the triage page `/triage`: image thumbnails, every field, filters, **Confirm all suggested in this set**, a category list and *propose a new category*, and your comment. See the [User guide](user-guide.md#deciding-in-the-web-ui).
   - **Obsidian** (fallback on the `vault` surface; on the `web` surface the file is only a summary page with a link): open `0-INBOX/Inbox-Triage.md`. For each row, tick the **confirm** checkbox if the suggestion is right, or write a category id into **override**. Leave a row alone to keep it pending.
-  - **Chat agent:** ask your MCP chat client to `list_triage`, then `confirm_item` / `override_item`. These are owner actions: the client must use the owner token (the agent token can only list and run flows). Each decision is logged on the UI audit page.
+  - **Chat agent:** ask your MCP chat client to `list_triage`, then `confirm_item` / `override_item` (and `retry_items` for failed items, see the user guide; the CLI has `pkpipe retry`). These are owner actions: the client must use the owner token (the agent token can only list and run flows). Each decision is logged on the UI audit page.
 - **Tips:** the notification shows confidence and reason per item; look closely at low-confidence ones. Every override becomes a training signal for the triage eval, so overriding is better than confirming a wrong category.
 - **If you skip it:** unreviewed items stay `pending`, are counted in the 06:00 daily summary and appear again in the next triage notification ("N older item(s) still wait for your decision"). Nothing is processed by default.
 

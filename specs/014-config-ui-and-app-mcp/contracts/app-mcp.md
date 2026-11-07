@@ -19,6 +19,7 @@ Endpoint `http://127.0.0.1:8787/mcp` (Streamable HTTP, same listener as the UI).
 | `confirm_item` | **owner** | `item_id: str` | updated row (`resource` datamarked) |
 | `override_item` | **owner** | `item_id: str`, `category: str` | updated row |
 | `release_quarantine` | **owner** | `item_id: str` | updated row (`state = pending`) |
+| `retry_items` | **owner** | `item_ids: list[str]` (spec 027, see `specs/027-retry-failed-items/contracts/retry.md`) | per item: retried or the refusal reason |
 
 Errors are MCP tool errors (`isError`) with a short message: `authentication required`,
 `'<tool>' is an owner action and needs the owner token`, `unknown flow`, `unknown run`, `unknown triage item`,

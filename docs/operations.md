@@ -253,7 +253,7 @@ PKPIPE_OVERLAY_DIR=~/pkpipe-overlay PKPIPE_VAULT_DIR=~/Vault uv run pkpipe serve
 
 **Tokens.** On first start `tokens.json` (mode 0600) is created in the data directory with an **owner** token and an **agent** token; `PKPIPE_TOKEN` / `PKPIPE_AGENT_TOKEN` (24+ characters) override them. Log into the UI with the owner token. Without `PKPIPE_OVERLAY_DIR` the config pages are read-only.
 
-**App MCP** is `http://127.0.0.1:8787/mcp` with `Authorization: Bearer <token>`. The agent token can `run_flow`, `get_run` and `list_triage`; `confirm_item`, `override_item` and `release_quarantine` are owner actions and need the owner token (give it only to a chat agent you trust to act for you). Every owner action and `run_flow` lands in the audit log (UI page `/audit`, `GET /api/audit`). Contract: `specs/014-config-ui-and-app-mcp/contracts/`.
+**App MCP** is `http://127.0.0.1:8787/mcp` with `Authorization: Bearer <token>`. The agent token can `run_flow`, `get_run` and `list_triage`; `confirm_item`, `override_item`, `release_quarantine` and `retry_items` are owner actions and need the owner token (give it only to a chat agent you trust to act for you). Every owner action and `run_flow` lands in the audit log (UI page `/audit`, `GET /api/audit`). Contract: `specs/014-config-ui-and-app-mcp/contracts/`.
 
 **Reaching the UI over Tailscale** (spec 023). Two supported setups, both private to your tailnet, **never Tailscale Funnel** (it publishes the UI to the internet):
 
