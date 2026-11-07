@@ -24,3 +24,4 @@ title: Glossary
 | Run report | The summary the pipeline sends after every triage and release run (counts, created evaluations / notebooks / podcasts, todos); spec 024 |
 | Todo block | The generated lines between the `pkpipe-todo` markers in the daily journal: `date - todo - item count - link` |
 | Owner | The single user of a pkpipe installation |
+| Config form | The generated edit form of a config section in the UI (spec 026); it edits the same draft as the JSON view |

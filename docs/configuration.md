@@ -368,6 +368,21 @@ What the flow does for a scope ([Refresh Project Contexts](process/refresh-proje
 
 The flows handle the data class `context` ([Flows](flows.md)): they validate and run on a loopback model only (a remote profile, fallback, environment value, egress tool or session with tools is refused), their traces carry no prompt or response content, and a flow that drops the data class fails validation.
 
+## Editing config in the UI: forms and JSON
+
+Every config section (`categories`, `schedules`, `channels`, `triage`, `ui`, `report`, `images`, `layout`, `security`, `snapshots`, `telemetry`, `evals`, `models`, `mcp_servers`) has two views in the UI (spec 026): a **form** and the **JSON** text. Both edit the same draft, so an edit saved in one view is what the other opens. Flows (`flows/<id>.json`) and text files keep the text editor.
+
+The forms are generated from the JSON Schema of the config models (`pkpipe schema`), so a new section or field has a form without UI code. What you see:
+
+- **Fields by type**: text, numbers (with their limits), enums as lists, booleans as *default / true / false* (leave *default* to keep a key out of the file), lists of values one per line, and **rows** for lists of objects and maps (a name per row) with *add*, *remove*, *move up* and *move down*. A shape without a widget appears as a JSON field in the same form.
+- **Categories**: each category with its `sessions` as rows (order is the run order). `instruction`, `system` and `context` of a session link to the text file they name (`instructions/<value>`, `prompts/system/<value>.md`, `contexts/<value>.md`); the text editor of an instruction shows about how many tokens it is, against the 800 token budget (a hint, not a gate). An `evaluate` session of a category is one more row with the same fields.
+- **Schedules**: the cron field shows the next three runs, or why the expression is invalid.
+- **Channels and routes**: a secret field (`url`, `urls`, `token`) takes an **`env:NAME` reference only**, in the form and in the JSON view; it shows whether the variable is set, never its value, and a literal secret that already sits in a file is not shown. Route events, channel names and the `env:` names already in use are offered as lists.
+- **Errors** appear at the field. They come from the section's model validated **merged onto the pack file** (an overlay file may name only what it changes), so a route to a channel of the pack is valid; the draft as a whole is validated again after every save and the form says if it is not valid yet.
+- **A pack section without an overlay file** saves only what you changed into a new overlay file instead of copying the pack file (a copy would shadow later pack updates). A pack entry cannot be removed that way; set `enabled: false` on it. A form that changes nothing writes nothing.
+
+Saving only changes the draft. Validate, smoke eval and publish below are unchanged.
+
 ## Publishing a change
 
 Edits in the UI are drafts. Publish runs schema and reference validation and a smoke eval on the affected step's dataset, then commits to the config git repo. A running flow finishes on the config version it started with; the version hash is stored in the run state and on every trace.

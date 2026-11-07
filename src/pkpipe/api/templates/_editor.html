@@ -4,7 +4,10 @@
   <input type="hidden" name="rev" value="{{ draft.rev }}">
   <input type="hidden" name="path" value="{{ info.path }}">
   <input type="hidden" name="base_hash" value="{{ draft.files[info.path].base_hash if info.path in draft.files else info.base_hash }}">
-  <textarea name="content" spellcheck="false" aria-label="file content">{{ content }}</textarea>
+  {% set is_instruction = info.path.startswith("instructions/") and info.path.endswith(".md") %}
+  <textarea name="content" spellcheck="false" aria-label="file content"
+    {% if is_instruction %}data-token-budget="800" data-token-target="tokens-hint"{% endif %}>{{ content }}</textarea>
+  {% if is_instruction %}<p class="muted small">Instruction text of a session: keep it near 800 tokens. <span id="tokens-hint" class="tokens {{ 'over' if ((content|length + 3) // 4) > 800 }}" data-testid="token-hint">about {{ (content|length + 3) // 4 }} tokens of 800</span></p>{% endif %}
   <p class="row"><button class="primary" type="submit">Save to draft</button>
   {% if message %}<span class="{{ 'err' if error else 'ok' }}" data-testid="editor-message">{{ message }}</span>{% endif %}</p>
 </form>

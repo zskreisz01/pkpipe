@@ -84,6 +84,14 @@ A category is configuration (its sessions, its folder, its instructions), so pkp
 If the evaluation fails (for example the model is down), the next 06:00 run tries again, at most 3 times. After the third failure the item stays `pending` and the evening message says "The proposal for 'children' failed 3 times and is not retried": change the override (a new name starts a fresh count) or add the category by hand.
 3. You add the category through a **config draft** in the UI (`/config`): validate, run the evals, publish. Then the next 06:00 run releases the item like any other. You can change the override to an existing category at any time instead.
 
+## Editing the configuration in forms
+
+`/config` lists every config file with **form** and **JSON** links. The form edits categories (and their sessions: add, remove, reorder), schedules (with a preview of the next runs), channels and routes, and every other section as fields with checks at the field. A session's instruction is one click away (`edit text`) with a token estimate against 800.
+
+- Secrets (webhook URLs, bot tokens) are written as `env:NAME`; the real value lives in the environment. A literal is refused.
+- You can add an `evaluate` session to a category here; spec 025's source discovery settings get their form the same way.
+- *Save to draft* changes nothing live. Review the diff, **validate**, run the **smoke eval** and **publish** on the Config page, as before. A pack section you did not change before is saved as a small overlay file (only your changes).
+
 ## Your comment
 
 `comment` is your column: the pipeline never writes, trims or clears it. It does one more thing (spec 023): at 06:00 your comment is given to the model session of the category as **your direction for that item** (`owner_note`: "why I filed this", "focus on the licence", "for the kids"), and to the evaluation of a new-category proposal. Rules that keep this safe:

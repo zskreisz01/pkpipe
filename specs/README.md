@@ -30,6 +30,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [022-owner-comment-and-new-categories](022-owner-comment-and-new-categories/spec.md) | Owner comment column and proposals for new categories | Completed | data-model |
 | [023-web-triage-surface](023-web-triage-surface/spec.md) | Web triage surface, owner note to the sessions, one place for the triage data | Completed | data-model |
 | [024-run-report-and-journal-todos](024-run-report-and-journal-todos/spec.md) | Run report after every run, and todos in the daily journal | Completed | data-model |
+| [026-config-editor-forms](026-config-editor-forms/spec.md) | Config editor forms in the UI (schema-driven, shared draft with the JSON view) | Completed | data-model |
 
 ## Implementation order
 

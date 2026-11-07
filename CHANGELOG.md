@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Spec 026: the config UI edits every config section as a generated form (fields from the Pydantic JSON Schema, add / remove / move rows, per-field errors validated on the merged layers, cron preview, instruction token hint, pickers for flows, categories, events and channels) next to the JSON view; both edit the same draft. Secrets in `channels.json` are `env:NAME` only in both views and a stored literal is never rendered. A pack section saves only what changed.
+
 ## 0.1.5 – 2026-11-07
 - Spec 024: after every triage and release run one report goes out as the `daily_summary` notification (new suggestions or items processed per category, quarantined and failed counts, created evaluations / notebooks / podcasts, what waits in the triage, and todos with counts: triage decisions to review, notebook materials and podcasts to process, tool evaluations to read). `report.enabled: false` keeps the earlier one-line messages. The report holds counts, ids and note links only.
 - Spec 024: the vault tool `write_journal_todos` sets one marked block (`<!-- pkpipe-todo:begin/end -->`, heading `## pkpipe todo`) of the day's daily journal with the todo lines `date - todo - item count - link`; off unless the vault policy grants the journal folder (`allow.write_journal_todos`) and `report.journal_todos.enabled` is on; never reads the journal out; outside every snapshot. New read-only tool `unreviewed_notes`.

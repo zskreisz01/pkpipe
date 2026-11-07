@@ -1,0 +1,21 @@
+{% from "_fields.html" import field %}
+<form id="cfg-form" hx-post="/ui/config/form/save" hx-target="#form-wrap" hx-swap="innerHTML">
+  <input type="hidden" name="draft_id" value="{{ draft.draft_id }}">
+  <input type="hidden" name="rev" value="{{ draft.rev }}">
+  <input type="hidden" name="path" value="{{ path }}">
+  <input type="hidden" name="base_hash" value="{{ base_hash }}">
+  {% if source == "pack" %}
+  <p class="card muted" data-testid="pack-note">This section comes from the pack. Saving writes only the values you changed into an overlay file; a pack entry is switched off with <code>enabled: false</code>, not by removing it.</p>
+  {% endif %}
+  {% if root.error %}<p class="err" data-testid="form-error" role="alert">{{ root.error }}</p>{% endif %}
+  {{ field(root, env_status, assets) }}
+  <datalist id="dl-flows">{% for f in hints.flows %}<option value="{{ f }}">{% endfor %}</datalist>
+  <datalist id="dl-categories">{% for f in hints.categories %}<option value="{{ f }}">{% endfor %}</datalist>
+  <datalist id="dl-events">{% for f in hints.events %}<option value="{{ f }}">{% endfor %}</datalist>
+  <datalist id="dl-channels">{% for f in hints.channels %}<option value="{{ f }}">{% endfor %}</datalist>
+  <datalist id="dl-env">{% for f in hints.env %}<option value="env:{{ f }}">{% endfor %}</datalist>
+  <p class="row"><button class="primary" type="submit">Save to draft</button>
+    {% if message %}<span class="{{ 'err' if error else 'ok' }}" data-testid="form-message" role="status">{{ message }}</span>{% endif %}
+    {% if saved %}<a href="/config">Review the diff, validate and publish</a>{% endif %}</p>
+  {% for e in problems %}<p class="err" data-testid="draft-problem">{{ e }}</p>{% endfor %}
+</form>

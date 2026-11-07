@@ -1,0 +1,94 @@
+{# Spec 026: recursive macros that render the field tree of api/forms.py. Autoescape is on: every value,
+   label and message is escaped. Names are built from schema property names and row numbers only. #}
+{% macro act(label, action, aria, cls="") -%}
+<button type="button" class="small {{ cls }}" aria-label="{{ aria }}" title="{{ aria }}"
+  hx-post="/ui/config/form/action" hx-include="#cfg-form" hx-target="#form-wrap" hx-swap="innerHTML"
+  hx-vals='{{ {"act": action}|tojson }}'>{{ label }}</button>
+{%- endmacro %}
+
+{% macro err(n) -%}
+{% if n.error %}<span class="err" id="e-{{ n.name }}" data-testid="field-error">{{ n.error }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro scalar(n, env_status, assets) -%}
+{% set da = ('aria-describedby="e-' ~ n.name ~ '" aria-invalid="true"')|safe if n.error else "" %}
+{% set cronid = "cron-" ~ n.name|replace(".", "-") %}
+{% if n.kind == "boolean" %}
+  <select id="{{ n.name }}" name="{{ n.name }}" {{ da }}>
+    {% if not n.required or n.has_default %}<option value="" {{ "selected" if not n.present }}>default{% if n.has_default %} ({{ "true" if n.default else "false" }}){% endif %}</option>{% endif %}
+    <option value="true" {{ "selected" if n.present and n.value }}>true</option>
+    <option value="false" {{ "selected" if n.present and not n.value }}>false</option>
+  </select>
+{% elif n.kind == "enum" %}
+  <select id="{{ n.name }}" name="{{ n.name }}" {{ da }}>
+    {% if not n.required or n.nullable %}<option value="" {{ "selected" if not n.present }}>{% if n.has_default and n.default is not none %}default ({{ n.default }}){% else %}-{% endif %}</option>{% endif %}
+    {% for o in n.enum %}<option value="{{ o }}" {{ "selected" if n.present and n.value == o }}>{{ o }}</option>{% endfor %}
+  </select>
+{% elif n.kind == "text" %}
+  <textarea id="{{ n.name }}" name="{{ n.name }}" rows="3" class="short" {{ da }}>{{ n.value if n.value is not none }}</textarea>
+{% elif n.kind in ("lines", "json") %}
+  <textarea id="{{ n.name }}" name="{{ n.name }}" rows="{{ 4 if n.kind == 'lines' else 6 }}" class="short" spellcheck="false" {{ da }}
+    {% if n.hint %}placeholder="{{ n.hint }}"{% endif %}>{{ n.value if n.value is not none }}</textarea>
+  <span class="muted small">{{ "one per line" if n.kind == "lines" else "JSON" }}</span>
+{% elif n.kind in ("integer", "number") %}
+  <input id="{{ n.name }}" name="{{ n.name }}" type="number" step="{{ 1 if n.kind == 'integer' else 'any' }}"
+    {% if n.minimum is not none %}min="{{ n.minimum }}"{% endif %} {% if n.maximum is not none %}max="{{ n.maximum }}"{% endif %}
+    value="{{ n.value if n.value is not none }}" {% if n.has_default and n.default is not none %}placeholder="{{ n.default }}"{% endif %}
+    {{ da }} {{ "required" if n.required and not n.has_default }}>
+{% else %}
+  {% if n.secret %}
+  <input id="{{ n.name }}" name="{{ n.name }}" type="text" autocomplete="off" spellcheck="false" placeholder="env:NAME"
+    value="{{ n.value if n.value is not none and not n.extra.get('literal') }}" list="dl-env" {{ da }}>
+  {% if n.extra.get("literal") %}<span class="err">stored as a literal: enter an env:NAME reference to replace it</span>{% endif %}
+  {% if n.value is string and n.value.startswith("env:") %}{% set var = n.value[4:] %}<span class="pill {{ 'done' if env_status.get(var) else 'failed' }}">{{ "set" if env_status.get(var) else "not set" }}</span>{% endif %}
+  {% elif n.widget == "cron" %}
+  <input id="{{ n.name }}" name="{{ n.name }}" type="text" value="{{ n.value if n.value is not none }}" required spellcheck="false" aria-describedby="{{ cronid }}"
+    hx-get="/ui/config/cron-preview" hx-trigger="keyup changed delay:400ms, load" hx-target="#{{ cronid }}" hx-include="this">
+  <span id="{{ cronid }}" class="muted small" role="status"></span>
+  {% else %}
+  <input id="{{ n.name }}" name="{{ n.name }}" type="text" value="{{ n.value if n.value is not none }}"
+    {% if n.hint %}list="dl-{{ n.hint }}"{% endif %} {% if n.has_default and n.default is not none %}placeholder="{{ n.default }}"{% endif %}
+    {{ da }} {{ "required" if n.required and not n.has_default and n.kind == "string" }}>
+  {% if n.widget == "asset" and assets.get(n.name) %}<a class="small" href="/config/edit?path={{ assets[n.name]|urlencode }}">edit text</a>{% endif %}
+  {% endif %}
+{% endif %}
+{%- endmacro %}
+
+{% macro field(n, env_status, assets) -%}
+{% if n.kind == "object" %}
+<fieldset class="obj">{% if n.label %}<legend>{{ n.label }}</legend>{% endif %}
+  {% if n.help %}<p class="muted small">{{ n.help }}</p>{% endif %}
+  {% for c in n.children %}{{ field(c, env_status, assets) }}{% endfor %}
+</fieldset>
+{% elif n.kind in ("array", "map") %}
+<fieldset class="list" data-testid="list-{{ n.name }}"><legend>{{ n.label }} <span class="muted">({{ n.children|length }})</span></legend>
+  {% if n.help %}<p class="muted small">{{ n.help }}</p>{% endif %}
+  {% for r in n.children %}
+  <div class="rowcard" id="row-{{ r.name }}">
+    <div class="row rowhead">
+      {% if n.kind == "map" %}
+      <label class="inline" for="{{ r.extra.key_name }}">name</label>
+      <input id="{{ r.extra.key_name }}" name="{{ r.extra.key_name }}" type="text" value="{{ r.key }}" required spellcheck="false"
+        {% if n.extra.get("key_hint") %}list="dl-{{ n.extra.key_hint }}"{% endif %}>
+      {% if r.extra.get("key_error") %}<span class="err" data-testid="field-error">{{ r.extra.key_error }}</span>{% endif %}
+      {% else %}<strong>{{ r.label }}</strong>{% endif %}
+      <span class="spacer"></span>
+      {% if not loop.first %}{{ act("↑", "up:" ~ n.name ~ ":" ~ r.row, "move " ~ r.label ~ " up") }}{% endif %}
+      {% if not loop.last %}{{ act("↓", "down:" ~ n.name ~ ":" ~ r.row, "move " ~ r.label ~ " down") }}{% endif %}
+      {{ act("remove", "del:" ~ n.name ~ ":" ~ r.row, "remove " ~ (r.key or r.label), "danger") }}
+    </div>
+    {% if r.kind == "object" %}{% for c in r.children %}{{ field(c, env_status, assets) }}{% endfor %}
+    {% else %}{{ field(r, env_status, assets) }}{% endif %}
+  </div>
+  {% endfor %}
+  <p>{{ act("add entry" if n.kind == "map" else "add row", "add:" ~ n.name, "add a row to " ~ n.label) }}</p>
+  {{ err(n) }}
+</fieldset>
+{% else %}
+<div class="fld {{ 'invalid' if n.error }}">
+  <label for="{{ n.name }}">{{ n.label }}{% if n.required and n.kind not in ("boolean",) %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+  {{ scalar(n, env_status, assets) }} {{ err(n) }}
+  {% if n.help %}<p class="muted small">{{ n.help }}</p>{% endif %}
+</div>
+{% endif %}
+{%- endmacro %}

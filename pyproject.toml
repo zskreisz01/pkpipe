@@ -104,6 +104,8 @@ files = [
   "src/pkpipe/domain/data_classes.py",
   "src/pkpipe/steps/image_code.py",
   "src/pkpipe/adapters/image_pillow.py",
+  # spec 026
+  "src/pkpipe/api/forms.py",
 ]
 ignore_missing_imports = true
 follow_imports = "silent"
