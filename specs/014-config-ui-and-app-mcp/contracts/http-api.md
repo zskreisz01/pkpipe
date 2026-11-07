@@ -26,5 +26,5 @@ Owner token (bearer) or login session; the agent token only reaches `/mcp` and `
 | `GET /api/publishes`, `GET /api/publishes/{id}/diff`, `POST /api/publishes/{id}/rollback` | history, diff, rollback |
 | `GET /api/audit` | owner action log |
 
-Browser pages: `/`, `/triage`, `/runs`, `/runs/{id}`, `/config`, `/config/edit?path=`, `/publishes/{id}`,
-`/audit`, `/login`. HTMX fragments live under `/ui/...` and need the `X-CSRF-Token` header.
+Browser pages: `/`, `/triage`, `/runs`, `/runs/{id}`, `/config`, `/config/edit?path=`, `/config/form?path=` (schema-driven form, spec 026), `/publishes/{id}`,
+`/audit`, `/login`. HTMX fragments live under `/ui/...` and need the `X-CSRF-Token` header; spec 026 adds `/ui/config/form/save`, `/ui/config/form/action` and `/ui/config/cron-preview`.
