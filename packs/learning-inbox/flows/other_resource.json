@@ -1,8 +1,16 @@
 {
   "id": "other_resource",
-  "description": "Process one released item of a category with a session plan (Tool, Marketing, Misc, overlay categories): load the plan from categories.json, run secure fetch when a session reads the page extract (raw page text only reaches the Reader), run the sessions in plan order (spec 010; each is an isolated session with its declared inputs, the run canary and its own span), check everything they produced with the output guard, then store the note in the category's PARA folder (with its system relevance, spec 016), add a new-category suggestion to the agent tasks, add a system tool candidate to System-Tool-Candidates (a rejected or adopted tool is never added again), set the processing-list status and archive the INBOX note. A flag hands the item to handle_security_flag; a failed session or fetch lists the item as failed with the reason.",
+  "description": "Process one released item of a category with a session plan (Tool, Marketing, Misc, overlay categories): load the plan from categories.json, run secure fetch when a session reads the page extract (raw page text only reaches the Reader), run the sessions in plan order (spec 010; each is an isolated session with its declared inputs, the run canary and its own span), check everything they produced with the output guard, then store the note in the category's PARA folder (with its system relevance, spec 016), add a new-category suggestion to the agent tasks, add a system tool candidate to System-Tool-Candidates (a rejected or adopted tool is never added again), set the processing-list status and archive the INBOX note. A flag hands the item to handle_security_flag; a failed session or fetch lists the item as failed with the reason. Spec 025: an image item first loads its cached description (subflow load_image_description); an item without a URL in a category with source_discovery is not failed: item.find_sources searches the web with a guarded query built from the validated description or text, the found pages go through secure fetch one after the other (the next one when a fetch fails) and the category's own sessions evaluate the first clean page.",
   "bpmn": "process-other-resource",
   "nodes": [
+    {
+      "id": "load_description",
+      "type": "subflow",
+      "bpmn_element": "Load image description from the cache",
+      "config": {
+        "flow": "load_image_description"
+      }
+    },
     {
       "id": "fetch_note",
       "type": "tool",
@@ -55,6 +63,37 @@
           "processing_status": "failed",
           "failure_reason": "no source URL in the note"
         }
+      }
+    },
+    {
+      "id": "discover",
+      "type": "code",
+      "bpmn_element": "Find source by web search",
+      "config": {
+        "function": "item.find_sources",
+        "args": {
+          "note": "${read}"
+        }
+      }
+    },
+    {
+      "id": "no_source",
+      "type": "code",
+      "bpmn_element": "List item as failed (reason in the processing list)",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "processing_status": "failed",
+          "failure_reason": "${discover.reason}"
+        }
+      }
+    },
+    {
+      "id": "next_source",
+      "type": "code",
+      "bpmn_element": "Find source by web search",
+      "config": {
+        "function": "item.next_source"
       }
     },
     {
@@ -214,6 +253,14 @@
   "edges": [
     {
       "from": "START",
+      "to": "load_description",
+      "when": {
+        "path": "item.kind",
+        "eq": "image"
+      }
+    },
+    {
+      "from": "START",
       "to": "fetch_note",
       "when": {
         "path": "item.path",
@@ -222,6 +269,19 @@
     },
     {
       "from": "START",
+      "to": "read",
+      "default": true
+    },
+    {
+      "from": "load_description",
+      "to": "security_flag",
+      "when": {
+        "path": "item.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "load_description",
       "to": "read",
       "default": true
     },
@@ -247,6 +307,14 @@
       "when": {
         "path": "plan.status",
         "eq": "no_url"
+      }
+    },
+    {
+      "from": "plan",
+      "to": "discover",
+      "when": {
+        "path": "plan.status",
+        "eq": "discover"
       }
     },
     {
@@ -280,6 +348,40 @@
     },
     {
       "from": "secure_fetch",
+      "to": "next_source",
+      "when": {
+        "path": "item.source_discovered",
+        "truthy": true
+      }
+    },
+    {
+      "from": "secure_fetch",
+      "to": "fetch_failed",
+      "default": true
+    },
+    {
+      "from": "discover",
+      "to": "secure_fetch",
+      "when": {
+        "path": "discover.status",
+        "eq": "ok"
+      }
+    },
+    {
+      "from": "discover",
+      "to": "no_source",
+      "default": true
+    },
+    {
+      "from": "next_source",
+      "to": "secure_fetch",
+      "when": {
+        "path": "next_source.status",
+        "eq": "ok"
+      }
+    },
+    {
+      "from": "next_source",
       "to": "fetch_failed",
       "default": true
     },

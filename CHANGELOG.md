@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Spec 025: an item that needs a page but names no URL (an image whose description shows no address, a note or text entry without a link) is no longer failed with "no source URL in the note" when `source_discovery` is on for its category (off by default; `categories` default `["tool"]`). One guarded web search is built from the validated image description or the owner's text by a template (no model), the first clean found page is fetched by secure fetch (the next candidate when a fetch fails) and the category's own configured sessions evaluate it. Released images load their cached description again (`load_image_description`), so images that show an address work too. Failures are fixed, content-free reasons; the flow eval harness learns the case inputs `config` and `search`.
+
 ## 0.1.5 – 2026-11-07
 - Spec 024: after every triage and release run one report goes out as the `daily_summary` notification (new suggestions or items processed per category, quarantined and failed counts, created evaluations / notebooks / podcasts, what waits in the triage, and todos with counts: triage decisions to review, notebook materials and podcasts to process, tool evaluations to read). `report.enabled: false` keeps the earlier one-line messages. The report holds counts, ids and note links only.
 - Spec 024: the vault tool `write_journal_todos` sets one marked block (`<!-- pkpipe-todo:begin/end -->`, heading `## pkpipe todo`) of the day's daily journal with the todo lines `date - todo - item count - link`; off unless the vault policy grants the journal folder (`allow.write_journal_todos`) and `report.journal_todos.enabled` is on; never reads the journal out; outside every snapshot. New read-only tool `unreviewed_notes`.

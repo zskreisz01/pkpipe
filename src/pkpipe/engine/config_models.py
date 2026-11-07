@@ -619,6 +619,65 @@ class ReportConfig(_Strict):
     journal_todos: JournalTodosConfig = Field(default_factory=JournalTodosConfig)
 
 
+class SourceDiscoveryConfig(_Strict):
+    """Items without a source URL: find one by web search (spec 025). Off by default: a search query leaves
+    the machine, so the owner switches it on knowingly."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Search for the source of an item that names no URL (an image, a note without a link) "
+        "instead of failing it with 'no source URL in the note'. Needs the websearch tool of the category "
+        "plan's server and the secure-fetch web-fetch server",
+    )
+    categories: list[str] = Field(
+        default_factory=lambda: ["tool"],
+        description="Categories (ids) that use discovery. Only categories whose subflow is other_resource "
+        "can: learning-material would send a found URL to the notebook service and is not supported",
+    )
+    from_images: bool = Field(
+        default=True,
+        description="Image items: the query is built from the validated image description (topic and the "
+        "first words of the visible text). An address in the image wins over a search",
+    )
+    from_notes: bool = Field(
+        default=True, description="Note and text items without a link: query from the text"
+    )
+    max_candidates: int = Field(
+        default=2,
+        ge=1,
+        le=5,
+        description="At most this many found pages are fetched, in order, until one is clean",
+    )
+    max_results: int = Field(default=5, ge=1, le=10, description="Results asked from the search tool")
+    max_query_chars: int = Field(default=120, ge=20, le=300, description="Longest search query (whole words)")
+    query_template: str = Field(
+        default="{topic} {text}",
+        max_length=200,
+        description="Placeholders {topic} (image topic, or empty) and {text} (image visible text, or the "
+        "text of the note). Nothing else is substituted; no model builds the query",
+    )
+
+    @field_validator("categories")
+    @classmethod
+    def _categories(cls, value: list[str]) -> list[str]:
+        import re as _re
+
+        for c in value:
+            if not _re.fullmatch(r"[a-z0-9][a-z0-9-]{0,39}", c):
+                raise ValueError(f"category id '{c}' is not a valid id")
+        return list(dict.fromkeys(value))
+
+    @field_validator("query_template")
+    @classmethod
+    def _template(cls, value: str) -> str:
+        import string as _string
+
+        names = {f for _, f, _, _ in _string.Formatter().parse(value) if f is not None}
+        if not names <= {"topic", "text"} or not names:
+            raise ValueError("query_template may use only {topic} and {text}, at least one of them")
+        return value
+
+
 _HOST = re.compile(r"^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$")
 
 
@@ -701,6 +760,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "triage": TriageConfig,
     "ui": UiConfig,
     "report": ReportConfig,
+    "source_discovery": SourceDiscoveryConfig,
     "telemetry": TelemetrySettings,
     "evals": EvalsConfig,
 }

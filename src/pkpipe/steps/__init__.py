@@ -38,6 +38,7 @@ BUILTIN_MODULES = (
     "pkpipe.steps.flow_control",
     "pkpipe.steps.triage_code",
     "pkpipe.steps.report_code",
+    "pkpipe.steps.discovery_code",
     "pkpipe.steps.improvement_code",
     "pkpipe.steps.secure_fetch",
     "pkpipe.steps.learning_code",

@@ -24,6 +24,7 @@ node's own config, assets and declared inputs, so the eval measures exactly what
 from __future__ import annotations
 
 import contextvars
+import dataclasses
 import hashlib
 import json
 import re
@@ -905,6 +906,11 @@ class FlowsSuite(Suite):
         from pkpipe.steps import StepPorts
 
         inp, exp = case.input, case.expected or {}
+        if inp.get(
+            "config"
+        ):  # spec 025: a case may switch a config section on (merged over the pinned section)
+            patched = {k: {**(snapshot.data.get(k) or {}), **v} for k, v in inp["config"].items()}
+            snapshot = dataclasses.replace(snapshot, data={**snapshot.data, **patched})
         with tempfile.TemporaryDirectory(prefix="pkpipe-eval-flow-") as tmp:
             vault = Path(tmp) / "vault"
             for folder in (DEFAULT_LAYOUT.inbox_dir, DEFAULT_LAYOUT.resources_dir):
@@ -923,7 +929,9 @@ class FlowsSuite(Suite):
                 Path(tmp) / "security" / "deny_list.txt",
                 seed=snapshot.asset(deny_rel) if deny_rel else None,
             )
-            web = flowkit.ScriptedWeb(inp.get("web") or {}, down=bool(inp.get("web_down")))
+            web = flowkit.ScriptedWeb(
+                inp.get("web") or {}, down=bool(inp.get("web_down")), search_results=inp.get("search")
+            )
             ports = StepPorts(
                 clock=clock,
                 tracer=OtelTracer(),

@@ -23,4 +23,5 @@ title: Glossary
 | Eval gate | Required green eval before a change is published |
 | Run report | The summary the pipeline sends after every triage and release run (counts, created evaluations / notebooks / podcasts, todos); spec 024 |
 | Todo block | The generated lines between the `pkpipe-todo` markers in the daily journal: `date - todo - item count - link` |
+| Source discovery | Spec 025: for an item that names no URL, one guarded web search from the validated image description or the owner's text finds the page the category's sessions then evaluate; off by default (`source_discovery.json`) |
 | Owner | The single user of a pkpipe installation |

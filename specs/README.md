@@ -30,6 +30,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [022-owner-comment-and-new-categories](022-owner-comment-and-new-categories/spec.md) | Owner comment column and proposals for new categories | Completed | data-model |
 | [023-web-triage-surface](023-web-triage-surface/spec.md) | Web triage surface, owner note to the sessions, one place for the triage data | Completed | data-model |
 | [024-run-report-and-journal-todos](024-run-report-and-journal-todos/spec.md) | Run report after every run, and todos in the daily journal | Completed | data-model |
+| [025-find-and-evaluate-urlless-items](025-find-and-evaluate-urlless-items/spec.md) | Find the source of items without a URL and evaluate it | Completed | data-model |
 
 ## Implementation order
 
