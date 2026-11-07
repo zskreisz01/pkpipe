@@ -32,6 +32,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [024-run-report-and-journal-todos](024-run-report-and-journal-todos/spec.md) | Run report after every run, and todos in the daily journal | Completed | data-model |
 | [027-retry-failed-items](027-retry-failed-items/spec.md) | The owner retries failed items | Completed | data-model · contracts |
 | [025-find-and-evaluate-urlless-items](025-find-and-evaluate-urlless-items/spec.md) | Find the source of items without a URL and evaluate it | Completed | data-model |
+| [026-config-editor-forms](026-config-editor-forms/spec.md) | Config editor forms in the UI (schema-driven, shared draft with the JSON view) | Completed | data-model |
 
 ## Implementation order
 

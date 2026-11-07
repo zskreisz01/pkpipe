@@ -11,7 +11,7 @@ relevant_when:
   - app MCP
   - Hermes
 related: [013-evaluation-framework, 005-flow-engine, 004-obsidian-vault-mcp, 006-notifications]
-updated: 2026-11-01
+updated: 2026-11-08
 ---
 
 # Feature Specification: Config UI and app MCP server

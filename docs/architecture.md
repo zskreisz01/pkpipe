@@ -181,7 +181,7 @@ Dependencies point inwards: inbound adapters call the core, the core knows only 
 
 | Component | Module (main classes) | Depends on | Replacing it affects |
 | --- | --- | --- | --- |
-| REST + UI router | `pkpipe.api.app.create_app`, `pkpipe.api.services.AppServices`, `RunLauncher`, `pkpipe.api.workspace.ConfigWorkspace`, `pkpipe.api.security.GuardMiddleware` | Run service, Config registry, App store, Publish gate | UI only |
+| REST + UI router | `pkpipe.api.app.create_app`, `pkpipe.api.services.AppServices`, `RunLauncher`, `pkpipe.api.workspace.ConfigWorkspace`, `pkpipe.api.forms` (schema-driven config forms), `pkpipe.api.security.GuardMiddleware` | Run service, Config registry, App store, Publish gate | UI only |
 | App MCP server | `pkpipe.mcp.server.build_app_mcp` (`run_flow`, `get_run`, `list_triage`, `confirm_item`, `override_item`, `release_quarantine`, `retry_items`, `restore_run`) | `pkpipe.api.services.AppServices`, Triage domain | MCP clients only |
 | Scheduler | `pkpipe.scheduler.FlowScheduler` | Run service, APScheduler SQLite job store | Nothing |
 | CLI | `pkpipe.cli.main`, `pkpipe.candidates_cli`, `pkpipe.snapshot_cli`, `pkpipe.system.cli`, `pkpipe.evals.cli` | Run service, Snapshot restore, Preflight service, Evals | – |
@@ -316,5 +316,5 @@ The code level names the classes that carry each component; the tables above giv
 | web-fetch | `SecureFetcher`, `FilteringProxy`, `LightpandaBrowser`, `ChromiumBrowser`, `Browser` | `pkpipe.webfetch.service`, `.proxy`, `.browsers` |
 | learning-gateway | `LearningGateway`, `JobStore`, `LearningBackend`, `OpenNotebookBackend`, `NotebookLMBrowserBackend`, `FakeBackend`, `check_url` | `pkpipe.learning.gateway`, `.store`, `.backend`, `.backends`, `.urlcheck` |
 | obsidian-vault | `Vault`, `VaultPolicy`, `TableFile`, `TriageRow`, `ProcessingListRow` | `pkpipe.obsidian.vault`, `.policy`, `.tables`, `.models` |
-| App MCP, UI | `build_app_mcp`, `create_app`, `AppServices`, `RunLauncher`, `ConfigWorkspace`, `Publisher`, `GitRepo`, `Tokens` | `pkpipe.mcp.server`, `pkpipe.api.*` |
+| App MCP, UI | `build_app_mcp`, `create_app`, `AppServices`, `RunLauncher`, `ConfigWorkspace`, `forms`, `Publisher`, `GitRepo`, `Tokens` | `pkpipe.mcp.server`, `pkpipe.api.*` |
 | Pack | flows (`flows/*.json`), categories with session plans, prompts, instructions, schemas, templates, `mcp_servers.json`, `models.json`, `security.json` | `packs/learning-inbox/` |

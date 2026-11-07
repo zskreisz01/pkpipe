@@ -26,3 +26,4 @@ title: Glossary
 | Retry (failed item) | The owner's action that sends a processed item with a failed result through the next release run again; bounded by `triage.retry_max`; spec 027 |
 | Source discovery | Spec 025: for an item that names no URL, one guarded web search from the validated image description or the owner's text finds the page the category's sessions then evaluate; off by default (`source_discovery.json`) |
 | Owner | The single user of a pkpipe installation |
+| Config form | The generated edit form of a config section in the UI (spec 026); it edits the same draft as the JSON view |

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Form {{ path }}{% endblock %}
+{% block body %}
+<h1>{{ path }}</h1>
+<nav class="tabs" aria-label="editor view"><span class="pill done" aria-current="page">Form</span>
+  <a class="pill" href="/config/edit?path={{ path|urlencode }}">JSON</a> <a href="/config">Back to config</a></nav>
+<p class="muted">Both views edit the same draft. Nothing changes until you validate and publish it.</p>
+{% if error_text %}<p class="card err" data-testid="form-unavailable">{{ error_text }}</p>
+{% elif not draft %}<p class="card err">The config is read-only here (no private overlay is configured).</p>
+{% else %}<div id="form-wrap">{% include "_form.html" %}</div>{% endif %}
+{% endblock %}

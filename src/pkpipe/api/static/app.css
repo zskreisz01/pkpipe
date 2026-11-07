@@ -39,3 +39,19 @@ td.comment textarea { min-height:3rem; width:16rem; font:inherit; }
 .resource { word-break:break-all; }
 form.decide { display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; }
 form.filters, form.bulk { margin:.6rem 0; align-items:flex-end; }
+/* spec 026: config forms */
+fieldset.obj, fieldset.list { border:1px solid var(--line); margin:.6rem 0; padding:.4rem .8rem .8rem; background:var(--card); }
+fieldset.obj fieldset.obj { background:transparent; }
+legend { font-weight:600; padding:0 .3rem; }
+.rowcard { border:1px solid var(--line); margin:.5rem 0; padding:.4rem .7rem; background:var(--bg); }
+.rowhead { margin-bottom:.3rem; }
+.spacer { flex:1; }
+.fld { margin:.35rem 0; }
+.fld input[type=text], .fld input[type=number], .fld select, .fld textarea.short { width:100%; max-width:46rem; background:var(--card); color:var(--fg); border:1px solid var(--line); padding:.3rem .45rem; font:inherit; }
+textarea.short { min-height:4rem; }
+.fld.invalid input, .fld.invalid select, .fld.invalid textarea { border-color:var(--bad); outline:1px solid var(--bad); }
+.req { color:var(--bad); }
+.small { font-size:.8rem; }
+button.small { padding:.1rem .5rem; }
+nav.tabs { display:flex; gap:.6rem; align-items:center; margin:.4rem 0; }
+.tokens.over { color:var(--bad); font-weight:600; }
