@@ -6,7 +6,7 @@
     {
       "id": "load_description",
       "type": "subflow",
-      "bpmn_element": "Load image description from the cache",
+      "bpmn_element": "Load image description from the cache (image items; no model call)",
       "config": {
         "flow": "load_image_description"
       }
@@ -68,7 +68,7 @@
     {
       "id": "discover",
       "type": "code",
-      "bpmn_element": "Find source by web search",
+      "bpmn_element": "Find source by web search (guarded query, next page if a fetch fails)",
       "config": {
         "function": "item.find_sources",
         "args": {
@@ -91,7 +91,7 @@
     {
       "id": "next_source",
       "type": "code",
-      "bpmn_element": "Find source by web search",
+      "bpmn_element": "Find source by web search (guarded query, next page if a fetch fails)",
       "config": {
         "function": "item.next_source"
       }

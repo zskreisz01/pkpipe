@@ -10,7 +10,7 @@
     {
       "id": "prepare",
       "type": "code",
-      "bpmn_element": "Load image description from the cache",
+      "bpmn_element": "Load image description from the cache (image items; no model call)",
       "config": {
         "function": "image.prepare",
         "args": {
@@ -21,7 +21,7 @@
     {
       "id": "finish",
       "type": "code",
-      "bpmn_element": "Load image description from the cache",
+      "bpmn_element": "Load image description from the cache (image items; no model call)",
       "config": {
         "function": "image.finish",
         "args": {
