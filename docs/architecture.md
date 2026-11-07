@@ -194,6 +194,7 @@ Dependencies point inwards: inbound adapters call the core, the core knows only 
 | Output guard | `pkpipe.steps.output_guard.OutputGuardStep`, `pkpipe.security.guard.check_output` | ClassifierPort, canary, heuristics | – |
 | Security library | `pkpipe.security` (`urlfilter.UrlPolicy`, `sanitize`, `heuristics`, `canary`, `verdict`, `quarantine`, `query_guard`) | Nothing (pure Python) | – |
 | Triage domain | `pkpipe.domain.triage`, `pkpipe.steps.triage_code` | Nothing (pure Python) | – |
+| Failed-item retry | `pkpipe.domain.triage.check_retry`, `pkpipe.obsidian.lists.retry_item`, `pkpipe.api.services.AppServices.retry_item`, `pkpipe.retry_cli` | App DB table `item_retries`, vault tool `failed_items` (read only); owner channels UI, HTTP, app MCP `retry_items`, CLI | – |
 | Run report and journal todos | `pkpipe.domain.run_report`, `pkpipe.domain.journal_todos`, `pkpipe.steps.report_code`, subflow `run_report` | Notify port, vault tools `unreviewed_notes` and `write_journal_todos` (MCP) | – |
 | Context packs | `pkpipe.domain.context_pack`, `pkpipe.steps.context_code` | ContextStorePort | – |
 | Improvements, tool candidates | `pkpipe.domain.improvement`, `pkpipe.domain.tool_candidate`, `pkpipe.steps.improvement_code`, `pkpipe.evals.ab` | Vault tools (MCP) | – |

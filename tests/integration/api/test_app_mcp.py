@@ -19,6 +19,7 @@ TOOLS = {
     "override_item",
     "get_run",
     "release_quarantine",
+    "retry_items",  # spec 027
     "restore_run",
 }
 TRIAGE_FILE = "0-INBOX/Inbox-Triage.md"

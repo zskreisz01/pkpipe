@@ -86,6 +86,7 @@ The flow calls [Handle Security Flag](process/handle-security-flag.md) for the i
 3. The note moves to `0-INBOX/_quarantine/` in inert form: verbatim inside a fenced code block, `security_flag` front matter with flag codes only. Only the vault tool `quarantine_note` writes there (the folder is `layout.quarantine_dir`); `write_note`, `append_note` and `move_note` refuse the folder.
 4. An alert goes to the configured channel and a `security.flag` event to the trace.
 5. A false positive is released by the owner (UI triage page or app MCP `release_quarantine`, owner token, audited): the note is restored exactly (byte for byte: the quarantine note records the original line ends and final newline), the row is `pending` again and the text becomes a candidate case of the security eval dataset (`<overlay>/evals/candidates/security.jsonl`). Domains are never unblocked automatically.
+6. **Failed items** (spec 027) are retried by the owner only: the retry is an owner guard (`check_retry`), not a transition of the state machine, so no pipeline step and no vault tool can leave `processed`; the UI, the HTTP API and the app MCP tool `retry_items` need the owner scope (the agent token is refused, audited), a quarantined item is never retryable, and each item is limited to `triage.retry_max` owner retries. Audit entries hold ids, counts and a refusal reason, never an item's text.
 
 ## Private data
 

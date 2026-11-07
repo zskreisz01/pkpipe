@@ -25,8 +25,9 @@ TODO_LABELS = {
     "approval": "Review triage decisions",
     "notebooks": "Process notebook materials and podcasts",
     "tool_reads": "Read tool evaluations",
+    "retry": "Retry failed items",  # spec 027
 }
-TODO_ORDER = ("approval", "notebooks", "tool_reads")
+TODO_ORDER = ("approval", "notebooks", "tool_reads", "retry")
 
 _SAFE_CHARS = re.compile(r"[^\w \-./()+&,']", re.UNICODE)
 
@@ -71,10 +72,14 @@ def external_link(label: str, url: str | None) -> str | None:
 
 
 def build_todos(
-    approval: int, notebooks: int, tool_reads: int, links: Mapping[str, str | None]
+    approval: int,
+    notebooks: int,
+    tool_reads: int,
+    links: Mapping[str, str | None],
+    retry: int = 0,
 ) -> list[Todo]:
     """The todos with a count above zero, in the fixed order of :data:`TODO_ORDER`."""
-    counts = {"approval": approval, "notebooks": notebooks, "tool_reads": tool_reads}
+    counts = {"approval": approval, "notebooks": notebooks, "tool_reads": tool_reads, "retry": retry}
     return [Todo(k, counts[k], links.get(k)) for k in TODO_ORDER if counts[k] > 0]
 
 

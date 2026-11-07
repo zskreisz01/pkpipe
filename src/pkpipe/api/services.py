@@ -20,7 +20,7 @@ from pkpipe.adapters.app_store_sqlite import AppStore
 from pkpipe.api.publish import Publisher, PublishError
 from pkpipe.api.workspace import ConfigWorkspace, WorkspaceError, category_entry
 from pkpipe.domain import session_plan as plans
-from pkpipe.domain.triage import ItemState, is_unreviewed, resolve_category
+from pkpipe.domain.triage import DEFAULT_MAX_RETRIES, ItemState, is_unreviewed, resolve_category
 from pkpipe.domain.vault_snapshot import SnapshotError, UnknownSnapshot
 from pkpipe.engine.restore import restore_run
 from pkpipe.engine.runs import ACTIVE, RunService
@@ -234,6 +234,9 @@ class AppServices:
         app MCP): the owner's comment is for the owner and the sessions' declared input only."""
         data = self._vault().read_triage()
         layout = self._vault().policy.layout
+        failed = self._failed_ids()
+        retries = self.store.retry_counts() if failed else {}
+        limit = self.retry_max()
         rows = []
         for r in data["rows"]:
             effective = r["override"] or r["ai_suggested_category"]
@@ -246,12 +249,84 @@ class AppServices:
             row = {**r, "resource": r["resource"][:MAX_RESOURCE_CHARS], "category": effective}
             if not with_comment:
                 row.pop("comment", None)
+            if r["state"] == ItemState.PROCESSED.value and r["item_id"] in failed:
+                # spec 027: the processing of this item failed; the owner may send it through again
+                done = retries.get(r["item_id"], 0)
+                row.update(failed=True, retries=done, retryable=done < limit)
             if r["state"] == ItemState.AWAITING_CATEGORY.value and r["override"]:
                 kind, slug = resolve_category(r["override"], self.category_map())
                 if kind == "new" and slug:
                     row["proposal_note"] = plans.proposal_path(layout.proposals_dir, slug, r["item_id"])
             rows.append(row)
         return {"rows": rows, "invalid": len(data["invalid"]), "conflicts": data["conflicts"]}
+
+    # -- retry of failed items (spec 027) -------------------------------------------------------------------
+    def retry_max(self) -> int:
+        """The owner's retries per failed item (``triage.retry_max``, default 3)."""
+        value = (self.runs.config().data.get("triage") or {}).get("retry_max", DEFAULT_MAX_RETRIES)
+        return value if isinstance(value, int) and value >= 1 else DEFAULT_MAX_RETRIES
+
+    def _failed_ids(self) -> dict[str, str]:
+        """``{item id: category}`` of the failed processing-list lines; empty when the list cannot be read."""
+        try:
+            return {i["item_id"]: i["category"] for i in self._vault().failed_items()["items"]}
+        except (VaultError, Refused):
+            return {}
+
+    def failed_summary(self) -> dict[str, Any]:
+        """Counts for the triage page and the report: failed items, how many may still be retried."""
+        failed = self._failed_ids()
+        done = self.store.retry_counts() if failed else {}
+        limit = self.retry_max()
+        rows = {r["item_id"]: r for r in self._vault().read_triage()["rows"]}
+        retryable = sum(
+            1
+            for i in failed
+            if rows.get(i, {}).get("state") == ItemState.PROCESSED.value and done.get(i, 0) < limit
+        )
+        return {
+            "failed": len(failed),
+            "retryable": retryable,
+            "capped": len(failed) - retryable,
+            "max": limit,
+        }
+
+    def retry_item(self, item_id: str, *, actor: str) -> dict[str, Any]:
+        """Owner decision (spec 027): a processed item whose processing failed goes back to ``released`` for
+        the next release run. Bounded by ``triage.retry_max`` per item; audited."""
+        done = self.store.retry_count(item_id)
+        try:
+            row = self._vault().owner_retry(item_id, retries=done, max_retries=self.retry_max())
+        except VaultError as exc:
+            self.store.audit(actor, "retry_item_refused", item_id, reason=str(exc))
+            raise Refused(str(exc)) from None
+        count = self.store.bump_retry(item_id)
+        self.store.audit(actor, "retry_item", item_id, retries=count, state=ItemState.RELEASED.value)
+        return {**row, "retries": count}
+
+    def retry_failed(self, *, actor: str, item_ids: list[str] | None = None) -> dict[str, Any]:
+        """Retry every failed item that may still be retried (or the named ones): the bulk action of the UI
+        and the app MCP. Items that cannot be retried (quarantined, over the limit, not failed) are skipped
+        and counted, never an error."""
+        wanted = set(item_ids) if item_ids is not None else None
+        retried: list[str] = []
+        skipped = capped = 0
+        done = self.store.retry_counts()
+        limit = self.retry_max()
+        for item_id in self._failed_ids():
+            if wanted is not None and item_id not in wanted:
+                continue
+            if done.get(item_id, 0) >= limit:
+                capped += 1
+                continue
+            try:
+                self.retry_item(item_id, actor=actor)
+            except Refused:
+                skipped += 1
+                continue
+            retried.append(item_id)
+        self.store.audit(actor, "bulk_retry", None, retried=len(retried), skipped=skipped, capped=capped)
+        return {"retried": len(retried), "skipped": skipped, "capped": capped, "item_ids": retried}
 
     def triage_info(self) -> dict[str, Any]:
         """Where the table lives and whether a switch of ``triage.surface`` still has to be moved by the next

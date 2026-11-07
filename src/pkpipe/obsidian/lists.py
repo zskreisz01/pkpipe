@@ -14,12 +14,13 @@ from pkpipe.domain.triage import (
     OwnerDecisionError,
     check_owner_decision,
     check_quarantine_release,
+    check_retry,
     check_transition,
 )
 
 from .atomic import update_text
 from .errors import InvalidRows
-from .models import EMBED_CELL, ProcessingListRow, TriageRow, item_id_for
+from .models import EMBED_CELL, ProcessingListRow, ProcessingStatus, TriageRow, item_id_for
 from .policy import is_conflict_name
 from .tables import TableFile
 
@@ -329,6 +330,55 @@ def upsert_processing_list(path: Path, rows: list[dict[str, Any]]) -> dict[str, 
 def read_processing_list(path: Path) -> list[ProcessingListRow]:
     table = _load(path, PROCESSING_COLUMNS, PROCESSING_PREAMBLE)
     return [ProcessingListRow.from_cells(c) for c in table.rows()]
+
+
+def failed_processing_items(path: Path) -> dict[str, str]:
+    """``{item id: category}`` of every line of the processing list whose status is ``failed`` (spec 027).
+
+    A hand-edited or unreadable line is skipped, never an error: this is a read of the owner's own file."""
+    failed: dict[str, str] = {}
+    try:
+        table = _load(path, PROCESSING_COLUMNS, PROCESSING_PREAMBLE)
+    except (OSError, InvalidRows):
+        return failed
+    for cells in table.rows():
+        if (cells.get("status") or "").strip().lower() == ProcessingStatus.FAILED.value:
+            failed[cells["item"]] = (cells.get("category") or "").strip()
+    return failed
+
+
+def retry_item(
+    triage_path: Path,
+    processing_path: Path,
+    item_id: str,
+    *,
+    retries: int,
+    max_retries: int,
+    preamble: str = TRIAGE_PREAMBLE,
+) -> dict[str, Any]:
+    """Owner decision (spec 027): a ``processed`` item whose processing list line says ``failed`` goes back to
+    ``released`` for the next release run. The owner's confirm / override stays, the failed line becomes
+    ``unprocessed`` (the next run writes the new result into the same line: no duplicate). The guard is
+    :func:`pkpipe.domain.triage.check_retry`; the pipeline's own transition rules are untouched."""
+    failed = failed_processing_items(processing_path)
+
+    def change(row: TriageRow) -> TriageRow:
+        check_retry(row.state, processing_failed=item_id in failed, retries=retries, max_retries=max_retries)
+        return row.model_copy(update={"state": ItemState.RELEASED})
+
+    result = _owner_edit(triage_path, item_id, change, preamble)
+    reset: dict[str, Any] = {}
+
+    def transform(text: str | None) -> str:
+        table = TableFile(text, PROCESSING_COLUMNS, key="item", preamble=PROCESSING_PREAMBLE)
+        cells = table.get(item_id)
+        if cells is not None:
+            table.upsert({**cells, "status": ProcessingStatus.UNPROCESSED.value})
+            reset["line"] = True
+        return table.render()
+
+    update_text(processing_path, transform)
+    return {**result, "processing_line_reset": bool(reset.get("line"))}
 
 
 def _short(exc: Exception) -> str:

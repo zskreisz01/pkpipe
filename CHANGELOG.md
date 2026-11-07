@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Spec 027: the owner retries failed items. A processed item whose processing list line says `failed` can be sent through the next release run again (UI Retry button and a confirmed *Retry all failed*, app MCP `retry_items`, `pkpipe retry`); at most `triage.retry_max` (default 3) times per item; confirm / override stay, the failed line becomes `unprocessed`; the state machine is unchanged (the guard is `check_retry`). New read-only vault tool `failed_items`, run report todo *Retry failed items*.
+
 ## 0.1.5 – 2026-11-07
 - Spec 024: after every triage and release run one report goes out as the `daily_summary` notification (new suggestions or items processed per category, quarantined and failed counts, created evaluations / notebooks / podcasts, what waits in the triage, and todos with counts: triage decisions to review, notebook materials and podcasts to process, tool evaluations to read). `report.enabled: false` keeps the earlier one-line messages. The report holds counts, ids and note links only.
 - Spec 024: the vault tool `write_journal_todos` sets one marked block (`<!-- pkpipe-todo:begin/end -->`, heading `## pkpipe todo`) of the day's daily journal with the todo lines `date - todo - item count - link`; off unless the vault policy grants the journal folder (`allow.write_journal_todos`) and `report.journal_todos.enabled` is on; never reads the journal out; outside every snapshot. New read-only tool `unreviewed_notes`.

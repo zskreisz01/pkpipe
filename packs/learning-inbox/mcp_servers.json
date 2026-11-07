@@ -19,6 +19,7 @@
       "inbox_remove_entries",
       "read_image",
       "unreviewed_notes",
+      "failed_items",
       "write_journal_todos"
     ]
   },

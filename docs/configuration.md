@@ -25,7 +25,7 @@ Core defaults (`CORE_DEFAULTS` in `pkpipe.engine.registry`) hold safe security v
 | `schedules.json` | Cron expression → flow; optional `misfire_grace_s` (default 21600) and `timezone` |
 | `categories.json` | Category → subflow, PARA path, triage hint, **session plan**, context |
 | `images.json` | Image input: the time budget of the image batch, the per-image estimate and timeout, scaling and size limits ([Image input](#image-input)) |
-| `triage.json` | `surface`: `vault` (default; the triage table is in the triage file) or `web` (the table lives in a data file, the triage file is a generated summary page; [below](#triage-surface-vault-or-web)) |
+| `triage.json` | `retry_max`: how often the owner may retry one failed item (1 to 20, default 3; spec 027). `surface`: `vault` (default; the triage table is in the triage file) or `web` (the table lives in a data file, the triage file is a generated summary page; [below](#triage-surface-vault-or-web)) |
 | `ui.json` | How the web UI is reached: `public_url` (linked from the generated triage page) and `allowed_hosts` (extra `Host` names: the MagicDNS name, the Tailscale IP) ([operations](operations.md#config-ui-and-app-mcp)) |
 | `layout.json` | The vault layout: every folder and file the flows and steps name ([Vault layout](#vault-layout)) |
 | `snapshots.json` | Retention of the vault snapshots taken before writing runs: `retention_days` (14), `max_bytes` (1 GiB), `max_file_bytes` (5 MiB; a larger note is manifest-only) ([operations](operations.md#vault-snapshots-and-restore)) |

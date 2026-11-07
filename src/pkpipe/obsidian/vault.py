@@ -492,6 +492,32 @@ class Vault:
             lists.owner_decide, item_id, confirm=confirm, override=override, categories=categories
         )
 
+    def _processing_path(self) -> Path:
+        return self.policy.resolve(self.policy.processing_list, "upsert_processing_list")
+
+    @_traced
+    def failed_items(self) -> dict[str, Any]:
+        """Item ids and categories of the processing-list lines marked ``failed`` (spec 027). Read only: no
+        note, resource or text is returned, so the run report and the owner channels may use it."""
+        failed = lists.failed_processing_items(self._processing_path())
+        return {"count": len(failed), "items": [{"item_id": i, "category": c} for i, c in failed.items()]}
+
+    @_traced
+    def owner_retry(self, item_id: str, *, retries: int, max_retries: int) -> dict[str, Any]:
+        """Owner decision (spec 027): a processed item with a failed result goes back to ``released``. Owner
+        channels only (no MCP tool of the vault server calls this): the one way out of ``processed``."""
+        _, path, preamble = self._table("update_triage")
+        result = lists.retry_item(
+            path,
+            self._processing_path(),
+            item_id,
+            retries=retries,
+            max_retries=max_retries,
+            preamble=preamble,
+        )
+        self._surface("update_triage").refresh_page(stamp=False)
+        return result
+
     @_traced
     def owner_comment(self, item_id: str, comment: str) -> dict[str, Any]:
         """The owner's comment of one row (spec 022 clarification 1, spec 023): owner channels only."""

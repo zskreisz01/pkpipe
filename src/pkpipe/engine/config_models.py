@@ -574,6 +574,14 @@ class TriageConfig(_Strict):
         "layout.triage_file is a generated summary page with a link and no table. The vault policy file "
         "of the vault server mirrors it as triage_surface (pkpipe validate checks both agree)",
     )
+    retry_max: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="How often the owner may send one failed item through the release again (spec 027). "
+        "The count per item is kept in the app database; at the limit the item has to be fixed or processed "
+        "by hand",
+    )
 
 
 class JournalTodosConfig(_Strict):

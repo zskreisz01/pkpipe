@@ -72,6 +72,11 @@ CREATE TABLE IF NOT EXISTS image_timing (
     at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS image_timing_model ON image_timing (model, seq);
+CREATE TABLE IF NOT EXISTS item_retries (
+    item_id TEXT PRIMARY KEY,
+    retries INTEGER NOT NULL,
+    updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS proposal_attempts (
     item_id TEXT PRIMARY KEY,
     requested TEXT NOT NULL,
@@ -289,6 +294,26 @@ class AppStore:
     def clear(self, item_id: str) -> None:
         with self._conn() as c:
             c.execute("DELETE FROM proposal_attempts WHERE item_id = ?", (item_id,))
+
+    # -- owner retries of failed items (spec 027) -----------------------------------------------------------
+    def retry_count(self, item_id: str) -> int:
+        with self._conn() as c:
+            row = c.execute("SELECT retries FROM item_retries WHERE item_id = ?", (item_id,)).fetchone()
+        return int(row["retries"]) if row else 0
+
+    def retry_counts(self) -> dict[str, int]:
+        with self._conn() as c:
+            rows = c.execute("SELECT item_id, retries FROM item_retries").fetchall()
+        return {r["item_id"]: int(r["retries"]) for r in rows}
+
+    def bump_retry(self, item_id: str) -> int:
+        count = self.retry_count(item_id) + 1
+        with self._conn() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO item_retries (item_id, retries, updated_at) VALUES (?, ?, ?)",
+                (item_id, count, _now()),
+            )
+        return count
 
     # -- audit ----------------------------------------------------------------------------------------------
     def audit(self, actor: str, action: str, target: str | None = None, **detail: Any) -> None:

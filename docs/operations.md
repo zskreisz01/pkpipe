@@ -47,6 +47,7 @@ Before the first node of every run whose flow can write to the vault (a tool cal
 | `pkpipe snapshot list [--json]` | Run, flow, time, size, files, status (`kept`, `restored`, `pruned`) |
 | `pkpipe snapshot show <run>` | Scope, what the run changed, notes that were not copied |
 | `pkpipe snapshot prune` | Remove snapshots past `snapshots.retention_days` and, while over `snapshots.max_bytes`, the oldest; the newest snapshot of each flow stays. Also runs after every new snapshot |
+| `pkpipe retry [--all \| ITEM ...] [--json]` | Spec 027, the owner's retry of failed items: without arguments only lists the failed items and their retries (`retried 1x`, `(limit)`); `--all` or item ids sends them through the next release run again (audit actor `cli`); exit 2 for `--all` with ids |
 | `pkpipe restore <run>` | **Dry run**: the plan with four verbs (`restore`, `remove`, `move_back`, `skip` with its reason); nothing changes |
 | `pkpipe restore <run> --apply` | Do it: first a snapshot of the current state (`restore-<run>-<time>-<n>`, so a restore is undoable too), then the plan. Exit 2 when a step was skipped |
 | `--force` | Also overwrite what changed since the run, after saving the current bytes in the snapshot's `trash/` |
