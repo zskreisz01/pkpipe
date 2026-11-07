@@ -196,6 +196,7 @@ Dependencies point inwards: inbound adapters call the core, the core knows only 
 | Triage domain | `pkpipe.domain.triage`, `pkpipe.steps.triage_code` | Nothing (pure Python) | – |
 | Failed-item retry | `pkpipe.domain.triage.check_retry`, `pkpipe.obsidian.lists.retry_item`, `pkpipe.api.services.AppServices.retry_item`, `pkpipe.retry_cli` | App DB table `item_retries`, vault tool `failed_items` (read only); owner channels UI, HTTP, app MCP `retry_items`, CLI | – |
 | Run report and journal todos | `pkpipe.domain.run_report`, `pkpipe.domain.journal_todos`, `pkpipe.steps.report_code`, subflow `run_report` | Notify port, vault tools `unreviewed_notes`, `failed_items` and `write_journal_todos` (MCP) | – |
+| Source discovery | `pkpipe.domain.source_discovery`, `pkpipe.steps.discovery_code`, flow `load_image_description` | Tool port (`websearch:search`), ImageStorePort (description cache), secure fetch | – |
 | Context packs | `pkpipe.domain.context_pack`, `pkpipe.steps.context_code` | ContextStorePort | – |
 | Improvements, tool candidates | `pkpipe.domain.improvement`, `pkpipe.domain.tool_candidate`, `pkpipe.steps.improvement_code`, `pkpipe.evals.ab` | Vault tools (MCP) | – |
 | Image input | `pkpipe.domain.images` (`ImageDescription`, `ImageBuffer`), `pkpipe.domain.image_batch` (the time guard as pure functions over a dict), `pkpipe.steps.image_code` (`vision` session, `image.*` code functions), flows `describe_images` and `describe_image_item`, vault tool `read_image` | ModelPort with `images`, ImagePreparePort (`pkpipe.adapters.image_pillow`, optional extra `images`), ImageStorePort (`AppStore`: description cache, timing table), ToolPort (`read_image`), ClockPort | Data class `image` (spec 021) |
@@ -310,7 +311,7 @@ The code level names the classes that carry each component; the tables above giv
 | | `FetchStep`, `SanitizeStep`, `ReaderStep` | `pkpipe.steps.secure_fetch` |
 | | `OutputGuardStep` (`output_guard`) | `pkpipe.steps.output_guard` |
 | | `SessionPlanStep` (`session_plan`) | `pkpipe.steps.session_plan` |
-| Code functions (`@register_code`) | triage, context, improvement, learning, security, category, report | `pkpipe.steps.triage_code`, `context_code`, `improvement_code`, `learning_code`, `security_code`, `session_plan`, `report_code` |
+| Code functions (`@register_code`) | triage, context, improvement, learning, security, category, report, discovery | `pkpipe.steps.triage_code`, `context_code`, `improvement_code`, `learning_code`, `security_code`, `session_plan`, `report_code`, `discovery_code` |
 | Ports | `ModelPort`, `ToolPort`, `NotifyPort`, `ClassifierPort`, `SecurityLogPort`, `ContextStorePort`, `SnapshotPort`, `RunStorePort`, `TracerPort`, `SpanPort`, `ClockPort`, `SystemProbePort`, `StatePort`, `ConfigPort` | `pkpipe.ports.ports` |
 | web-fetch | `SecureFetcher`, `FilteringProxy`, `LightpandaBrowser`, `ChromiumBrowser`, `Browser` | `pkpipe.webfetch.service`, `.proxy`, `.browsers` |
 | learning-gateway | `LearningGateway`, `JobStore`, `LearningBackend`, `OpenNotebookBackend`, `NotebookLMBrowserBackend`, `FakeBackend`, `check_url` | `pkpipe.learning.gateway`, `.store`, `.backend`, `.backends`, `.urlcheck` |

@@ -107,6 +107,10 @@ To switch: set `triage.json` `surface`, add `ui.json` `public_url` (for `web`), 
 
 If you use the `vault` surface and edit the file in Obsidian while a UI action writes it, writes are atomic and locked: a change made in Obsidian in between is detected and the write is retried on the fresh file, so neither side overwrites the other. A sync conflict copy of the file (`... (conflict).md`) is never read or merged; the UI points it out.
 
+## Items without a link
+
+A screenshot or a note without a link used to fail with "no source URL in the note" in the processing list. If you switch `source_discovery` on (`overlay/source_discovery.json`, `{"enabled": true}`, the Tool category by default), the 06:00 run searches the web for it: from the image description (topic and the visible text) or from your note text, one query, checked against your blocked names. The first clean found page is fetched and the category's evaluation runs on it; the note shows the page as its `Source`, so you can see where it came from and delete a wrong match. If nothing is found the item stays `failed` and says why; the fix is a link in its INBOX entry. An address that is visible in an image is used directly, without a search. Images need their description from the triage ("the image has no cached description; triage it again" means the vision model changed since).
+
 ## The run report and your todos
 
 After **every** run, the 20:00 triage and the 06:00 processing, pkpipe sends one report to your notification channel (Discord, Teams or any Apprise service; the `daily_summary` route):

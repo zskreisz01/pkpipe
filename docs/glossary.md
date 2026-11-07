@@ -24,4 +24,5 @@ title: Glossary
 | Run report | The summary the pipeline sends after every triage and release run (counts, created evaluations / notebooks / podcasts, todos); spec 024 |
 | Todo block | The generated lines between the `pkpipe-todo` markers in the daily journal: `date - todo - item count - link` |
 | Retry (failed item) | The owner's action that sends a processed item with a failed result through the next release run again; bounded by `triage.retry_max`; spec 027 |
+| Source discovery | Spec 025: for an item that names no URL, one guarded web search from the validated image description or the owner's text finds the page the category's sessions then evaluate; off by default (`source_discovery.json`) |
 | Owner | The single user of a pkpipe installation |

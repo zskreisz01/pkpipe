@@ -1,0 +1,10 @@
+{
+  "enabled": false,
+  "categories": ["tool"],
+  "from_images": true,
+  "from_notes": true,
+  "max_candidates": 2,
+  "max_results": 5,
+  "max_query_chars": 120,
+  "query_template": "{topic} {text}"
+}

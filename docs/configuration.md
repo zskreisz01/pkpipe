@@ -137,6 +137,26 @@ After every triage and release run the pipeline sends one report as the `daily_s
 
 `pkpipe validate` reports a grant that does not cover the journal pattern. The block sits between `<!-- pkpipe-todo:begin -->` and `<!-- pkpipe-todo:end -->` below the heading; text outside is never read back or changed (a note without the markers gets the heading and the block at its end, below an identical heading when there is one; a note that does not exist is created with `type: journal`). Add the heading to your daily note template if you want the section in a fixed place. The tool writes only for today and yesterday.
 
+### Source discovery (`source_discovery.json`)
+
+```json
+{"enabled": false, "categories": ["tool"], "from_images": true, "from_notes": true, "max_candidates": 2, "max_results": 5, "max_query_chars": 120, "query_template": "{topic} {text}"}
+```
+
+An item that a category's sessions need a page for but that names no URL (a screenshot, a text without a link) fails with "no source URL in the note". With `enabled: true` the pipeline searches for the source instead (spec 025): one query from the validated image description (`{topic}`, `{text}` = visible text) or from the owner's text, checked by `security.query_guard`, sent to `websearch:search`; the first `max_candidates` result URLs that pass the URL policy are fetched by secure fetch in order and the category's own sessions (`categories.json`, the evaluation stays configuration) evaluate the first clean page. An address shown in an image is used without a search.
+
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `enabled` | The switch. Off by default: a search query leaves the machine | `false` |
+| `categories` | Category ids that search. Only categories whose `subflow` is `other_resource` can; `learning-material` is not supported (a found URL would go to the notebook service) | `["tool"]` |
+| `from_images`, `from_notes` | Which kinds of item are searched for. An image needs a cached description (the triage described it) | `true`, `true` |
+| `max_candidates` | Pages fetched, in order, until one is clean (1 to 5) | `2` |
+| `max_results` | Results asked from the search tool (1 to 10) | `5` |
+| `max_query_chars` | Longest query, cut after a whole word (20 to 300) | `120` |
+| `query_template` | Only the placeholders `{topic}` and `{text}`; no model builds the query | `{topic} {text}` |
+
+The category needs the `websearch` server (`mcp_servers.json`, `allow` includes `search`) and the web-fetch server of secure fetch. Put client and project names into `security.query_guard` (`blocked_terms` or `terms_file`): a blocked term refuses the query. A failed item says why in the processing list ("no source found by web search; add a link to the entry and release it again", and the reasons in [the data model of spec 025](https://github.com/zskreisz01/pkpipe/blob/dev/specs/025-find-and-evaluate-urlless-items/data-model.md)).
+
 ## Notifications
 `channels.json` defines channels and routes events to them; `NotifyPort.send(event, payload)` delivers to every channel routed for the event (a `notify` step, or `channels` to override the route). Every delivery is a `notify.send` span with `notify.event`, `notify.channel`, `notify.channel_type` and the flow, step and item attributes of the sending step. One failing channel never stops the others; the failure sets that span to error status and is listed in the step output.
 
