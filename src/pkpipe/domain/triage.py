@@ -191,6 +191,37 @@ def check_owner_decision(
     return None
 
 
+#: Spec 027: how often the owner may send one failed item through the release again (``triage.retry_max``).
+DEFAULT_MAX_RETRIES = 3
+#: The reason an owner channel names for the one transition out of ``processed``.
+RETRY_REASON = "retry"
+
+
+def check_retry(
+    state: ItemState, *, processing_failed: bool, retries: int = 0, max_retries: int = DEFAULT_MAX_RETRIES
+) -> None:
+    """Raise :class:`OwnerDecisionError` unless the owner may send an item through the release again.
+
+    This is the only way out of ``processed`` (spec 027): :data:`TRANSITIONS` stays as it is, so no pipeline
+    code and no vault tool can leave ``processed``; the owner channels call this guard and then write
+    ``released``. The item must be ``processed`` with a ``failed`` line in the processing list (an item that
+    finished is final), a quarantined item is never retryable (it first needs the quarantine release), and the
+    owner's retries per item are bounded."""
+    if state is ItemState.QUARANTINED:
+        raise OwnerDecisionError("a quarantined item is released from quarantine first, it cannot be retried")
+    if state is not ItemState.PROCESSED:
+        raise OwnerDecisionError(
+            f"item is '{state.value}', only a processed item with a failed result can be retried"
+        )
+    if not processing_failed:
+        raise OwnerDecisionError("the processing of this item did not fail: nothing to retry")
+    if retries >= max_retries:
+        raise OwnerDecisionError(
+            f"this item was retried {retries} time(s) already (limit {max_retries}): fix the cause or "
+            "process it by hand"
+        )
+
+
 def check_quarantine_release(state: ItemState) -> None:
     """Only a quarantined item can be released from quarantine (back to ``pending`` for a new decision)."""
     if state is not ItemState.QUARANTINED:

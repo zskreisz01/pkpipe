@@ -11,6 +11,7 @@ from tests.support.vault_mcp import call, stdio_client, write_policy
 
 TOOLS = {
     "unreviewed_notes",
+    "failed_items",  # spec 027
     "write_journal_todos",
     "list_folder",
     "read_note",

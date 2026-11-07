@@ -1,6 +1,6 @@
 {
   "id": "run_report",
-  "description": "Spec 024: the report after every triage and release run. Reads the triage table as it is now and counts the tool evaluation notes the owner has not marked reviewed (read-only vault tools), builds ONE report from counts, category ids and note links (code, no model; no item text or URL), sets the todo block of today's daily journal when report.journal_todos is on (the vault tool writes only between its two markers) and sends the report as the daily_summary notification. A failing journal write or count never stops the report; the calling flow ignores a failure of this subflow.",
+  "description": "Spec 024: the report after every triage and release run. Reads the triage table as it is now and counts the tool evaluation notes the owner has not marked reviewed and the items whose processing failed (spec 027; read-only vault tools), builds ONE report from counts, category ids and note links (code, no model; no item text or URL), sets the todo block of today's daily journal when report.journal_todos is on (the vault tool writes only between its two markers) and sends the report as the daily_summary notification. A failing journal write or count never stops the report; the calling flow ignores a failure of this subflow.",
   "bpmn": "process-inbox-items",
   "start": "triage_now",
   "nodes": [
@@ -22,6 +22,14 @@
           "folder": "${item.tool_folder}",
           "category": "${item.tool_category}"
         }
+      }
+    },
+    {
+      "id": "failed_now",
+      "type": "tool",
+      "bpmn_element": "Send run report",
+      "config": {
+        "tool": "obsidian:failed_items"
       }
     },
     {
@@ -82,15 +90,24 @@
     },
     {
       "from": "triage_now",
-      "to": "report",
+      "to": "failed_now",
       "default": true
     },
     {
       "from": "tool_notes",
-      "to": "report"
+      "to": "failed_now"
     },
     {
       "from": "tool_notes",
+      "to": "failed_now",
+      "on": "error"
+    },
+    {
+      "from": "failed_now",
+      "to": "report"
+    },
+    {
+      "from": "failed_now",
       "to": "report",
       "on": "error"
     },

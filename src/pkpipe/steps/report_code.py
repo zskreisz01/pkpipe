@@ -78,6 +78,16 @@ def triage_counts(ctx: StepContext, rows: list[dict[str, Any]]) -> dict[str, int
     return {"approval": approval, "notebooks": notebooks}
 
 
+def failed_to_retry(rows: list[dict[str, Any]], failed: dict[str, Any]) -> int:
+    """Failed items the owner can send through the release again (spec 027): the processing list says
+    ``failed`` and the triage row is ``processed`` (a quarantined item is not retryable). Ids and states
+    only."""
+    ids = {str(i.get("item_id")) for i in failed.get("items") or [] if isinstance(i, dict)}
+    return sum(
+        1 for r in rows or [] if r.get("item_id") in ids and r.get("state") == ItemState.PROCESSED.value
+    )
+
+
 @register_code("report.settings")
 def settings(
     ctx: StepContext,
@@ -155,6 +165,8 @@ def run_summary(ctx: StepContext, triage: dict[str, Any] | None = None) -> dict[
     day, clock = _day(ctx)
     counts = triage_counts(ctx, (triage or {}).get("rows") or [])
     tool_reads = int(tools.get("count") or 0)
+    failed = ctx.resolve("failed_now", required=False)  # spec 027: absent when the count failed
+    retry = failed_to_retry((triage or {}).get("rows") or [], failed if isinstance(failed, dict) else {})
     surface, public_url = item.get("surface", "vault"), item.get("public_url")
     triage_link = (
         rr.external_link("triage UI", f"{public_url}/triage")
@@ -165,8 +177,13 @@ def run_summary(ctx: StepContext, triage: dict[str, Any] | None = None) -> dict[
         "approval": triage_link,
         "notebooks": rr.wikilink(str(item.get("processing_list") or "")),
         "tool_reads": rr.wikilink(tools.get("newest")),
+        "retry": (
+            rr.external_link("failed items", f"{public_url}/triage?state=processed")
+            if surface == "web" and public_url
+            else rr.wikilink(str(item.get("processing_list") or ""))
+        ),
     }
-    todos = rr.build_todos(counts["approval"], counts["notebooks"], tool_reads, links)
+    todos = rr.build_todos(counts["approval"], counts["notebooks"], tool_reads, links, retry)
     notes = [n for n in (str(x).strip() for x in item.get("notes") or []) if n]
     kind = str(item.get("kind") or "process_released")
     text = rr.render_report(

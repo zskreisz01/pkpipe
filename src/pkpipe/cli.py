@@ -154,6 +154,12 @@ def _restore(args: argparse.Namespace) -> int:
     return restore_command(args)
 
 
+def _retry(args: argparse.Namespace) -> int:
+    from pkpipe.retry_cli import retry_command
+
+    return retry_command(args)
+
+
 def _serve(args: argparse.Namespace) -> int:
     from pkpipe.serve import serve_command
 
@@ -175,6 +181,7 @@ HANDLERS: dict[str, Handler] = {
     "candidates": _candidates,
     "snapshot": _snapshot,
     "restore": _restore,
+    "retry": _retry,
     "validate": _validate,
     "schema": _schema,
 }
@@ -227,6 +234,10 @@ def build_parser() -> argparse.ArgumentParser:
     from pkpipe.snapshot_cli import add_restore_arguments
 
     add_restore_arguments(rest)
+    ret = sub.add_parser("retry", help="send failed items through the next release run again (owner)")
+    from pkpipe.retry_cli import add_retry_arguments
+
+    add_retry_arguments(ret)
     val = sub.add_parser("validate", help="validate the layered config (pack + overlay)")
     val.add_argument("--pack", help="pack directory (default: packs/learning-inbox or PKPIPE_PACK_DIR)")
     val.add_argument("--overlay", help="overlay directory (default: PKPIPE_OVERLAY_DIR)")

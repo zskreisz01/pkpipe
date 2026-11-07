@@ -1,7 +1,8 @@
 """App MCP server: lets a chat agent run flows and work through triage (spec 014 US2, FR-002).
 
 Tools: ``run_flow``, ``list_triage``, ``get_run`` (agent or owner token) and the **owner actions**
-``confirm_item``, ``override_item``, ``release_quarantine`` and ``restore_run`` (owner token only, each one
+``confirm_item``, ``override_item``, ``release_quarantine``, ``retry_items`` and ``restore_run`` (owner
+token only, each one
 audited). It is
 mounted by ``pkpipe serve`` on the same authenticated listener as the UI (``/mcp``); the guard middleware has
 already checked Host and bearer token, and every tool checks the scope again (fail closed: no scope, no
@@ -29,7 +30,7 @@ from pkpipe.api.services import AppServices, NotFound, Refused
 from pkpipe.security.canary import wrap_untrusted
 from pkpipe.telemetry import tool_span
 
-OWNER_TOOLS = ("confirm_item", "override_item", "release_quarantine", "restore_run")
+OWNER_TOOLS = ("confirm_item", "override_item", "release_quarantine", "retry_items", "restore_run")
 AGENT_TOOLS = ("run_flow", "list_triage", "get_run")
 UNTRUSTED_FIELDS = ("resource", "comment")
 
@@ -169,6 +170,15 @@ def build_app_mcp(services: AppServices, tokens: Tokens) -> FastMCP:
             "release_quarantine",
             True,
             lambda actor: mark_decision(services.release_quarantine(item_id, actor=actor)),
+        )
+
+    @mcp.tool
+    def retry_items(item_ids: list[str] | None = None) -> dict:
+        """OWNER ACTION. Send processed items whose processing failed (a failed line of the processing list)
+        through the next release run again. Without item_ids every failed item that may still be retried is
+        sent; each item is limited to `triage.retry_max` owner retries. Returns counts and the item ids."""
+        return guarded(
+            "retry_items", True, lambda actor: services.retry_failed(actor=actor, item_ids=item_ids)
         )
 
     @mcp.tool

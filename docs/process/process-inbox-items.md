@@ -36,5 +36,6 @@ flowchart LR
         co -. security flag .-> hq
     end
     mi --> rm[Remove processed entry from INBOX list<br/>entry moves to the dated archive; failed and quarantined items stay; a missing entry is reported as not_found] --> sum[Send run report<br/>processed per category, created evaluations / notebooks / podcasts, todos with counts<br/>todo block in the daily journal] --> e((Done))
-    sum --> wk[Owner: work through processing list] --> qr[Owner: review quarantine]
+    sum --> wk[Owner: work through processing list] --> rt[Owner: retry failed items<br/>UI button, app MCP retry_items or pkpipe retry; max 3 per item] --> qr[Owner: review quarantine]
+    rt -. next 06:00 .-> sel
 ```

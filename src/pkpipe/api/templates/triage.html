@@ -11,6 +11,14 @@
 <p class="muted">Surface <strong>web</strong>: this page is where you decide; the table is machine-owned in <code>{{ info.data_file }}</code>.</p>
 {% endif %}
 {% if bulk %}<p class="ok" data-testid="bulk-result">Bulk confirm: {{ bulk }}.</p>{% endif %}
+{% if retried %}<p class="ok" data-testid="retry-result">{{ retried }}.</p>{% endif %}
+{% if failed and failed.failed %}
+<form class="row bulk" hx-post="/ui/triage/retry-failed" hx-confirm="Send {{ failed.retryable }} failed item(s) through the next release run again?{% if failed.capped %} {{ failed.capped }} item(s) reached the retry limit ({{ failed.max }}) and stay as they are.{% endif %}">
+  <input type="hidden" name="confirm" value="yes">
+  <span data-testid="failed-count">{{ failed.failed }} item(s) failed to process, {{ failed.retryable }} can be retried.</span>
+  <button type="submit" data-testid="retry-failed" {{ "disabled" if not failed.retryable }}>Retry all failed ({{ failed.retryable }})</button>
+</form>
+{% endif %}
 <form class="filters row" method="get" action="/triage" hx-boost="false">
   <label class="inline">State
     <select name="state"><option value="">any</option>

@@ -51,7 +51,7 @@ The pipeline never guesses blindly. An **image** that could not be described (th
 | `suggested` | New: a category was suggested, you have not decided |
 | `pending` | Seen at 06:00 without a decision from you: waits, nothing is processed |
 | `released` | You decided and the 06:00 run took the item; a failed run leaves it here and the next run tries again |
-| `processed` | Done: the note is filed, the processing list updated |
+| `processed` | Done: the note is filed, the processing list updated. If the processing **failed** (the page could not be fetched, the learning service was down or over quota), the row is `processed` with a `failed` line in the processing list and a **Retry** button (see below) |
 | `quarantined` | A security check flagged the item (for example an injection in the text). Its note was moved into the quarantine folder, inert. You can **release** it from quarantine if it was a false positive: it becomes `pending` again |
 | `awaiting_category` | You asked for a new category that does not exist yet; a proposal note was written; the item waits until you add the category (see below) |
 
@@ -66,6 +66,7 @@ Open `https://<your address>/triage` (see [Reaching the UI](#reaching-the-ui-fro
 - **Comment**: write your words and press Save; it is stored exactly as you typed it.
 - **Filters** at the top narrow the page by state, category or "needs you". **Confirm all suggested in this set** confirms every waiting row of the filtered set that has a configured suggestion; rows with an override, images that need you and rows without a valid suggestion are left alone.
 - **Release from quarantine** appears on quarantined rows.
+- **Retry** appears on processed rows whose processing failed; **Retry all failed (N)** at the top of the page asks for a confirmation with the counts. A retry sends the item through the next 06:00 run again (or a manual `process_released` run); your confirm or override stays. Each item can be retried `triage.retry_max` times (default 3); after that the row says *retry limit reached*: fix the cause (for example the web-fetch server, or wait for the NotebookLM quota window) or process it by hand. The same action is the app MCP tool `retry_items` (owner token) and the command `pkpipe retry` (lists the failed items; `--all` or item ids retries them). A quarantined item is never retried; release it from quarantine first.
 
 The rules are enforced on the server, not in the page: an override is a configured category or a valid new name, a confirm works only on rows in an allowed state, and every decision is logged on the **Audit** page (the log keeps what you decided, never your comment text).
 
@@ -113,7 +114,7 @@ After **every** run, the 20:00 triage and the 06:00 processing, pkpipe sends one
 - what the run did: the new suggestions per category after triage, or the items processed per category after processing, with quarantined and failed counts;
 - what it created: evaluations (notes of the category sessions), notebooks and podcasts;
 - what waits for you in the triage;
-- your **todos with counts**: *Review triage decisions* (items you still have to confirm or override), *Process notebook materials and podcasts* (learning items you decided that the next 06:00 run turns into a notebook and a podcast), *Read tool evaluations* (evaluation notes of the `tool` category you have not marked as read). A todo with a zero count is left out.
+- your **todos with counts**: *Review triage decisions* (items you still have to confirm or override), *Process notebook materials and podcasts* (learning items you decided that the next 06:00 run turns into a notebook and a podcast), *Read tool evaluations* (evaluation notes of the `tool` category you have not marked as read), *Retry failed items* (processed items whose processing failed, see the Triage page). A todo with a zero count is left out.
 
 The report only contains counts, category ids, run ids and links to your own notes, never the text or the URL of an item. To mark a tool evaluation as read, add `reviewed: true` to the note's front matter; the todo drops it at the next run.
 

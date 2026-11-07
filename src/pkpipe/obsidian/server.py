@@ -122,6 +122,12 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         return _run(vault.unreviewed_notes, folder, category)
 
     @mcp.tool
+    def failed_items() -> dict:
+        """The processing-list lines marked `failed`: `{count, items: [{item_id, category}]}`. Read only, no
+        text. Retrying them is an owner action of the app (UI, `retry_items`), not a vault tool."""
+        return _run(vault.failed_items)
+
+    @mcp.tool
     def write_journal_todos(day: str, lines: list[str], heading: str = "## pkpipe todo") -> dict:
         """Set the pkpipe todo block (between the pkpipe-todo markers, below the heading) of the daily
         journal of today or yesterday. Replaces only that block, never reads the journal out, refused unless

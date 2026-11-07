@@ -76,6 +76,13 @@ class CommentRequest(BaseModel):
     comment: str = ""
 
 
+class RetryRequest(BaseModel):
+    """The bulk retry of failed items needs the explicit ``confirm`` (spec 027)."""
+
+    confirm: bool = False
+    item_ids: list[str] | None = None
+
+
 class BulkConfirmRequest(BaseModel):
     state: str | None = None
     category: str | None = None
@@ -236,6 +243,20 @@ def create_app(
     def api_release(item_id: str):
         return services.release_quarantine(item_id, actor="ui")
 
+    @app.get("/api/triage/failed")
+    def api_failed():
+        return services.failed_summary()
+
+    @app.post("/api/triage/retry-failed")
+    def api_retry_failed(body: RetryRequest):
+        if not body.confirm:
+            raise Refused("retrying every failed item needs confirm: true")
+        return services.retry_failed(actor="ui", item_ids=body.item_ids)
+
+    @app.post("/api/triage/{item_id}/retry")
+    def api_retry(item_id: str):
+        return services.retry_item(item_id, actor="ui")
+
     # -- JSON API: config drafts and publishes --------------------------------------------------------------
     @app.get("/api/config/files")
     def api_files():
@@ -355,7 +376,12 @@ def create_app(
 
     @app.get("/triage", response_class=HTMLResponse)
     def ui_triage(
-        request: Request, state: str = "", category: str = "", needs_owner: str = "", bulk: str = ""
+        request: Request,
+        state: str = "",
+        category: str = "",
+        needs_owner: str = "",
+        bulk: str = "",
+        retried: str = "",
     ):
         filters = triage_filters(state, category, needs_owner)
         try:
@@ -366,10 +392,12 @@ def create_app(
             request,
             "triage.html",
             categories=sorted(services.categories()),
+            failed=services.failed_summary() if info else {},
             states=[s.value for s in ItemState],
             filters={"state": state, "category": category, "needs_owner": needs_owner},
             info=info,
             bulk=bulk,
+            retried=retried,
             **triage_ctx(**filters),
         )
 
@@ -411,6 +439,21 @@ def create_app(
         )
         return Response(status_code=200, headers={"HX-Redirect": f"/triage?{query}"})
 
+    @app.post("/ui/triage/retry-failed", response_class=HTMLResponse)
+    def ui_retry_failed(request: Request, confirm: str = Form("")):
+        if confirm != "yes":
+            raise Refused("retrying every failed item needs the confirm step")
+        result = services.retry_failed(actor="ui")
+        from urllib.parse import urlencode
+
+        note = f"{result['retried']} failed item(s) go through the next release run"
+        if result["capped"]:
+            note += f", {result['capped']} reached the retry limit"
+        return Response(
+            status_code=200,
+            headers={"HX-Redirect": "/triage?" + urlencode({"state": "released", "retried": note})},
+        )
+
     @app.get("/ui/triage/{item_id}/image")
     def ui_triage_image(item_id: str):
         return image_response(services.item_image(item_id))
@@ -436,6 +479,15 @@ def create_app(
     def ui_comment(request: Request, item_id: str, comment: str = Form("")):
         return triage_action(
             request, item_id, lambda: services.comment_item(item_id, comment, actor="ui"), "comment saved"
+        )
+
+    @app.post("/ui/triage/{item_id}/retry", response_class=HTMLResponse)
+    def ui_retry(request: Request, item_id: str):
+        return triage_action(
+            request,
+            item_id,
+            lambda: services.retry_item(item_id, actor="ui"),
+            "released again for the next run",
         )
 
     @app.post("/ui/triage/{item_id}/release", response_class=HTMLResponse)
