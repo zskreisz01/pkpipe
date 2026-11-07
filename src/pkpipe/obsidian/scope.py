@@ -39,6 +39,10 @@ class SnapshotScope:
         return path in self.managed or any(under(path, f) for f in self.folders)
 
 
+#: Tools that write only the generated todo block of a journal: their folder never enters a snapshot scope.
+JOURNAL_BLOCK_TOOLS = frozenset({"write_journal_todos"})
+
+
 def journal_folder(layout: VaultLayout) -> str:
     """The folder of the journal pattern (its segments before the first placeholder segment, without the
     file name): ``DailyJournals/{yyyy}/{yyyy-MM-dd}.md`` -> ``DailyJournals``."""
@@ -53,7 +57,7 @@ def journal_folder(layout: VaultLayout) -> str:
 def derive_scope(policy: VaultPolicy) -> SnapshotScope:
     layout = policy.layout
     folders = list(layout.snapshot_roots())
-    for tool in sorted(WRITING_VAULT_TOOLS):
+    for tool in sorted(WRITING_VAULT_TOOLS - JOURNAL_BLOCK_TOOLS):
         folders += policy.allow.get(tool, [])
     folders += [layout.quarantine_dir]
     managed = tuple(sorted(dict.fromkeys(policy.managed_files)))

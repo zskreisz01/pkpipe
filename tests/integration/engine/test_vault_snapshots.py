@@ -50,6 +50,7 @@ WRITING_FLOWS = {
     "categorize_item": "triage",
     "describe_images": "triage",  # spec 021: the image batch; a flagged image is quarantined
     "describe_image_item": "triage",
+    "run_report": "triage",  # spec 024: the todo block of the daily journal (only when it is switched on)
     "handle_security_flag": "process_released",
     "process_released": "process_released",
     "propose_category": "process_released",  # spec 022: the proposal note and the awaiting_category row

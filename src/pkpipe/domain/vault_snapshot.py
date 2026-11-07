@@ -33,6 +33,7 @@ WRITING_VAULT_TOOLS = frozenset(
         "update_tool_candidates",
         "quarantine_note",
         "inbox_remove_entries",
+        "write_journal_todos",  # spec 024: one block of the daily journal
     }
 )
 #: Vault tools that only read. Together with the writing tools this is every tool of the vault policy; a test
@@ -46,6 +47,7 @@ READ_ONLY_VAULT_TOOLS = frozenset(
         "read_improvements",
         "read_tool_candidates",
         "read_image",
+        "unreviewed_notes",
     }
 )
 

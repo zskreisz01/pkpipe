@@ -49,6 +49,12 @@ CORE_DEFAULTS: dict[str, Any] = {
     #: UI is reached
     "triage": {"surface": "vault"},
     "ui": {"public_url": None, "allowed_hosts": []},
+    #: spec 024: the run report after every triage and release run; the journal todo block is opt-in
+    "report": {
+        "enabled": True,
+        "tool_category": "tool",
+        "journal_todos": {"enabled": False, "heading": "## pkpipe todo"},
+    },
     "channels": {"channels": {}, "routes": {}},
     "telemetry": {"capture_content": {"flows": []}},
     # Code-only levels are all-or-nothing (docs/evaluation.md); LLM gates come from the pack.

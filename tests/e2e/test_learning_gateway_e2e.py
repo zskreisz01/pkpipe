@@ -120,7 +120,7 @@ def test_confirmed_learning_item_becomes_a_ready_notebook_whatever_the_backend(w
     assert job["status"] == "ready" and job["item_id"] == VIDEO and job["nb_id"] == row.nb_id
     assert job["backend"] == request.node.callspec.id  # the overlay's backend ran, not another one
     assert Path(job["audio_path"]).is_file() and Path(job["audio_path"]).stat().st_size > 0  # audio stored
-    assert notify.sent[-1].message.startswith("Processed 1, quarantined 0, failed 0")
+    assert "**Processed (1):**" in notify.sent[-1].message and "1 notebooks" in notify.sent[-1].message
 
 
 @pytest.mark.parametrize("world", [{}], indirect=True)
@@ -132,7 +132,7 @@ def test_a_private_source_url_is_quarantined_before_anything_reaches_the_gateway
     assert rows[BAD] == "quarantined"
     assert not (data_dir / "jobs.db").exists() or jobs(data_dir) == []
     assert BAD not in {r.item_id for r in lists.read_processing_list(vault / PLIST)}
-    assert notify.sent[-1].message.startswith("Processed 0, quarantined 1, failed 0")
+    assert "**Processed (0):**" in notify.sent[-1].message and "quarantined 1" in notify.sent[-1].message
 
 
 @pytest.mark.parametrize("world", [{"deny": ["denied.example.invalid"]}], indirect=True)
@@ -146,7 +146,7 @@ def test_a_url_the_gateway_refuses_quarantines_the_item_instead_of_retrying_it(w
     assert rows[DENIED] == "quarantined"
     assert not (data_dir / "jobs.db").exists() or jobs(data_dir) == []
     assert DENIED not in {r.item_id for r in lists.read_processing_list(vault / PLIST)}
-    assert notify.sent[-1].message.startswith("Processed 0, quarantined 1, failed 0")
+    assert "**Processed (0):**" in notify.sent[-1].message and "quarantined 1" in notify.sent[-1].message
 
 
 @pytest.mark.parametrize("world", [{"backend_options": {"fail": []}, "timeout_s": 0.001}], indirect=True)

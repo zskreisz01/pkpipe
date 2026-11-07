@@ -17,7 +17,9 @@
       "update_tool_candidates",
       "quarantine_note",
       "inbox_remove_entries",
-      "read_image"
+      "read_image",
+      "unreviewed_notes",
+      "write_journal_todos"
     ]
   },
   "websearch": {

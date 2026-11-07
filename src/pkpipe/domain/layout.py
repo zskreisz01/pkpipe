@@ -290,6 +290,9 @@ class VaultLayout(BaseModel):
             "quarantine_note": [self.inbox_dir],
             "inbox_remove_entries": [self.inbox_dir, self.archive_root],
             "read_image": [self.attachments_dir],  # its own entry: no other tool reads or writes images
+            # spec 024: counts of notes the owner has not marked reviewed (no text is returned)
+            "unreviewed_notes": [self.projects_dir, self.areas_dir, self.resources_dir],
+            # ``write_journal_todos`` has no default: the owner grants the journal folder on purpose
         }
 
     def tool_paths(self) -> list[tuple[str, str, str]]:
@@ -352,6 +355,14 @@ def layout_errors(layout: VaultLayout, allow: Mapping[str, Sequence[str]]) -> li
         checked = _static_part(path)
         if not allowed_by(checked, allow.get(tool, [])):
             errors.append(f"layout.{field} '{path}' is outside the allowlist of tool '{tool}'")
+    # spec 024: the todo block is written only where the owner granted it; no grant, no check
+    if allow.get("write_journal_todos") and not allowed_by(
+        _static_part(layout.journal_pattern), allow["write_journal_todos"]
+    ):
+        errors.append(
+            f"layout.journal_pattern '{layout.journal_pattern}' is outside the allowlist of tool "
+            "'write_journal_todos'"
+        )
     return errors
 
 

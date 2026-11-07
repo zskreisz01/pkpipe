@@ -202,7 +202,7 @@ def test_released_items_go_through_the_full_category_process(world, site, capsys
         "## Alternatives" in tool_note and "## Fit personal" in tool_note and "## Fit enterprise" in tool_note
     )
     summary = [m for m in notify.sent if m.event == "daily_summary"][-1]
-    assert summary.message == "Processed 3, quarantined 0, failed 0; 0 item(s) still pending."
+    assert "**Processed (3):**" in summary.message and "**Todo:** nothing open" in summary.message
     assert process["status"] == "done"
     # isolation (constitution IV and VIII)
     page_seen = [c for c in model.calls if "Rendered by JavaScript" in c["user"]]
@@ -228,7 +228,7 @@ def test_released_items_go_through_the_full_category_process(world, site, capsys
     ]
     assert sessions == []  # no session ran for the flagged page
     summary = [m for m in notify.sent if m.event == "daily_summary"][-1]
-    assert summary.message == "Processed 0, quarantined 1, failed 0; 0 item(s) still pending."
+    assert "**Processed (0):**" in summary.message and "quarantined 1 · failed 0" in summary.message
 
 
 @pytest.mark.live("lmstudio", "lightpanda")

@@ -10,6 +10,8 @@ import pytest
 from tests.support.vault_mcp import call, stdio_client, write_policy
 
 TOOLS = {
+    "unreviewed_notes",
+    "write_journal_todos",
     "list_folder",
     "read_note",
     "write_note",
@@ -358,3 +360,41 @@ def test_read_image_over_mcp_returns_the_bytes_and_refuses_with_stable_codes(tmp
     ):
         err, message = out[key]
         assert err and code in message, (key, message)
+
+
+def test_journal_todos_over_mcp_are_refused_without_a_grant_and_write_one_block_with_it(
+    tmp_path, synthetic_vault
+):
+    """Spec 024: the policy file decides. No ``allow.write_journal_todos``: the tool exists but refuses."""
+    from datetime import date
+
+    day = date.today().isoformat()
+    line = f"- {day} - Review triage decisions - 2 items - [[0-INBOX/Inbox-Triage]]"
+    off = write_policy(tmp_path, synthetic_vault)
+
+    async def refused():
+        async with stdio_client(off) as c:
+            return await call(c, "write_journal_todos", day=day, lines=[line])
+
+    err, msg = run(refused())
+    assert err and "allowlist" in msg
+    assert not list(synthetic_vault.rglob(f"{day}.md"))
+
+    on = write_policy(
+        tmp_path, synthetic_vault, allow={"write_journal_todos": ["2-Areas/Journal"]}
+    )  # the default layout keeps journals in 2-Areas/Journal
+
+    async def written():
+        async with stdio_client(on) as c:
+            first = await call(c, "write_journal_todos", day=day, lines=[line])
+            again = await call(c, "write_journal_todos", day=day, lines=[line])
+            far = await call(c, "write_journal_todos", day="2020-01-01", lines=[line])
+            bad = await call(c, "write_journal_todos", day=day, lines=["- <!-- pkpipe-todo:end -->"])
+            return first, again, far, bad
+
+    first, again, far, bad = run(written())
+    assert first == (False, {"path": f"2-Areas/Journal/{day}.md", "lines": 1, "created": True})
+    assert again[1]["created"] is False
+    assert far[0] and "today or yesterday" in far[1] and bad[0]
+    text = (synthetic_vault / f"2-Areas/Journal/{day}.md").read_text(encoding="utf-8")
+    assert text.count("pkpipe-todo:begin") == 1 and line in text

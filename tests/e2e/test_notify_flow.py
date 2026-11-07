@@ -56,15 +56,16 @@ def test_triage_and_summary_notifications_reach_discord_and_teams(world, capsys)
     vault, hooks, common = world
     code, triage = _run(capsys, "run", "triage", *common)
     assert code == 0 and triage["status"] == "done"
-    assert "Triage ready" in hooks.on("/discord/SECRET")[0].body["content"]
-    assert "2 new item(s)" in hooks.on("/discord/SECRET")[0].body["content"]
+    assert "**Triage run**" in hooks.on("/discord/SECRET")[0].body["content"]
+    assert "**New suggestions (2):**" in hooks.on("/discord/SECRET")[0].body["content"]
     card = hooks.on("/teams/SECRET")[0].body["attachments"][0]["content"]
-    assert card["type"] == "AdaptiveCard" and "2 new item(s)" in card["body"][1]["text"]
+    assert card["type"] == "AdaptiveCard" and "**New suggestions (2):**" in card["body"][1]["text"]
 
     owner_decides(vault, confirm=[TOOL])
     code, done = _run(capsys, "run", "process_released", *common)
     assert code == 0 and done["status"] == "done"
-    assert hooks.on("/discord/SECRET")[1].body["content"].startswith("**Daily summary**\nProcessed 1,")
+    assert hooks.on("/discord/SECRET")[1].body["content"].startswith("**Release run**\n")
+    assert "**Processed (1):**" in hooks.on("/discord/SECRET")[1].body["content"]
     assert len(hooks.on("/teams/SECRET")) == 2
 
 
@@ -75,5 +76,7 @@ def test_a_failing_channel_does_not_fail_the_run_or_block_the_other_channel(worl
     code, triage = _run(capsys, "run", "triage", *common)
     assert code == 0 and triage["status"] == "done"
     assert len(hooks.on("/teams/SECRET")) == 1
-    assert triage["outputs"]["notify"]["failed"] == [{"channel": "discord_main", "error": "HTTP 500"}]
-    assert triage["outputs"]["notify"]["sent"] == ["teams_main"]
+    assert triage["outputs"]["run_report"]["outputs"]["notify"]["failed"] == [
+        {"channel": "discord_main", "error": "HTTP 500"}
+    ]
+    assert triage["outputs"]["run_report"]["outputs"]["notify"]["sent"] == ["teams_main"]

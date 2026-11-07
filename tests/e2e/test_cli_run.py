@@ -63,7 +63,7 @@ def test_pkpipe_run_triage_then_process_released(served_vault, fakes, capsys):
         TOOL: "misc",
         VIDEO: "learning-material",
     }
-    assert notify.sent[0].channel == "discord_main" and "2 new item(s)" in notify.sent[0].message
+    assert notify.sent[0].channel == "discord_main" and "**New suggestions (2):**" in notify.sent[0].message
     assert len(model.calls) == 2
 
     owner_decides(vault, confirm=[TOOL])  # the video stays unreviewed
@@ -74,7 +74,8 @@ def test_pkpipe_run_triage_then_process_released(served_vault, fakes, capsys):
     assert (vault / "4-Archive/Inbox" / f"{TOOL}-example-tool.md").is_file()  # archived through the vault MCP
     rows = {r["item_id"]: r["state"] for r in lists.read_triage(vault / TRIAGE_FILE)["rows"]}
     assert rows == {TOOL: "processed", VIDEO: "pending"}
-    assert notify.sent[-1].message == "Processed 1, quarantined 0, failed 0; 1 item(s) still pending."
+    assert "**Processed (1):**" in notify.sent[-1].message
+    assert "**Waiting for you:** 1 decision(s)" in notify.sent[-1].message
 
     code, runs = _run(capsys, "runs", "--db", str(db), "--json")
     assert code == 0

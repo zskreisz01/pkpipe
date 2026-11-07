@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from pkpipe.domain.inbox_list import archive_text, remove_entries
+from pkpipe.domain.journal_todos import DEFAULT_HEADING, JournalTodoError, replace_block
 from pkpipe.security import quarantine
 from pkpipe.telemetry import set_span_attributes, tool_span
 
@@ -52,6 +53,9 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
 
     return wrapper
 
+
+#: Notes ``unreviewed_notes`` looks at per call (a folder of an owner can be large).
+MAX_SCANNED_NOTES = 5000
 
 IMAGE_TYPES = {
     ".jpg": "image/jpeg",
@@ -264,6 +268,62 @@ class Vault:
             note = parse_note(target.read_text(encoding="utf-8"))
             notes.append({"path": path, "front_matter": jsonable(note.front_matter), "body": note.body})
         return {"notes": notes, "missing": missing}
+
+    @_traced
+    def write_journal_todos(
+        self, day: str, lines: list[str], heading: str = DEFAULT_HEADING
+    ) -> dict[str, Any]:
+        """Spec 024: set the pkpipe todo block of the daily journal of ``day`` (today or yesterday).
+
+        The only journal write path. It replaces the text between the two markers below the heading (see
+        :mod:`pkpipe.domain.journal_todos`) and changes no other byte; it never reads the journal out: the
+        answer is the path, the number of lines and whether the note was created. A granted folder in
+        ``allow.write_journal_todos`` is required (no default)."""
+        if not isinstance(day, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+            raise PathRejected("the day must be YYYY-MM-DD")
+        try:
+            parsed = date.fromisoformat(day)
+        except ValueError:
+            raise PathRejected("the day must be a real date") from None
+        if abs((parsed - self._today()).days) > 1:
+            raise PathRejected("the todo block is written for today or yesterday only")
+        rel = self.policy.layout.journal_path(parsed)
+        target = self._writable(rel, "write_journal_todos")
+        created = not target.exists()
+        try:
+            update_text(target, lambda existing: replace_block(existing, heading, lines))
+        except JournalTodoError as exc:
+            raise PathRejected(str(exc)) from None
+        return {"path": rel, "lines": len(lines), "created": created}
+
+    @_traced
+    def unreviewed_notes(self, folder: str, category: str) -> dict[str, Any]:
+        """Spec 024: how many notes the pipeline wrote for ``category`` (front matter ``pkpipe_item`` and
+        ``category``) below ``folder`` the owner has not marked ``reviewed: true``, and the newest one.
+        Counts and one path only: no note text, title or front matter is returned."""
+        if not isinstance(category, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,39}", category):
+            raise PathRejected("the category must be a category id")
+        root = self.policy.resolve(folder, "unreviewed_notes", kind="folder")
+        if not root.is_dir():
+            return {"count": 0, "newest": None}
+        count, newest, newest_mtime = 0, None, -1.0
+        for scanned, entry in enumerate(sorted(root.rglob("*.md"))):
+            if scanned >= MAX_SCANNED_NOTES:
+                break
+            if is_conflict_name(entry.name) or any(p.startswith(".") for p in entry.relative_to(root).parts):
+                continue
+            if not entry.is_file() or entry.is_symlink():
+                continue
+            front = parse_note(entry.read_text(encoding="utf-8")).front_matter
+            if not front.get("pkpipe_item") or front.get("category") != category:
+                continue
+            if str(front.get("reviewed", "")).strip().lower() in ("true", "yes"):
+                continue
+            count += 1
+            mtime = entry.stat().st_mtime
+            if mtime > newest_mtime:
+                newest, newest_mtime = self.policy.rel(entry), mtime
+        return {"count": count, "newest": newest}
 
     @_traced
     def inbox_remove_entries(self, entries: list[str]) -> dict[str, Any]:

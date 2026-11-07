@@ -1,6 +1,6 @@
 {
   "id": "process_released",
-  "description": "06:00: release confirmed or overridden items, process each released item in its own instance (parallel, limited), write states and the processing list, remove the entries of processed list items from the INBOX list file (spec 020), send the daily summary.",
+  "description": "06:00: release confirmed or overridden items, process each released item in its own instance (parallel, limited), write states and the processing list, remove the entries of processed list items from the INBOX list file (spec 020), send the run report (spec 024; the earlier one-line daily summary when report.enabled is false).",
   "bpmn": "process-inbox-items",
   "start": "read_triage",
   "max_parallel": 2,
@@ -132,6 +132,21 @@
       }
     },
     {
+      "id": "report_cfg",
+      "type": "code",
+      "bpmn_element": "Send run report",
+      "config": {
+        "function": "report.settings",
+        "args": {
+          "kind": "process_released",
+          "notify": true,
+          "results": "${process_item}",
+          "release": "${release}",
+          "list_report": "${list_report}"
+        }
+      }
+    },
+    {
       "id": "summary",
       "type": "notify",
       "bpmn_element": "Notify: daily summary",
@@ -146,6 +161,15 @@
           "list_not_found": "${list_report.count_not_found}",
           "list_remove_failed": "${list_report.remove_failed}"
         }
+      }
+    },
+    {
+      "id": "run_report",
+      "type": "subflow",
+      "bpmn_element": "Send run report",
+      "config": {
+        "flow": "run_report",
+        "item": "${report_cfg.item}"
       }
     }
   ],
@@ -246,7 +270,28 @@
     },
     {
       "from": "list_report",
-      "to": "summary"
+      "to": "report_cfg"
+    },
+    {
+      "from": "report_cfg",
+      "to": "summary",
+      "when": {
+        "path": "report_cfg.legacy_notify",
+        "truthy": true
+      }
+    },
+    {
+      "from": "report_cfg",
+      "to": "run_report",
+      "when": {
+        "path": "report_cfg.enabled",
+        "truthy": true
+      }
+    },
+    {
+      "from": "run_report",
+      "to": "END",
+      "on": "error"
     }
   ]
 }

@@ -55,7 +55,7 @@
       }
     },
     "notify_contains": [
-      "Processed 1, quarantined 0, failed 0"
+      "Processed (1)"
     ]
   }
 }

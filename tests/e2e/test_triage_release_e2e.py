@@ -127,8 +127,8 @@ def test_triage_confirm_override_release_fans_out_to_category_processes(world, v
         assert row["state"] == "suggested" and row["ai_suggested_category"] in CATEGORIES
         assert not row["confirm"] and not row["override"]
     suggestions = {n: rows[i]["ai_suggested_category"] for n, i in IDS.items() if n not in flagged}
-    ready = next(m for m in notify.sent if m.event == "triage_ready")
-    assert f"{6 - len(flagged)} new item(s)" in ready.message and ready.channel == "discord_main"
+    ready = next(m for m in notify.sent if m.event == "daily_summary")  # the run report (spec 024)
+    assert f"**New suggestions ({6 - len(flagged)}" in ready.message and ready.channel == "discord_main"
     results = {r["item"]["id"]: r for r in triage["outputs"]["categorize"]}
     suggest_steps = [r["output"]["outputs"]["suggest"] for r in results.values()]
     assert all(0 <= s["confidence"] <= 1 and s["reason"].strip() for s in suggest_steps)  # FR-001
@@ -185,9 +185,9 @@ def test_triage_confirm_override_release_fans_out_to_category_processes(world, v
     summary = [m for m in notify.sent if m.event == "daily_summary"][-1]
     done = sum(1 for i in decided if rows[i]["state"] == "processed")
     quarantined = sum(1 for i in decided if rows[i]["state"] == "quarantined")
-    assert summary.message == (
-        f"Processed {done}, quarantined {quarantined}, failed 0; 1 item(s) still pending."
-    )
+    assert f"**Processed ({done}):**" in summary.message
+    assert f"quarantined {quarantined} · failed 0" in summary.message or quarantined == 0
+    assert "**Waiting for you:** 1 decision(s)" in summary.message
     plist = lists.read_processing_list(vault / "0-INBOX/Manual-Resource-Processing-List.md")
     assert {r.item_id for r in plist} == {i for i in decided if rows[i]["state"] == "processed"}
 

@@ -78,6 +78,10 @@ def vault_tools(
             "obsidian:update_triage": lambda rows: vault.update_triage(rows),
             "obsidian:upsert_processing_list": lambda rows: vault.upsert_processing_list(rows),
             "obsidian:read_notes": lambda paths: vault.read_notes(paths),
+            "obsidian:unreviewed_notes": lambda folder, category: vault.unreviewed_notes(folder, category),
+            "obsidian:write_journal_todos": lambda day, lines, heading="## pkpipe todo": (
+                vault.write_journal_todos(day, lines, heading)
+            ),
             "obsidian:read_improvements": lambda: vault.read_improvements(),
             "obsidian:update_improvements": lambda rows: vault.update_improvements(rows),
             "obsidian:read_tool_candidates": lambda: vault.read_tool_candidates(),

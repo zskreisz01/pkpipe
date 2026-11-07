@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "tool_category": "tool",
+  "journal_todos": {
+    "enabled": false,
+    "heading": "## pkpipe todo"
+  }
+}

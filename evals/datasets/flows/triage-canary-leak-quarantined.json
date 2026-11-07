@@ -86,7 +86,7 @@
     },
     "notify_contains": [
       "Security flag on item {id:0-INBOX/leak.md}",
-      "Triage ready: 1 new item(s)"
+      "quarantined 2"
     ]
   }
 }

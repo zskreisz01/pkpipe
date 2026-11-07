@@ -576,6 +576,49 @@ class TriageConfig(_Strict):
     )
 
 
+class JournalTodosConfig(_Strict):
+    """The pkpipe todo block of the daily journal (spec 024)."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Write the todo lines of the run report into the daily journal. Also needs the vault "
+        "policy to grant the journal folder to the tool write_journal_todos (allow.write_journal_todos)",
+    )
+    heading: str = Field(
+        default="## pkpipe todo",
+        description="The Markdown heading above the block; the block sits between two HTML comment markers "
+        "below it, and nothing else of the journal is ever touched",
+    )
+
+    @field_validator("heading")
+    @classmethod
+    def _heading(cls, value: str) -> str:
+        from pkpipe.domain.journal_todos import JournalTodoError, check_heading
+
+        try:
+            return check_heading(value)
+        except JournalTodoError as exc:
+            raise ValueError(str(exc)) from None
+
+
+class ReportConfig(_Strict):
+    """The run report after every triage and release run, and its todos (spec 024)."""
+
+    enabled: bool = Field(
+        default=True,
+        description="Send the run report as the daily_summary notification after every triage and release "
+        "run (counts per category, created evaluations / notebooks / podcasts, todos with counts). "
+        "false keeps the earlier one-line messages (triage_ready and the daily summary)",
+    )
+    tool_category: str = Field(
+        default="tool",
+        pattern=r"^[a-z0-9][a-z0-9-]{0,39}$",
+        description="Category whose notes the owner reads as tool evaluations: the todo counts its notes "
+        "that have no `reviewed: true` in the front matter",
+    )
+    journal_todos: JournalTodosConfig = Field(default_factory=JournalTodosConfig)
+
+
 _HOST = re.compile(r"^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$")
 
 
@@ -657,6 +700,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "images": ImagesConfig,
     "triage": TriageConfig,
     "ui": UiConfig,
+    "report": ReportConfig,
     "telemetry": TelemetrySettings,
     "evals": EvalsConfig,
 }

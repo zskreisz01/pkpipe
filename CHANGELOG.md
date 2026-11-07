@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5 – 2026-11-07
+- Spec 024: after every triage and release run one report goes out as the `daily_summary` notification (new suggestions or items processed per category, quarantined and failed counts, created evaluations / notebooks / podcasts, what waits in the triage, and todos with counts: triage decisions to review, notebook materials and podcasts to process, tool evaluations to read). `report.enabled: false` keeps the earlier one-line messages. The report holds counts, ids and note links only.
+- Spec 024: the vault tool `write_journal_todos` sets one marked block (`<!-- pkpipe-todo:begin/end -->`, heading `## pkpipe todo`) of the day's daily journal with the todo lines `date - todo - item count - link`; off unless the vault policy grants the journal folder (`allow.write_journal_todos`) and `report.journal_todos.enabled` is on; never reads the journal out; outside every snapshot. New read-only tool `unreviewed_notes`.
+- `pkpipe.__version__` now reads the installed metadata (single source: `pyproject.toml`); 0.1.4 reported 0.1.2.
+
 ## 0.1.4 – 2026-11-06
 - Spec 022 FR-009: a new-category proposal whose evaluation fails is retried at most 3 times per item and requested name (counted in the app DB); then the item stays pending, the evening message says so, and a changed override starts a fresh count.
 - Version number of the package aligned with the tag (0.1.3 shipped with metadata 0.1.2).

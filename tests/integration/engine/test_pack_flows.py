@@ -77,18 +77,19 @@ def test_triage_then_process_released_end_to_end(vault, pack_dir):
         EVIL: ("misc", "suggested"),  # the invented category was replaced by code
         LATER: ("tool", "suggested"),
     }
-    assert [(s.channel, s.message) for s in notify.sent] == [
-        ("discord_main", "Triage ready: 4 new item(s) to confirm or override in 0-INBOX/Inbox-Triage.md.")
-    ]
+    assert [s.channel for s in notify.sent] == ["discord_main"]  # the run report (spec 024)
+    assert "**New suggestions (4):**" in notify.sent[0].message
+    assert "**Waiting for you:** 4 decision(s)" in notify.sent[0].message
     triage_calls = [c for c in model.calls if c["system"].startswith("You sort")]
     assert len(triage_calls) == 4
     assert all(c["json_schema"]["required"] == ["category", "confidence", "reason"] for c in triage_calls)
     assert all("<<<DATA" in c["user"] and '"recipes"' not in c["user"] for c in triage_calls)
 
-    # a second triage run finds nothing new and stays quiet ------------------------------------------------
+    # a second triage run finds nothing new; its report (spec 024) says so ---------------------------------
     second = svc.start("triage")
     assert second.ok and second.outputs["rows"]["count"] == 0
-    assert len(notify.sent) == 1 and "write_triage" not in second.outputs
+    assert len(notify.sent) == 2 and "**New suggestions (0):** none" in notify.sent[-1].message
+    assert "write_triage" not in second.outputs
 
     # the owner reviews: confirm tool + video, override the odd one; 'later' stays unreviewed ---------------
     owner_decides(vault, confirm=[TOOL, VIDEO], override={EVIL: "misc"})
@@ -118,7 +119,8 @@ def test_triage_then_process_released_end_to_end(vault, pack_dir):
     assert plist[TOOL].obsidian_link == f"3-Resources/Tools/{note_file.name}"
 
     summary = [m for m in notify.sent if m.event == "daily_summary"][-1]
-    assert summary.message == "Processed 2, quarantined 1, failed 0; 1 item(s) still pending."
+    assert "**Processed (2):**" in summary.message and "quarantined 1 · failed 0" in summary.message
+    assert "**Waiting for you:** 1 decision(s)" in summary.message
     # spec 009: the output guard flagged the injected instruction (heuristics) and the item was quarantined:
     # logged, deny-listed, moved to the quarantine folder in inert form and alerted
     assert {

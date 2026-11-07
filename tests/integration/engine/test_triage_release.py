@@ -94,20 +94,20 @@ def test_suggestions_carry_no_tools_and_only_url_title_note(world):
 def test_unconfirmed_items_stay_pending_and_show_up_in_the_next_notification(world):
     """US2-AS1, SC-002, T003: nothing is released unconfirmed; the backlog size is in the next triage mail."""
     assert world.svc.start("triage").ok
-    assert world.notify.sent[-1].message == (
-        "Triage ready: 2 new item(s) to confirm or override in 0-INBOX/Inbox-Triage.md."
-    )
+    assert "**New suggestions (2):**" in world.notify.sent[-1].message
+    assert "**Waiting for you:** 2 decision(s)" in world.notify.sent[-1].message
     run = world.svc.start("process_released")
     assert run.ok and _states(world.vault) == {TOOL: "pending", VIDEO: "pending"}
-    assert world.notify.sent[-1].message == "Processed 0, quarantined 0, failed 0; 2 item(s) still pending."
+    assert "**Processed (0):** none" in world.notify.sent[-1].message
+    assert "**Waiting for you:** 2 decision(s)" in world.notify.sent[-1].message
     assert not list((world.vault / "3-Resources").rglob("*.md"))  # no note was written
 
     (world.vault / "0-INBOX" / "next-day.md").write_text("A new fictional CLI tool.\n", encoding="utf-8")
     assert world.svc.start("triage").ok
     sent = world.notify.sent[-1]
-    assert sent.message.startswith("Triage ready: 1 new item(s)")
-    assert sent.message.endswith("2 older item(s) still wait for your decision.")
-    assert sent.payload["awaiting"] == 3 and sent.payload["backlog"] == 2 and sent.payload["new"] == 1
+    assert "**New suggestions (1):**" in sent.message
+    assert "2 older item(s) still wait for your decision." in sent.message
+    assert sent.payload["awaiting"] == 3 and sent.payload["new"] == 1
     assert _states(world.vault)[NEXT] == "suggested"
 
 
@@ -161,7 +161,7 @@ def test_quarantined_and_processed_items_are_skipped_by_release(world):
     calls_before = len(world.model.calls)
     again = world.svc.start("process_released")
     assert again.ok and len(world.model.calls) == calls_before
-    assert world.notify.sent[-1].message == "Processed 0, quarantined 0, failed 0; 0 item(s) still pending."
+    assert "**Processed (0):** none" in world.notify.sent[-1].message
 
 
 def test_category_removed_from_config_flags_an_undecided_item_for_retriage(world):
@@ -177,10 +177,8 @@ def test_category_removed_from_config_flags_an_undecided_item_for_retriage(world
     assert [i["id"] for i in again.outputs["select_new"]["items"]] == [TOOL]
     rows = {r["item_id"]: r for r in lists.read_triage(world.vault / TRIAGE_FILE)["rows"]}
     assert rows[TOOL]["ai_suggested_category"] == "marketing" and rows[TOOL]["state"] == "suggested"
-    assert world.notify.sent[-1].message == (
-        "Triage ready: 1 new item(s) to confirm or override in 0-INBOX/Inbox-Triage.md. "
-        "1 older item(s) still wait for your decision."
-    )
+    assert "**New suggestions (1):**" in world.notify.sent[-1].message
+    assert "1 older item(s) still wait for your decision." in world.notify.sent[-1].message
     assert world.svc.start("process_released").ok
     assert _states(world.vault)[TOOL] == "pending"  # SC-002: the new suggestion is not confirmed yet
 
@@ -205,7 +203,7 @@ def test_confirmed_item_whose_category_was_removed_goes_back_to_the_owner(world)
     again = world.svc.start("triage")
     assert again.ok and again.outputs["select_new"]["count"] == 0 and len(world.model.calls) == calls
     sent = world.notify.sent[-1]
-    assert sent.event == "triage_ready" and sent.payload["invalid"] == 1 and sent.payload["new"] == 0
+    assert sent.event == "daily_summary" and sent.payload["awaiting"] == 2 and sent.payload["new"] == 0
     assert "1 item(s) name a category that is no longer configured" in sent.message
     assert world.svc.start("process_released").ok
     assert _states(world.vault)[TOOL] == "pending"  # still not released
@@ -216,12 +214,25 @@ def test_confirmed_item_whose_category_was_removed_goes_back_to_the_owner(world)
     assert list((world.vault / "3-Resources/Misc").glob(f"*-{TOOL}.md"))
 
 
-def test_unchanged_unreviewed_backlog_alone_sends_no_evening_mail(world):
-    """US2-AS1 without nagging: nothing new and nothing undeliverable -> no triage_ready notification; the
-    pending items are in the 06:00 summary and in the next triage notification."""
+def test_every_run_sends_its_report_even_when_nothing_is_new(world):
+    """Spec 024: the owner gets a summary after EVERY run; an unchanged backlog is in it as todo counts."""
     assert world.svc.start("triage").ok
     sent = len(world.notify.sent)
+    assert world.svc.start("triage").ok and len(world.notify.sent) == sent + 1
+    assert "**New suggestions (0):** none" in world.notify.sent[-1].message
+    assert "**Waiting for you:** 2 decision(s)" in world.notify.sent[-1].message
+
+
+def test_with_the_report_off_an_unchanged_backlog_alone_sends_no_evening_mail(world):
+    """The earlier behaviour stays under ``report.enabled: false``: US2-AS1 without nagging: nothing new and
+    nothing undeliverable -> no triage_ready notification; the pending items are in the 06:00 summary."""
+    world.snap.data["report"] = {"enabled": False}
+    assert world.svc.start("triage").ok
+    assert world.notify.sent[-1].event == "triage_ready"
+    sent = len(world.notify.sent)
     assert world.svc.start("triage").ok and len(world.notify.sent) == sent
+    assert world.svc.start("process_released").ok
+    assert world.notify.sent[-1].message.startswith("Processed 0, quarantined 0, failed 0;")
 
 
 def test_one_row_per_note_and_a_rerun_does_not_duplicate(world):

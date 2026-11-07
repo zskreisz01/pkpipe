@@ -1,6 +1,6 @@
 {
   "id": "triage",
-  "description": "20:00: bring the triage table up to date (maintenance call: columns, owner comment migration), read new INBOX items (one note per item, or the entries of the INBOX list file when the layout names one), suggest a category per text item in an isolated session without tools, write the triage file, then describe the new image entries with the local vision model (phase two, bounded by the time budget, spec 021) and write their rows, and notify the owner.",
+  "description": "20:00: bring the triage table up to date (maintenance call: columns, owner comment migration), read new INBOX items (one note per item, or the entries of the INBOX list file when the layout names one), suggest a category per text item in an isolated session without tools, write the triage file, then describe the new image entries with the local vision model (phase two, bounded by the time budget, spec 021) and write their rows, then send the run report (spec 024: new suggestions per category, what waits for the owner, todos with counts; the earlier triage_ready message when report.enabled is false).",
   "bpmn": "process-inbox-items",
   "start": "cycle",
   "max_parallel": 2,
@@ -169,6 +169,29 @@
           "awaiting": "${backlog.awaiting}"
         }
       }
+    },
+    {
+      "id": "report_cfg",
+      "type": "code",
+      "bpmn_element": "Send run report",
+      "config": {
+        "function": "report.settings",
+        "args": {
+          "kind": "triage",
+          "notify": "${backlog.notify}",
+          "new_rows": "${rows.rows}",
+          "backlog": "${backlog}"
+        }
+      }
+    },
+    {
+      "id": "run_report",
+      "type": "subflow",
+      "bpmn_element": "Send run report",
+      "config": {
+        "flow": "run_report",
+        "item": "${report_cfg.item}"
+      }
     }
   ],
   "edges": [
@@ -262,16 +285,33 @@
     },
     {
       "from": "backlog",
+      "to": "report_cfg"
+    },
+    {
+      "from": "report_cfg",
       "to": "notify",
       "when": {
-        "path": "backlog.notify",
+        "path": "report_cfg.legacy_notify",
         "truthy": true
       }
     },
     {
-      "from": "backlog",
+      "from": "report_cfg",
+      "to": "run_report",
+      "when": {
+        "path": "report_cfg.enabled",
+        "truthy": true
+      }
+    },
+    {
+      "from": "report_cfg",
       "to": "END",
       "default": true
+    },
+    {
+      "from": "run_report",
+      "to": "END",
+      "on": "error"
     }
   ]
 }
