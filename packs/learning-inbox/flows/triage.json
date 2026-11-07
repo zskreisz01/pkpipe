@@ -146,7 +146,7 @@
     {
       "id": "backlog",
       "type": "code",
-      "bpmn_element": "Notify: triage ready",
+      "bpmn_element": "Send run report",
       "config": {
         "function": "triage.backlog",
         "args": {
@@ -158,7 +158,7 @@
     {
       "id": "notify",
       "type": "notify",
-      "bpmn_element": "Notify: triage ready",
+      "bpmn_element": "Send run report",
       "config": {
         "event": "triage_ready",
         "message": "${backlog.message}",

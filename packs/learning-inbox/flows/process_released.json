@@ -149,7 +149,7 @@
     {
       "id": "summary",
       "type": "notify",
-      "bpmn_element": "Notify: daily summary",
+      "bpmn_element": "Send run report",
       "config": {
         "event": "daily_summary",
         "message": "Processed ${finalize.processed}, quarantined ${finalize.quarantined}, failed ${finalize.failed}; ${release.count_pending} item(s) still pending.${release.proposal_note}${list_report.note}",
