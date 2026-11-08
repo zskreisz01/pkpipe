@@ -229,3 +229,15 @@ def test_an_image_without_a_cached_description_says_so(make):
     lists.owner_decide(w.triage_path, item, override="tool")
     assert w.svc.start("process_released").ok
     assert "no cached description" in (w.plist()[item].link or "")
+
+
+def test_a_description_made_with_an_older_prompt_is_still_found_at_release(make):
+    """Spec 028: the release makes no model call, so a changed prompt digest must not hide the description."""
+    w = make(ON)
+    assert w.run("triage")
+    item = rid("shot.jpg")
+    w.store.cache = {(sha, model, "oldprompt0000"): v for (sha, model, _), v in w.store.cache.items()}
+    lists.owner_decide(w.triage_path, item, override="tool")
+    assert w.svc.start("process_released").ok
+    row = w.plist()[item]
+    assert row.status == "done", row

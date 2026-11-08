@@ -11,6 +11,7 @@ Releasing restores the text exactly (:func:`unwrap_inert`).
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any, Literal
 from urllib.parse import urlsplit
@@ -62,6 +63,12 @@ def flag_domain(url: str | None) -> str | None:
     if parts.scheme not in ("http", "https") or not host:
         return None
     return host.removeprefix("www.") or None
+
+
+def is_protected(domain: str, protected: Iterable[str]) -> bool:
+    """Whether ``domain`` is a protected host or a subdomain of one (spec 028)."""
+    d = domain.lower().strip(".")
+    return any(d == p or d.endswith("." + p) for p in (str(x).lower().strip(". ") for x in protected) if p)
 
 
 def _line_domain(line: str) -> str:

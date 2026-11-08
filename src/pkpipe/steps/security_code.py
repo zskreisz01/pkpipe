@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from pkpipe.security.quarantine import EVIDENCE_CHARS, flag_domain
+from pkpipe.security.quarantine import EVIDENCE_CHARS, flag_domain, is_protected
 from pkpipe.steps.base import StepContext, StepResult, register_code
 from pkpipe.steps.learning_code import find_source_url
 
@@ -59,7 +59,13 @@ def record_flag(ctx: StepContext, read: str = "read") -> StepResult:
                 "timestamp": now,
             }
         )
-    deny = log.deny_domain(domain, day=now.date().isoformat()) if domain else None
+    url_filter = (ctx.snapshot.data.get("security") or {}).get("url_filter") or {}
+    protected = url_filter.get("protected_domains") or []
+    deny: dict[str, Any] | None
+    if domain and is_protected(domain, protected):
+        deny = {"domain": domain, "added": False, "count": 0, "protected": True}  # spec 028: host stays open
+    else:
+        deny = log.deny_domain(domain, day=now.date().isoformat()) if domain else None
     out = {
         "url": url,
         "domain": domain,

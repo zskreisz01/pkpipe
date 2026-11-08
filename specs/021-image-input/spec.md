@@ -109,7 +109,7 @@ updated: 2026-11-05
 - **FR-010**: `layout.attachments_dir` is read-only: not validated as a write destination, not in `snapshot_roots()`
 - **FR-011**: `images.time_budget_s`, `images.estimate_s`, `images.per_image_timeout_s`, `images.max_side`, `images.max_tokens`, `images.max_bytes` in `config/images.json`
 - **FR-014**: Code step `image.budget` (the time guard of clarification 7): counts uncached images, estimates, decides before every image (`continue` | `stop`), records per-image durations in the app DB for the next run's seed; a deferred item gets no row and no removal. The clock is injectable, so the guard is a pure, testable function
-- **FR-012**: Description cache table in the app DB (hash, description, model, version); the triage row shows `topic` only, the full description stays in the DB
+- **FR-012**: Description cache table in the app DB (hash, description, model, version); the triage row shows `topic` only, the full description stays in the DB. Since spec 028 `cache_get_latest(hash, model)` also reads the newest row regardless of prompt version (release lookups, no model call)
 - **FR-013**: A fake vision model for tests (scripted by image digest) and synthetic image fixtures generated in code (no personal image in the repository)
 
 ## Success Criteria

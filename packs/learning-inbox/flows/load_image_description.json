@@ -5,7 +5,7 @@
     "image"
   ],
   "start": "prepare",
-  "description": "Spec 025: a released image item has no description in its run (the triage cycle described it earlier). Read and prepare the image again (code, same preparation as the triage), look the prepared bytes up in the description cache and hand the validated description to the item (the same checks as the triage: an address that fails the URL policy or a suspected injection is a security flag). A cache miss or a failed read leaves the item without a description; the model is never called here.",
+  "description": "Spec 025: a released image item has no description in its run (the triage cycle described it earlier). Read and prepare the image again (code, same preparation as the triage), look the prepared bytes up in the description cache and hand the validated description to the item (the same checks as the triage: an address that fails the URL policy or a suspected injection is a security flag). Spec 028: the lookup accepts a description of any prompt version (no model call is made, so the digest of today's prompt is no reason to ignore a validated description). A cache miss or a failed read leaves the item without a description; the model is never called here.",
   "nodes": [
     {
       "id": "prepare",
@@ -14,7 +14,8 @@
       "config": {
         "function": "image.prepare",
         "args": {
-          "session": "describe_image_item.describe"
+          "session": "describe_image_item.describe",
+          "any_version": true
         }
       }
     },

@@ -128,6 +128,11 @@ class ImageStorePort(Protocol):
 
     def cache_get(self, sha256: str, model: str, prompt_version: str) -> dict[str, Any] | None: ...
 
+    def cache_get_latest(self, sha256: str, model: str) -> dict[str, Any] | None:
+        """The newest description of the image for the model under any prompt version (spec 028). Only for
+        callers that make no model call and so need no description of one exact prompt."""
+        ...
+
     def cache_put(
         self, sha256: str, model: str, prompt_version: str, description: dict[str, Any]
     ) -> None: ...
@@ -173,7 +178,8 @@ class SecurityLogPort(Protocol):
     ``log_malicious_url`` appends one ``MaliciousUrlEntry`` row (see :mod:`pkpipe.security.quarantine`).
     ``deny_domain`` adds a domain to the deny-list once; flagging it again increments its counter
     (``{"domain", "added", "count"}``). ``denied_domains`` is what the handler has deny-listed so far (the URL
-    filter merges it with the config's deny-list file)."""
+    filter merges it with the config's deny-list file). ``deny_domain`` is only called for unprotected hosts:
+    ``security.record_flag`` skips ``security.url_filter.protected_domains`` (spec 028)."""
 
     def log_malicious_url(self, entry: dict[str, Any]) -> None: ...
 
