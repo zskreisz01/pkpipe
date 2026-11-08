@@ -12,7 +12,7 @@ from tests.fakes import FakeClock, FakeSecurityLog
 from tests.support.flows import make_ports, make_snapshot
 
 
-def _ctx(item, outputs=None, log=None):
+def _ctx(item, outputs=None, log=None, security=None):
     log = log if log is not None else FakeSecurityLog("denied.example\n")
     ports = make_ports(clock=FakeClock(1_793_520_000.0), security_log=log)
     outputs = outputs or {}
@@ -20,7 +20,7 @@ def _ctx(item, outputs=None, log=None):
         item=item,
         ports=ports,
         run=RunInfo("run-9", "handle_security_flag", "schedule", "v"),
-        snapshot=make_snapshot(),
+        snapshot=make_snapshot(**({"security": security} if security else {})),
         resolve=lambda ref, required=True: outputs.get(ref),
     ), log
 
@@ -104,3 +104,20 @@ def test_flagged_triage_items_become_quarantined_rows_and_unhandled_flags_fail()
         and note["quarantined"] == 1
         and "quarantined by the security checks" in note["message"]
     )
+
+
+def test_a_protected_host_is_logged_but_never_deny_listed():
+    """Spec 028: one flagged page of github.com must not block every other github.com link."""
+    sec = {"url_filter": {"protected_domains": ["github.com"]}}
+    ctx, log = _ctx(
+        {"id": "i1", "url": "https://github.com/some/repo", "security_flags": FLAGS[:1]}, security=sec
+    )
+    out = CODE["security.record_flag"](ctx).output
+    assert out["domain"] == "github.com"
+    assert out["deny"] == {"domain": "github.com", "added": False, "count": 0, "protected": True}
+    assert log.deny_text == "denied.example\n"  # the deny-list file is untouched
+    assert log.rows[0]["domain"] == "github.com"  # the flag itself is still logged
+    ctx2, log2 = _ctx(
+        {"id": "i2", "url": "https://gist.github.com/x", "security_flags": FLAGS[:1]}, security=sec
+    )
+    assert CODE["security.record_flag"](ctx2).output["deny"]["protected"] is True  # a subdomain is covered

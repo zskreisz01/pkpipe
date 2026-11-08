@@ -347,6 +347,14 @@ class UrlFilter(_Strict):
     block_private_networks: bool = True
     max_bytes: int = Field(gt=0)
     deny_list: str | None = None
+    protected_domains: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Hosts (and their subdomains) that a security flag never puts on the deny-list (spec 028): "
+            "one flagged page of a big host must not block the whole host. The flagged item is still "
+            "quarantined and the flag is logged."
+        ),
+    )
 
 
 class QueryGuard(_Strict):

@@ -47,8 +47,8 @@ flowchart LR
 | Update estimate | `image.record` | The mean of this run's model calls replaces the estimate (a failed or timed-out call counts its seconds too; a read or decode failure does not); every call also goes to the timing table of the app DB |
 | Time budget, estimate seed, timeout | `config/images.json`: `time_budget_s` (7200), `estimate_s` (60), `per_image_timeout_s` (300) | |
 | read_image | Vault tool `read_image` (FR-004) | Basename only, extensions `jpg jpeg png webp gif`, size limit, symlink refusal; `attachments_dir` is read-only (FR-010) |
-| Prepare | `image.prepare` over the port `ImagePreparePort` (Pillow adapter, FR-005) | EXIF removal, scaling to `images.max_side`, JPEG re-encode, pixel limit; the hash of the prepared bytes is the cache key |
-| Cache hit? | Description cache in the app DB (`ImageStorePort`, FR-012) | Key: hash, model, prompt version; the triage row shows `topic` only |
+| Prepare | `image.prepare` over the port `ImagePreparePort` (Pillow adapter, FR-005) | EXIF removal, scaling to `images.max_side`, JPEG re-encode, pixel limit; the hash of the prepared bytes is the cache key; argument `any_version` (spec 028) |
+| Cache hit? | Description cache in the app DB (`ImageStorePort`, FR-012) | Key: hash, model, prompt version; the triage row shows `topic` only. `load_image_description` (spec 025) passes `any_version` and reads `ImageStorePort.cache_get_latest(sha256, model)`: the newest description of any prompt version (spec 028) |
 | Describe | Session `describe` of `describe_image_item`, step type `vision` (FR-006), data class `image` (FR-009) | No tools, loopback model only, `max_tokens`, `images.retries` attempts, then `needs_owner` |
 | per-image timeout (300 s) | The `vision` step | Counts as a failure of that image; the loop continues |
 | Output guard + canary | `output_guard` behind `describe` (FR-007), then `image.finish` | On `visible_text`, `topic`, `urls`, `evidence`; the URL policy and the deny-list for `urls` |

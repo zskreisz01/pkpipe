@@ -196,6 +196,7 @@ Webhook and Apprise URLs contain secrets, so the config accepts only `env:NAME` 
 | `url_filter.block_private_networks` | Refuse private, loopback, link-local and CGNAT targets (after DNS) | `true` |
 | `url_filter.max_bytes` | Size limit of a page; larger pages are blocked (security flag) | 2000000 |
 | `url_filter.deny_list` | Deny-list file in the config layers (`security/deny_list.txt`) | none |
+| `url_filter.protected_domains` | Hosts (and subdomains) that a security flag never adds to the deny-list (spec 028); the flag is still logged and the item quarantined | pack: github.com, gitlab.com, huggingface.co, arxiv.org, pypi.org, npmjs.com, wikipedia.org, stackoverflow.com, youtube.com |
 | `classifier.backend` | `qwen3guard`, `deberta` or `combined` (maximum over `members`); see [decision 0001](decisions/0001-injection-classifier.md) | pack: `combined` |
 | `classifier.members[]` | `{backend, model, model_dir, chunk_tokens}` per model of `combined` | pack: Qwen3Guard-Gen-0.6B (1024 tokens) + ProtectAI DeBERTa (512) |
 | `classifier.model_dir` (also per member) | Local model directory (may be `env:NAME\|default`); else `~/tools/qwen3guard/<model name>` or `~/tools/protectai-deberta-pi-v2` | none |

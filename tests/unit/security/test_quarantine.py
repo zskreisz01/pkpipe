@@ -98,3 +98,15 @@ def test_release_candidate_is_a_valid_security_eval_case():
     parsed = EvalCase.model_validate({**case, "suite": "security"})
     assert parsed.source.value == "release" and parsed.expected["label"] == "benign"
     assert len(parsed.input["text"]) == 4000 and parsed.id == "release-abc-2026-11-01"
+
+
+def test_is_protected_matches_the_host_and_its_subdomains_only():
+    from pkpipe.security.quarantine import is_protected
+
+    protected = ["github.com", " HuggingFace.co "]
+    assert is_protected("github.com", protected) and is_protected("gist.github.com", protected)
+    assert is_protected("huggingface.co", protected)
+    assert not is_protected("notgithub.com", protected) and not is_protected(
+        "github.com.evil.example", protected
+    )
+    assert not is_protected("github.com", [])

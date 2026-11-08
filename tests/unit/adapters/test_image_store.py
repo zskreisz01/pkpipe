@@ -59,3 +59,13 @@ def test_the_app_db_keeps_the_rows_across_connections(tmp_path):
     AppStore(path).record_timing("r", "h", "m", 12.5)
     again = AppStore(path)  # a new process: the tables exist already (CREATE IF NOT EXISTS)
     assert again.cache_get("h", "m", "v") == DESC and again.recent_seconds("m") == [12.5]
+
+
+def test_get_latest_ignores_the_prompt_version_but_not_hash_or_model(store):
+    """Spec 028: a caller that makes no model call takes the newest description of the model."""
+    assert store.cache_get_latest("h1", "m") is None
+    store.cache_put("h1", "m", "v1", {**DESC, "topic": "Old."})
+    store.cache_put("h1", "m", "v2", {**DESC, "topic": "New."})
+    assert store.cache_get_latest("h1", "m")["topic"] == "New."
+    assert store.cache_get_latest("h1", "other-model") is None
+    assert store.cache_get_latest("h2", "m") is None

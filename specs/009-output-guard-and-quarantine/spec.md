@@ -39,7 +39,7 @@ A synthesized note with harmful content or embedded instructions is stopped.
 
 ### User Story 2 - Flagged items are handled consistently (Priority: P1)
 
-Every flag logs the URL, deny-lists the domain, quarantines inertly and alerts.
+Every flag logs the URL, deny-lists the domain (except protected domains, spec 028), quarantines inertly and alerts.
 
 **Independent Test**: Flow test of `handle_security_flag`.
 
@@ -60,7 +60,7 @@ The owner releases an item; it re-enters processing and becomes an eval entry.
 
 ### Edge Cases
 
-- Same domain flagged repeatedly → single deny-list entry, counter incremented.
+- Same domain flagged repeatedly → single deny-list entry, counter incremented. Protected domains (`security.url_filter.protected_domains`, spec 028) are never added.
 
 ## Requirements *(mandatory)*
 
@@ -79,7 +79,7 @@ The owner releases an item; it re-enters processing and becomes an eval entry.
 ## Success Criteria *(mandatory)*
 
 - **SC-001**: 0 flagged outputs written to PARA in tests.
-- **SC-002**: Every flag produces log row, deny-list entry, quarantine note and alert.
+- **SC-002**: Every flag produces log row, deny-list entry (not for protected domains, spec 028), quarantine note and alert.
 
 ## Clarifications
 

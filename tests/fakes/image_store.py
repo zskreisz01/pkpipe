@@ -16,6 +16,10 @@ class FakeImageStore:
         hit = self.cache.get((sha256, model, prompt_version))
         return copy.deepcopy(hit) if hit is not None else None
 
+    def cache_get_latest(self, sha256: str, model: str) -> dict[str, Any] | None:
+        hits = [v for (sh, m, _), v in self.cache.items() if sh == sha256 and m == model]
+        return copy.deepcopy(hits[-1]) if hits else None
+
     def cache_put(self, sha256: str, model: str, prompt_version: str, description: dict[str, Any]) -> None:
         self.cache[(sha256, model, prompt_version)] = copy.deepcopy(description)
 

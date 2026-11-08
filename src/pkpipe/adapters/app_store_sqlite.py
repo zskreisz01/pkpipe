@@ -250,6 +250,15 @@ class AppStore:
             ).fetchone()
         return json.loads(row["description"]) if row else None
 
+    def cache_get_latest(self, sha256: str, model: str) -> dict[str, Any] | None:
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT description FROM image_cache WHERE sha256 = ? AND model = ? "
+                "ORDER BY created_at DESC LIMIT 1",
+                (sha256, model),
+            ).fetchone()
+        return json.loads(row["description"]) if row else None
+
     def cache_put(self, sha256: str, model: str, prompt_version: str, description: dict[str, Any]) -> None:
         with self._conn() as c:
             c.execute(

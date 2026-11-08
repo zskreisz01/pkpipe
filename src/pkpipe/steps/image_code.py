@@ -195,8 +195,11 @@ def load_prepared(
     return prepared, None
 
 
-def _prepare_one(ctx: StepContext, cfg: ImagesConfig, item: dict[str, Any], session: str) -> dict[str, Any]:
-    """Read, prepare and look up one image: the output of ``image.prepare`` (digests and sizes only)."""
+def _prepare_one(
+    ctx: StepContext, cfg: ImagesConfig, item: dict[str, Any], session: str, any_version: bool = False
+) -> dict[str, Any]:
+    """Read, prepare and look up one image: the output of ``image.prepare`` (digests and sizes only).
+    ``any_version`` (spec 028) serves the newest description of the model whatever prompt it was made with."""
     node = session_node(ctx, session)
     profile = str(node.config.get("profile") or "default")
     model, version = model_of(ctx, profile), prompt_version(ctx, node)
@@ -206,7 +209,11 @@ def _prepare_one(ctx: StepContext, cfg: ImagesConfig, item: dict[str, Any], sess
             span.set("image.failure", failure or "unknown")
             return {"ok": False, "reason": failure, "key": item["id"], "cached": False}
         store = image_store(ctx)
-        description = store.cache_get(prepared.sha256, model, version) if store else None
+        description = None
+        if store:
+            description = store.cache_get(prepared.sha256, model, version)
+            if description is None and any_version:
+                description = store.cache_get_latest(prepared.sha256, model)
         span.set("image.bytes", len(prepared.data))
         span.set("image.source_bytes", prepared.source_bytes)
         span.set("image.cache_hit", description is not None)
@@ -226,13 +233,13 @@ def _prepare_one(ctx: StepContext, cfg: ImagesConfig, item: dict[str, Any], sess
 
 
 @register_code("image.prepare", data_class=DATA_CLASS)
-def prepare(ctx: StepContext, session: str = DEFAULT_SESSION) -> StepResult:
+def prepare(ctx: StepContext, session: str = DEFAULT_SESSION, any_version: bool = False) -> StepResult:
     """BPMN: read_image, Prepare, Cache hit?. Reads the item's image through the vault tool (``read_image``,
     ``attachments_dir`` read only), removes EXIF, scales to ``images.max_side``, hashes the prepared bytes and
     looks the hash up in the description cache. A failure is a result (``ok: false`` and a stable ``reason``),
     not an exception: the flow sends that image to the owner and goes on."""
     item = ctx.item or {}
-    out = _prepare_one(ctx, images_config(ctx), item, session)
+    out = _prepare_one(ctx, images_config(ctx), item, session, any_version)
     fields: dict[str, Any] = {"image_ok": out["ok"], "image_cached": bool(out.get("cached"))}
     if out["ok"]:
         fields["image_sha"] = out["sha256"]
