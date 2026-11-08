@@ -292,6 +292,14 @@ class ClassifierMember(_Strict):
         return self
 
 
+class ClassifierReview(_Strict):
+    """``security.classifier.review`` (spec 029): hold an item for the owner instead of quarantining it when
+    the injection detector alone is over the threshold, every safety model says Safe, the heuristics are
+    clean and the Reader found nothing. Every other flag keeps the quarantine."""
+
+    enabled: bool = Field(default=False, description="Hold such an item for the owner (pack default: on)")
+
+
 class ClassifierSettings(_Strict):
     """``security.classifier``: the local classifier of secure fetch (spec 008 FR-004) and of the output
     guard (spec 009 FR-002). ``combined`` scans with every member and takes the maximum score."""
@@ -307,6 +315,7 @@ class ClassifierSettings(_Strict):
         description="Fail closed: without a usable classifier every secure fetch and every guarded output "
         "is flagged (spec 008, 009)",
     )
+    review: ClassifierReview = Field(default_factory=ClassifierReview)
 
     @model_validator(mode="after")
     def _members(self) -> ClassifierSettings:

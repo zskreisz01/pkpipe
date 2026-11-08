@@ -30,7 +30,7 @@ Notation: **NEW** = introduced by this spec · **EXISTING** = already in the cod
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
 | `clean` | bool | yes |  |
-| `status` | enum | yes | clean · flagged · failed (timeout, unreachable: not a flag) |
+| `status` | enum | yes | clean · flagged · review (spec 029: held for the owner) · failed (timeout, unreachable: not a flag) |
 | `flags` | list[enum] | yes | url_filter · heuristic · classifier · canary · reader |
 | `reasons` | list[str] | yes | Reason codes (never page text) |
 | `flag_reasons` | object | yes | First reason code per flag |
@@ -73,4 +73,4 @@ erDiagram
 ## Storage
 
 - Pydantic models in `pkpipe.security.verdict`; JSON Schemas exported by `pkpipe schema` (`fetch-result`, `reader-extract`, `verdict`). The Reader's structured-output schema is `packs/learning-inbox/schemas/reader_extract.json` (a test keeps fields and bounds in line). The Reader step validates every reply strictly against the model; a reply that does not validate is flagged (`reader_invalid_output`).
-- Nothing new is persisted beyond the run checkpoints; the verdict sets `item.fetch_status`, `item.extract` (clean only), `item.flagged`, `item.security_flags`. The web-fetch server can append one JSON line per fetch (`--stats-file`, no URLs) for the fallback rate.
+- Nothing new is persisted beyond the run checkpoints; the verdict sets `item.fetch_status`, `item.extract` (clean only), `item.flagged`, `item.security_flags` (each classifier flag with `score` and `detail`, spec 029) and, when held, `item.classifier_review`; the verdict also has `evidence` and `review`. The web-fetch server can append one JSON line per fetch (`--stats-file`, no URLs) for the fallback rate.

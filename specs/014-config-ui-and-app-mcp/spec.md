@@ -62,7 +62,7 @@ A chat agent lists triage items and confirms them over MCP.
   `Host` header must be on the allowlist (DNS rebinding), cookie requests that change state need the CSRF header
   and a same-origin `Origin`, and responses carry a strict CSP.
 - **FR-002**: App MCP tools: `run_flow`, `list_triage`, `confirm_item`, `override_item`, `get_run`,
-  `release_quarantine`. `confirm_item`, `override_item` and `release_quarantine` are **owner actions**: they need
+  `release_quarantine` (later: `retry_items`, spec 027, and `accept_classifier_warning`, spec 029). `confirm_item`, `override_item`, `release_quarantine`, `retry_items` and `accept_classifier_warning` are **owner actions**: they need
   the owner token, are audited and follow the triage domain rules; the agent token may only `run_flow`,
   `list_triage` and `get_run`.
 - **FR-003**: Config edits are drafts in the app DB on the private overlay (never the public pack). Publish =

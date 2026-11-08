@@ -32,6 +32,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [024-run-report-and-journal-todos](024-run-report-and-journal-todos/spec.md) | Run report after every run, and todos in the daily journal | Completed | data-model |
 | [027-retry-failed-items](027-retry-failed-items/spec.md) | The owner retries failed items | Completed | data-model · contracts |
 | [028-cache-any-version-and-protected-domains](028-cache-any-version-and-protected-domains/spec.md) | Cached image descriptions at release, protected hosts in the deny-list | Completed | plan · tasks |
+| [029-classifier-evidence-and-review](029-classifier-evidence-and-review/spec.md) | Classifier evidence in every flag, and a review hold for injection-detector-only warnings | Completed | data-model · plan · tasks |
 | [025-find-and-evaluate-urlless-items](025-find-and-evaluate-urlless-items/spec.md) | Find the source of items without a URL and evaluate it | Completed | data-model |
 | [026-config-editor-forms](026-config-editor-forms/spec.md) | Config editor forms in the UI (schema-driven, shared draft with the JSON view) | Completed | data-model |
 

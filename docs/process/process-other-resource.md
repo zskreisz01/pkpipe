@@ -22,6 +22,7 @@ flowchart LR
     gp -- no plan / no URL, discovery off --> fl[List item as failed<br/>reason in the processing list] --> f((Failed))
     sf -. fetch failed .-> fl
     sf -. security flag .-> x1((Security flag))
+    sf -. classifier warning only .-> hr[Hold for the owner<br/>classifier warning only] --> h((Held))
     rs -. error .-> fl
     rs --> og[Output guard<br/>canary, heuristics,<br/>Qwen3Guard + DeBERTa] --> g2{Flag?}
     g2 -- yes --> x2((Security flag))
@@ -31,3 +32,5 @@ flowchart LR
     gn -- none --> m
     m --> al[Add to processing list] --> ar[Archive INBOX item] --> e((Done))
 ```
+
+Spec 029: when the injection detector (DeBERTa) alone is over the threshold, every safety model (Qwen3Guard) says `Safe`, the heuristics are clean and the Reader found nothing, secure fetch returns `review` instead of a flag. The node `hold_review` (`security.hold_for_review`) lists the item as failed with the reason *held for your decision*, keeps the evidence (scores, labels, chunk numbers, address; no page text) in the app database and ends the item: no quarantine, no deny-list entry. The owner accepts the warning on the triage page (or `accept_classifier_warning`, `pkpipe retry --accept-warning`), the item goes through the release run again and the page passes; the Reader, the output guard and every other detector still apply.

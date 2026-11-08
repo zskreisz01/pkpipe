@@ -552,6 +552,7 @@ class Vault:
         flags: list[dict[str, Any]] | None = None,
         run_id: str = "",
         flagged_at: str = "",
+        url: str = "",
     ) -> dict[str, Any]:
         """Move a flagged note into the quarantine folder in inert form (code block, ``security_flag`` front
         matter with flag names and reason codes only). Idempotent: a re-run after the note moved keeps the
@@ -572,15 +573,38 @@ class Vault:
             flags=[f for f in flags or [] if isinstance(f, dict)],
             run_id=str(run_id)[:64],
             flagged_at=str(flagged_at)[:40],
+            url=str(url or "")[:500],
         )
         if raw is not None:
             front["original_format"] = quarantine.text_format(raw)  # for the exact restore
-        text = dump_front_matter(front) + quarantine.quarantine_body(item_id, original)
+        text = dump_front_matter(front) + quarantine.quarantine_body(
+            item_id, original, str(url or "")[:500], [f for f in flags or [] if isinstance(f, dict)]
+        )
         target.parent.mkdir(parents=True, exist_ok=True)
         update_text(target, lambda _existing: text)
         if source is not None and original is not None:
             source.unlink()
         return {"path": self.policy.rel(target), "original_path": path, "moved": original is not None}
+
+    @_traced
+    def quarantine_info(self, item_id: str) -> dict[str, Any]:
+        """What the owner needs to find and judge a quarantined item (spec 029): source address, flag codes,
+        scores and the classifier evidence from the front matter. Never the body, so never the quarantined
+        text. Empty when there is no quarantine note."""
+        target = self._quarantine_target(item_id)
+        if not target.is_file():
+            return {}
+        front = parse_note(target.read_text(encoding="utf-8")).front_matter
+        flag = front.get("security_flag") if isinstance(front.get("security_flag"), dict) else {}
+        return {
+            "source_url": str(front.get("source_url") or ""),
+            "flags": [str(f) for f in flag.get("flags") or []],
+            "reason_codes": [str(c) for c in flag.get("reason_codes") or []],
+            "scores": flag.get("scores") if isinstance(flag.get("scores"), dict) else {},
+            "classifier": flag.get("classifier") if isinstance(flag.get("classifier"), dict) else None,
+            "flagged_at": str(flag.get("flagged_at") or ""),
+            "path": self.policy.rel(target),
+        }
 
     def _restore_quarantined(self, item_id: str, *, dry_run: bool) -> dict[str, Any]:
         """Check (``dry_run``) or do the move back of a quarantined note to its original path."""

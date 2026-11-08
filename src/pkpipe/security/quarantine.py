@@ -46,6 +46,9 @@ class MaliciousUrlEntry(BaseModel):
     detector: str
     score: float | None = None
     evidence: str | None = Field(default=None, max_length=EVIDENCE_CHARS)
+    detail: dict[str, Any] | None = Field(
+        default=None, description="Spec 029: what each classifier model said (scores, labels; no text)"
+    )
     item_id: str | None = None
     run_id: str
     timestamp: datetime
@@ -129,11 +132,26 @@ def unwrap_inert(block: str) -> str | None:
     return m.group(2) if m else None
 
 
-def quarantine_front_matter(
-    *, item_id: str, original_path: str | None, flags: list[dict[str, Any]], run_id: str, flagged_at: str
-) -> dict[str, Any]:
-    """``security_flag`` front matter: flag names, detectors and reason codes only."""
+def _scores(flags: list[dict[str, Any]]) -> dict[str, float]:
     return {
+        str(f.get("flag") or f.get("detector")): round(float(f["score"]), 4)
+        for f in flags
+        if isinstance(f.get("score"), int | float)
+    }
+
+
+def quarantine_front_matter(
+    *,
+    item_id: str,
+    original_path: str | None,
+    flags: list[dict[str, Any]],
+    run_id: str,
+    flagged_at: str,
+    url: str = "",
+) -> dict[str, Any]:
+    """``security_flag`` front matter: flag names, detectors, reason codes and scores (spec 029), never text.
+    ``source_url`` is the address of the flagged page (the same address the malicious-URL log holds)."""
+    front: dict[str, Any] = {
         "security_flag": {
             "flags": sorted({str(f.get("flag") or f.get("detector")) for f in flags}),
             "detectors": sorted({str(f.get("detector")) for f in flags if f.get("detector")}),
@@ -145,14 +163,48 @@ def quarantine_front_matter(
         "original_path": original_path,
         "quarantined": True,
     }
+    if url:
+        front["source_url"] = url[:500]
+    if scores := _scores(flags):
+        front["security_flag"]["scores"] = scores
+    for f in flags:
+        if f.get("detector") == "classifier" and isinstance(f.get("detail"), dict):
+            front["security_flag"]["classifier"] = f["detail"]  # per model scores and labels, no text
+    return front
 
 
-def quarantine_body(item_id: str, original_text: str | None) -> str:
+def evidence_section(flags: list[dict[str, Any]]) -> str:
+    """The "Why it was flagged" section of the quarantine note: per model scores and fixed sentences that
+    explain them (spec 029). Empty without classifier evidence."""
+    from pkpipe.security.evidence import interpret
+
+    for f in flags:
+        detail = f.get("detail")
+        if f.get("detector") == "classifier" and isinstance(detail, dict) and detail.get("members"):
+            rows = [
+                "| Model | Kind | Top score | Label | Chunks over threshold |",
+                "| --- | --- | --- | --- | --- |",
+            ]
+            for m in detail["members"]:
+                rows.append(
+                    f"| {m['model']} | {m['kind']} | {float(m['max_score']):.3f} | {m.get('label', '-')} | "
+                    f"{m.get('flagged_chunk_count', 0)} of {m.get('chunks', 0)} |"
+                )
+            lines = "\n".join(f"- {s}" for s in interpret(detail))
+            return f"## Why it was flagged\n\n{chr(10).join(rows)}\n\n{lines}\n\n"
+    return ""
+
+
+def quarantine_body(
+    item_id: str, original_text: str | None, url: str = "", flags: list[dict[str, Any]] | None = None
+) -> str:
+    # inline code keeps the address from rendering as a link (the note is inert); a backtick cannot end it
+    source = f"Source: `{url.replace(chr(96), '%60')}`\n\n" if url else ""
     head = (
-        f"# Quarantined item {item_id}\n\n"
+        f"# Quarantined item {item_id}\n\n{source}"
         "pkpipe flagged this item (see `security_flag`). The original content is kept below in inert form; "
         "do not copy it out of the code block. Release a false positive from the triage page of the UI or "
-        "with the app MCP tool `release_quarantine`.\n\n"
+        "with the app MCP tool `release_quarantine`.\n\n" + evidence_section(flags or [])
     )
     if original_text is None:
         return head + "_No source note: the item came from a URL only._\n"

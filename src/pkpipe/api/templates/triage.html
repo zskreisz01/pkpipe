@@ -15,7 +15,7 @@
 {% if failed and failed.failed %}
 <form class="row bulk" hx-post="/ui/triage/retry-failed" hx-confirm="Send {{ failed.retryable }} failed item(s) through the next release run again?{% if failed.capped %} {{ failed.capped }} item(s) reached the retry limit ({{ failed.max }}) and stay as they are.{% endif %}">
   <input type="hidden" name="confirm" value="yes">
-  <span data-testid="failed-count">{{ failed.failed }} item(s) failed to process, {{ failed.retryable }} can be retried.</span>
+  <span data-testid="failed-count">{{ failed.failed }} item(s) failed to process, {{ failed.retryable }} can be retried.{% if failed.held %} {{ failed.held }} held for your decision (classifier warning, accept them one by one).{% endif %}</span>
   <button type="submit" data-testid="retry-failed" {{ "disabled" if not failed.retryable }}>Retry all failed ({{ failed.retryable }})</button>
 </form>
 {% endif %}

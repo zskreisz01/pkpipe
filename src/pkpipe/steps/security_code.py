@@ -21,7 +21,12 @@ SECURITY_LOG_PORT = "security_log"
 
 def flagged_url(ctx: StepContext, note: dict[str, Any] | None = None) -> str:
     item = ctx.item or {}
-    candidates = [item.get("url"), (item.get("extract") or {}).get("url"), item.get("resource")]
+    candidates = [
+        item.get("url"),
+        item.get("source_url"),
+        (item.get("extract") or {}).get("url"),
+        item.get("resource"),
+    ]
     for value in candidates:
         if isinstance(value, str) and flag_domain(value):
             return value.strip()
@@ -30,6 +35,25 @@ def flagged_url(ctx: StepContext, note: dict[str, Any] | None = None) -> str:
         if found:
             return found
     return ""
+
+
+def evidence_text(flags: list[dict[str, Any]]) -> str:
+    """One line for the alert: the scores of the detectors and, for the classifier, of each model
+    (numbers and labels only, spec 029)."""
+    parts: list[str] = []
+    for f in flags:
+        name = str(f.get("flag") or f.get("detector") or "flag")
+        score = f.get("score")
+        detail = f.get("detail") if isinstance(f.get("detail"), dict) else None
+        text = name if not isinstance(score, int | float) else f"{name} {float(score):.2f}"
+        if detail and detail.get("members"):
+            models = ", ".join(
+                f"{m['model']} {float(m['max_score']):.2f}" + (f" {m['label']}" if m.get("label") else "")
+                for m in detail["members"]
+            )
+            text += f" ({models})"
+        parts.append(text)
+    return "; ".join(parts)
 
 
 @register_code("security.record_flag")
@@ -54,6 +78,7 @@ def record_flag(ctx: StepContext, read: str = "read") -> StepResult:
                 "detector": str(f.get("detector") or "unknown"),
                 "score": f.get("score") if isinstance(f.get("score"), int | float) else None,
                 "evidence": str(f.get("reason_code") or "")[:EVIDENCE_CHARS] or None,
+                "detail": f.get("detail") if isinstance(f.get("detail"), dict) else None,
                 "item_id": item.get("id"),
                 "run_id": ctx.run.run_id,
                 "timestamp": now,
@@ -73,9 +98,29 @@ def record_flag(ctx: StepContext, read: str = "read") -> StepResult:
         "deny": deny,
         "flags": sorted({str(f.get("flag") or f.get("detector")) for f in flags}),
         "flag_text": ", ".join(sorted({str(f.get("flag") or f.get("detector")) for f in flags})),
+        "evidence_text": evidence_text(flags),
         "flagged_at": now.isoformat(timespec="seconds"),
     }
     return StepResult(output=out, item={"security_domain": domain})
+
+
+HELD_REASON = "held for your decision: only the injection detector fired (classifier warning)"
+
+
+@register_code("security.hold_for_review")
+def hold_for_review(ctx: StepContext) -> StepResult:
+    """BPMN: Hold for the owner (spec 029). The secure-fetch verdict found only a classifier warning of the
+    injection detector (the safety model said Safe, heuristics and Reader found nothing). The item is not
+    quarantined and its domain is not deny-listed: it is listed as failed with a fixed reason, and the
+    evidence (scores and labels, no text) is kept in the app DB for the triage page. The owner accepts the
+    warning (the item goes through the release run again) or leaves it. The item ends here."""
+    item = ctx.item or {}
+    review = item.get("classifier_review") if isinstance(item.get("classifier_review"), dict) else {}
+    port = ctx.ports.extra.get("classifier_reviews")
+    if port is not None and item.get("id"):
+        port.hold(str(item["id"]), flagged_url(ctx, None), review.get("evidence") or {})
+    fields = {"processing_status": "failed", "failure_reason": HELD_REASON}
+    return StepResult(output={**fields, "held": True}, item=fields)
 
 
 @register_code("security.quarantined")

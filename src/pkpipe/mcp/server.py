@@ -30,7 +30,14 @@ from pkpipe.api.services import AppServices, NotFound, Refused
 from pkpipe.security.canary import wrap_untrusted
 from pkpipe.telemetry import tool_span
 
-OWNER_TOOLS = ("confirm_item", "override_item", "release_quarantine", "retry_items", "restore_run")
+OWNER_TOOLS = (
+    "confirm_item",
+    "override_item",
+    "release_quarantine",
+    "retry_items",
+    "accept_classifier_warning",
+    "restore_run",
+)
 AGENT_TOOLS = ("run_flow", "list_triage", "get_run")
 UNTRUSTED_FIELDS = ("resource", "comment")
 
@@ -179,6 +186,17 @@ def build_app_mcp(services: AppServices, tokens: Tokens) -> FastMCP:
         sent; each item is limited to `triage.retry_max` owner retries. Returns counts and the item ids."""
         return guarded(
             "retry_items", True, lambda actor: services.retry_failed(actor=actor, item_ids=item_ids)
+        )
+
+    @mcp.tool
+    def accept_classifier_warning(item_id: str) -> dict:
+        """OWNER ACTION. Accept the classifier warning of an item that was held (only the injection detector
+        fired, the safety model said Safe; see the triage page for the scores): it goes through the next
+        release run again and its page may pass. Every other detector still applies."""
+        return guarded(
+            "accept_classifier_warning",
+            True,
+            lambda actor: services.accept_warning(item_id, actor=actor),
         )
 
     @mcp.tool

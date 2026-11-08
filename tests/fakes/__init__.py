@@ -1,6 +1,7 @@
 """In-memory fakes for every port in ``pkpipe.ports`` (one fake per port, shared by all specs)."""
 
 from tests.fakes.classifier import FakeClassifier
+from tests.fakes.classifier_review import FakeClassifierReview
 from tests.fakes.clock import FakeClock
 from tests.fakes.config import InMemoryConfig
 from tests.fakes.context_store import FakeContextStore
@@ -22,6 +23,7 @@ from tests.fakes.web import FakeSearch, FakeWeb
 
 __all__ = [
     "FakeClassifier",
+    "FakeClassifierReview",
     "FakeClock",
     "FakeContextStore",
     "FakeImageStore",

@@ -3,6 +3,9 @@
     "backend": "combined",
     "threshold": 0.5,
     "required": true,
+    "review": {
+      "enabled": true
+    },
     "members": [
       {
         "backend": "qwen3guard",

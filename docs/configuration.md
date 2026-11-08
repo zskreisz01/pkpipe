@@ -202,6 +202,7 @@ Webhook and Apprise URLs contain secrets, so the config accepts only `env:NAME` 
 | `classifier.model_dir` (also per member) | Local model directory (may be `env:NAME\|default`); else `~/tools/qwen3guard/<model name>` or `~/tools/protectai-deberta-pi-v2` | none |
 | `classifier.chunk_tokens` (also per member) | Tokens per scanned chunk (≤ 4096; DeBERTa ≤ 512) | 1024 / 512 |
 | `classifier.threshold` | Score that raises a flag (secure fetch and output guard) | 0.5 |
+| `classifier.review.enabled` | Spec 029: hold an item for the owner (not quarantine it) when only the injection detector is over the threshold, every safety model says Safe, heuristics and Reader are clean. Needs a combined classifier with a safety model; off in the model, on in the pack | pack: `true` |
 | `classifier.required` | Without a usable classifier every fetch and every guarded output is flagged (fail closed) | `true` |
 | `heuristics.threshold` | Heuristic score that raises a flag | 1.0 |
 

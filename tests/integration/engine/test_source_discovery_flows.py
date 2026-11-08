@@ -241,3 +241,59 @@ def test_a_description_made_with_an_older_prompt_is_still_found_at_release(make)
     assert w.svc.start("process_released").ok
     row = w.plist()[item]
     assert row.status == "done", row
+
+
+# -- spec 029: a classifier warning of the injection detector alone is held, not quarantined -------------
+def _two_models(injection_rules, labels=None):
+    from pkpipe.adapters.classifier_combined import CombinedClassifier
+    from tests.fakes import FakeClassifier
+
+    return CombinedClassifier(
+        [
+            FakeClassifier(labels=labels or {"zzz-never": ("Unsafe", ["Jailbreak"])}),
+            FakeClassifier(rules=injection_rules),
+        ]
+    )
+
+
+def _review_world(make, classifier):
+    from tests.fakes import FakeClassifierReview
+
+    w = make(ON)
+    w.ports.extra["classifier"] = classifier
+    w.ports.extra["classifier_reviews"] = FakeClassifierReview()
+    return w
+
+
+def test_the_injection_detector_alone_holds_the_item_for_the_owner(make):
+    w = _review_world(make, _two_models({"vectorlite adds": 0.99}))
+    item = w.release("shot.jpg")
+    row = w.plist()[item]
+    assert row.status == "failed" and "held for your decision" in (row.link or "")
+    held = w.ports.extra["classifier_reviews"].review_of(item)
+    assert held and held["evidence"]["reading"] == "injection_detector_only" and not held["waived"]
+    assert "quarantined" not in {
+        r.get("state") for r in lists.read_triage(w.triage_path)["rows"] if r["item_id"] == item
+    }
+    assert w.ports.extra["security_log"].rows == []  # nothing is logged as malicious, no host is deny-listed
+
+
+def test_both_models_firing_still_quarantines(make):
+    clf = _two_models({"vectorlite adds": 0.99}, labels={"vectorlite adds": ("Unsafe", ["Jailbreak"])})
+    w = _review_world(make, clf)
+    item = w.release("shot.jpg")
+    state = next(r["state"] for r in lists.read_triage(w.triage_path)["rows"] if r["item_id"] == item)
+    assert state == "quarantined"
+    assert w.ports.extra["classifier_reviews"].review_of(item) is None
+    assert w.ports.extra["security_log"].rows[0]["detail"]["reading"] == "both_over_threshold"
+
+
+def test_an_accepted_warning_lets_the_held_page_through(make):
+    w = _review_world(make, _two_models({"vectorlite adds": 0.99}))
+    assert w.run("triage")
+    item = rid("shot.jpg")
+    w.ports.extra["classifier_reviews"].hold(item, "", {})
+    w.ports.extra["classifier_reviews"].waive(item)
+    lists.owner_decide(w.triage_path, item, override="tool")
+    assert w.svc.start("process_released").ok
+    assert w.plist()[item].status == "done", w.plist()[item]

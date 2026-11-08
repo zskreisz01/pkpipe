@@ -143,6 +143,26 @@ class ImageStorePort(Protocol):
 
 
 @runtime_checkable
+class ClassifierReviewPort(Protocol):
+    """Items held after a classifier warning and the owner's acceptance (spec 029), in the app DB.
+
+    ``hold`` records the item, the page address and the evidence (scores and labels of every model, no page
+    text); ``review_of`` / ``held`` read it for the UI and the report; ``waive`` records that the owner
+    accepted the warning; ``waived`` is read by the secure-fetch verdict, which then lets a page through whose
+    only finding is the injection detector (every other detector still applies)."""
+
+    def hold(self, item_id: str, url: str, evidence: dict[str, Any]) -> None: ...
+
+    def review_of(self, item_id: str) -> dict[str, Any] | None: ...
+
+    def held(self) -> dict[str, dict[str, Any]]: ...
+
+    def waive(self, item_id: str) -> None: ...
+
+    def waived(self, item_id: str) -> bool: ...
+
+
+@runtime_checkable
 class ProposalAttemptsPort(Protocol):
     """Failed evaluations of new-category proposals (spec 022 FR-009), in the app DB.
 
@@ -178,7 +198,8 @@ class SecurityLogPort(Protocol):
     ``log_malicious_url`` appends one ``MaliciousUrlEntry`` row (see :mod:`pkpipe.security.quarantine`).
     ``deny_domain`` adds a domain to the deny-list once; flagging it again increments its counter
     (``{"domain", "added", "count"}``). ``denied_domains`` is what the handler has deny-listed so far (the URL
-    filter merges it with the config's deny-list file). ``deny_domain`` is only called for unprotected hosts:
+    filter merges it with the config's deny-list file). A ``MaliciousUrlEntry`` may carry
+    ``detail`` (spec 029). ``deny_domain`` is only called for unprotected hosts:
     ``security.record_flag`` skips ``security.url_filter.protected_domains`` (spec 028)."""
 
     def log_malicious_url(self, entry: dict[str, Any]) -> None: ...

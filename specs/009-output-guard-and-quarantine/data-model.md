@@ -33,13 +33,13 @@ Notation: **NEW** = introduced by this spec · **EXISTING** = already in the cod
 | Field | Type | Description |
 | --- | --- | --- |
 | `flagged` | bool | Any flag |
-| `flags` | list of `{flag, detector, reason_code, score}` | Flag codes only |
+| `flags` | list of `{flag, detector, reason_code, score, detail}` | Flag codes, scores and (classifier, spec 029) the evidence of both models: numbers, labels, a reading; never text |
 | `scores` | object | `heuristic`, `classifier`, `label` |
 | `flag_names` | list[str] | Distinct flags |
 
 ### NEW `QuarantineNote` (`0-INBOX/_quarantine/<item id>.md`)
 
-Front matter `security_flag: {flags, detectors, reason_codes, run_id, flagged_at}`, `pkpipe_item`, `original_path`, `quarantined: true`, `original_format: {crlf, final_newline}` (so the release restores the note byte for byte); body: a heading, a hint and the original note verbatim in a fenced code block (fence longer than any backtick run in the note).
+Front matter `security_flag: {flags, detectors, reason_codes, run_id, flagged_at, scores, classifier}` (scores and evidence added by spec 029), `source_url`, `pkpipe_item`, `original_path`, `quarantined: true`, `original_format: {crlf, final_newline}` (so the release restores the note byte for byte); body: a heading, a hint and the original note verbatim in a fenced code block (fence longer than any backtick run in the note).
 
 ### NEW Deny-list entry (`security/deny_list.txt`, existing format of spec 008)
 
