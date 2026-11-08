@@ -5,7 +5,7 @@
     {% endif %}
   </td>
   <td>
-    <code>{{ r.item_id }}</code>
+    <code>{{ r.item_id }}</code> <a href="/items/{{ r.item_id }}" data-testid="history-link">history</a>
     <div class="resource">{{ r.resource }}</div>
     <div class="muted">{{ r.kind }}{% if r.topic %} · <span data-testid="topic">{{ r.topic }}</span>{% endif %}</div>
     {% if r.needs_owner %}<div class="warn" data-testid="needs-owner">needs a category from you</div>{% endif %}

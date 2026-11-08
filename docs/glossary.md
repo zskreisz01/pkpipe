@@ -25,6 +25,7 @@ title: Glossary
 | Run report | The summary the pipeline sends after every triage and release run (counts, created evaluations / notebooks / podcasts, todos); spec 024 |
 | Todo block | The generated lines between the `pkpipe-todo` markers in the daily journal: `date - todo - item count - link` |
 | Retry (failed item) | The owner's action that sends a processed item with a failed result through the next release run again; bounded by `triage.retry_max`; spec 027 |
+| Item event log | Spec 030: the append-only list of events per item in the app DB (`item_events`): one event per flow step that touched the item, plus the secure-fetch verdict with the classifier scores, source searches, quarantine and hold. The owner's audited actions are merged in when the history is read. It explains what happened and is not the source of truth of any state (no event sourcing); events hold ids, numbers, codes and addresses, never page or note text. Read per item in the UI (`/items/<id>`), over HTTP, in the app MCP (`item_history`) and with `pkpipe item`. |
 | Source discovery | Spec 025: for an item that names no URL, one guarded web search from the validated image description or the owner's text finds the page the category's sessions then evaluate; off by default (`source_discovery.json`) |
 | Owner | The single user of a pkpipe installation |
 | Config form | The generated edit form of a config section in the UI (spec 026); it edits the same draft as the JSON view |

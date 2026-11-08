@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from pkpipe.domain.item_events import ctx_event
 from pkpipe.security.quarantine import EVIDENCE_CHARS, flag_domain, is_protected
 from pkpipe.steps.base import StepContext, StepResult, register_code
 from pkpipe.steps.learning_code import find_source_url
@@ -101,6 +102,16 @@ def record_flag(ctx: StepContext, read: str = "read") -> StepResult:
         "evidence_text": evidence_text(flags),
         "flagged_at": now.isoformat(timespec="seconds"),
     }
+    ctx_event(
+        ctx,
+        "quarantined",
+        "flagged",
+        url=url,
+        domain=domain,
+        reasons=out["flag_text"],
+        deny_listed=bool(deny and deny.get("added")),
+        protected=bool(deny and deny.get("protected")),
+    )
     return StepResult(output=out, item={"security_domain": domain})
 
 
@@ -119,6 +130,7 @@ def hold_for_review(ctx: StepContext) -> StepResult:
     port = ctx.ports.extra.get("classifier_reviews")
     if port is not None and item.get("id"):
         port.hold(str(item["id"]), flagged_url(ctx, None), review.get("evidence") or {})
+    ctx_event(ctx, "held", "held", url=flagged_url(ctx, None), classifier=(review.get("evidence") or {}))
     fields = {"processing_status": "failed", "failure_reason": HELD_REASON}
     return StepResult(output={**fields, "held": True}, item=fields)
 

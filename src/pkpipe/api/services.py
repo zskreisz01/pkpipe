@@ -137,6 +137,30 @@ class AppServices:
     def flows(self) -> list[str]:
         return sorted(self.runs.config().flows())
 
+    #: The top-level processes the overview offers as start buttons (spec 030): the scheduled maintenance and
+    #: processing flows, in the order of the daily cycle. Subflows (they need an item) are never offered.
+    LAUNCH_FLOWS = (
+        "triage",
+        "process_released",
+        "context_refresh",
+        "improvement_extract",
+        "improvement_review",
+    )
+
+    def launchable_flows(self) -> list[dict[str, Any]]:
+        """The start buttons of the overview: flow id, its description, and whether a run is active now."""
+        config = self.runs.config()
+        active = {r["flow_id"] for st in ACTIVE for r in self.list_runs(status=st, limit=200)}
+        out = []
+        for fid in self.LAUNCH_FLOWS:
+            try:
+                flow = config.flow(fid)
+            except KeyError:
+                continue
+            desc = str(getattr(flow, "description", "") or "").strip().split("\n")[0]
+            out.append({"flow": fid, "description": desc[:160], "running": fid in active})
+        return out
+
     def start_run(self, flow_id: str, *, trigger: str, actor: str, inputs: dict | None = None) -> dict:
         run = self.launcher.launch(flow_id, trigger=trigger, inputs=inputs)
         self.store.audit(actor, "run_flow", flow_id, run_id=run["run_id"])
@@ -299,6 +323,33 @@ class AppServices:
             "capped": len(failed) - retryable - len([i for i in failed if i in held]),
             "max": limit,
         }
+
+    # -- item history (spec 030) --------------------------------------------------------------------------
+    def item_history(self, item_id: str) -> dict[str, Any]:
+        """Everything known about one item in time order: its flow events, the owner's audited actions, and
+        the current state (triage row, retries, held warning, quarantine note). No page or note text."""
+        from pkpipe.domain.item_events import timeline
+
+        events = self.store.events_of(item_id)
+        audit = self.store.audit_of(item_id)
+        row = None
+        try:
+            row = next((r for r in self._vault().read_triage()["rows"] if r["item_id"] == item_id), None)
+        except (VaultError, Refused):
+            pass
+        if not events and not audit and row is None:
+            raise NotFound(f"no item {item_id}")
+        return {
+            "item_id": item_id,
+            "row": row,
+            "retries": self.store.retry_count(item_id),
+            "review": self.review_summary(item_id),
+            "quarantine": self.quarantine_summary(item_id) or None,
+            "timeline": timeline(events, audit),
+        }
+
+    def recent_items(self, limit: int = 50) -> list[str]:
+        return self.store.recent_item_ids(limit)
 
     # -- classifier warnings held for the owner (spec 029) ------------------------------------------
     def _held_ids(self) -> set[str]:

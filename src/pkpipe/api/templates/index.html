@@ -6,8 +6,23 @@
   {% if triage_error %}<span class="muted">Triage: {{ triage_error }}</span>
   {% else %}<a href="/triage"><strong data-testid="pending-count">{{ pending }}</strong> item(s) waiting for your decision</a>{% endif %}
 </div>
+<h2>Start a process</h2>
+<div class="card launch" data-testid="launch">
+  {% for l in launch %}
+  <div class="launch-row">
+    <button class="primary" hx-post="/ui/runs" hx-vals='{"flow": "{{ l.flow }}"}' hx-target="#runs" hx-swap="innerHTML"
+            hx-confirm="Start {{ l.flow }} now?" data-testid="launch-{{ l.flow }}"{% if l.running %} disabled{% endif %}>{{ l.flow }}{% if l.running %} (running){% endif %}</button>
+    <span class="muted">{{ l.description }}</span>
+  </div>
+  {% endfor %}
+</div>
 <h2>Recent runs</h2>
-{% include "_runs_table.html" %}
+<div id="runs">{% include "_runs_table.html" %}</div>
+<h2>Recent items</h2>
+<div class="card" data-testid="recent-items">
+  {% for i in recent_items %}<a href="/items/{{ i }}"><code>{{ i }}</code></a> {% else %}<span class="muted">No item events yet.</span>{% endfor %}
+  <div><a href="/items">find an item</a></div>
+</div>
 <h2>Recent publishes</h2>
 {% for p in publishes %}
 <div class="card"><a href="/publishes/{{ p.publish_id }}">{{ p.summary }}</a> <span class="muted">{{ p.created_at[:19] }} · {{ p.commit_sha[:10] }}</span></div>

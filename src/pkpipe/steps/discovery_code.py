@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 from pkpipe.domain import source_discovery as sd
+from pkpipe.domain.item_events import ctx_event
 from pkpipe.engine.config_models import SourceDiscoveryConfig
 from pkpipe.steps.base import StepContext, StepResult, register_code
 from pkpipe.steps.llm import query_blocked
@@ -41,7 +42,9 @@ def discovery_applies(ctx: StepContext, category: dict[str, Any] | None, item: d
     return cfg.from_images if image else cfg.from_notes
 
 
-def _fail(code: str) -> StepResult:
+def _fail(code: str, ctx: StepContext | None = None) -> StepResult:
+    if ctx is not None:
+        ctx_event(ctx, "source", code, reason=sd.failure_reason(code))
     return StepResult(output={"status": code, "found": 0, "reason": sd.failure_reason(code)})
 
 
@@ -56,7 +59,7 @@ def find_sources(ctx: StepContext, note: dict[str, Any] | None = None) -> StepRe
     description = item.get("description")
     if item.get("kind") == "image":
         if not isinstance(description, dict):
-            return _fail("no_description")
+            return _fail("no_description", ctx)
         topic, text = description.get("topic"), description.get("visible_text")
     else:
         topic, text = "", (note or {}).get("body", "")
@@ -64,23 +67,24 @@ def find_sources(ctx: StepContext, note: dict[str, Any] | None = None) -> StepRe
     with ctx.ports.tracer.tool("source.discover") as span:
         span.set("discovery.query_chars", len(query))
         if not query:
-            return _fail("nothing_to_search")
+            return _fail("nothing_to_search", ctx)
         arguments = {"query": query, "max_results": cfg.max_results}
         if query_blocked(ctx, SEARCH_TOOL, arguments):
             span.set("discovery.refused", "blocked_term")
-            return _fail("query_blocked")
+            return _fail("query_blocked", ctx)
         try:
             results = call_tool(ctx, SEARCH_TOOL, arguments)
         except Exception as exc:  # noqa: BLE001 - a failed search is that item's failure, with a fixed reason
             span.set("discovery.error", type(exc).__name__)
-            return _fail("search_failed")
+            return _fail("search_failed", ctx)
         urls, tally = sd.pick_candidates(
             results, lambda u: bool(url_check(ctx, url=u).get("allowed")), cfg.max_candidates
         )
         span.set("discovery.results", tally["results"])
         span.set("discovery.candidates", len(urls))
     if not urls:
-        return _fail("no_results")
+        return _fail("no_results", ctx)
+    ctx_event(ctx, "source", "ok", found=len(urls), results=tally["results"], urls=urls)
     return StepResult(
         output={"status": "ok", "found": len(urls), "results": tally["results"], "dropped": tally["dropped"]},
         item=sd.discovered_fields(urls),

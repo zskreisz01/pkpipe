@@ -77,6 +77,18 @@ CREATE TABLE IF NOT EXISTS item_retries (
     retries INTEGER NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS item_events (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    run_id TEXT,
+    flow_id TEXT,
+    step TEXT,
+    kind TEXT NOT NULL,
+    outcome TEXT,
+    detail TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS item_events_item ON item_events (item_id, seq);
 CREATE TABLE IF NOT EXISTS classifier_reviews (
     item_id TEXT PRIMARY KEY,
     url TEXT NOT NULL,
@@ -368,6 +380,56 @@ class AppStore:
     def waived(self, item_id: str) -> bool:
         row = self.review_of(item_id)
         return bool(row and row["waived"])
+
+    # -- item event log (spec 030): ItemEventPort ------------------------------------------------------
+    def record(
+        self,
+        item_id: str,
+        kind: str,
+        *,
+        run_id: str | None = None,
+        flow_id: str | None = None,
+        step: str | None = None,
+        outcome: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        with self._conn() as c:
+            c.execute(
+                "INSERT INTO item_events (at, item_id, run_id, flow_id, step, kind, outcome, detail) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    _now(),
+                    item_id,
+                    run_id,
+                    flow_id,
+                    step,
+                    kind,
+                    outcome,
+                    json.dumps(detail or {}, ensure_ascii=False, default=str),
+                ),
+            )
+
+    def events_of(self, item_id: str, limit: int = 500) -> list[dict[str, Any]]:
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT * FROM item_events WHERE item_id = ? ORDER BY seq LIMIT ?", (item_id, limit)
+            ).fetchall()
+        return [{**dict(r), "detail": json.loads(r["detail"])} for r in rows]
+
+    def recent_item_ids(self, limit: int = 50) -> list[str]:
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT item_id FROM item_events GROUP BY item_id ORDER BY MAX(seq) DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [r["item_id"] for r in rows]
+
+    def audit_of(self, item_id: str, limit: int = 200) -> list[dict[str, Any]]:
+        """The owner actions on one item (the audit rows that name it as target), oldest first."""
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT * FROM audit WHERE target = ? ORDER BY seq LIMIT ?", (item_id, limit)
+            ).fetchall()
+        return [{**dict(r), "detail": json.loads(r["detail"])} for r in rows]
 
     # -- audit ----------------------------------------------------------------------------------------------
     def audit(self, actor: str, action: str, target: str | None = None, **detail: Any) -> None:
