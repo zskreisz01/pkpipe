@@ -120,7 +120,9 @@ class StepContext:
         """The vault layout of the pinned config (spec 020); the defaults when it names none."""
         return layout_of(self)
 
-    def event(self, kind: str, outcome: str | None = None, **detail: Any) -> None:
+    def event(
+        self, kind: str, outcome: str | None = None, *, codes: dict[str, Any] | None = None, **detail: Any
+    ) -> None:
         """Append an event to the item's log (spec 030). Never raises; content-free in a private flow."""
         from pkpipe.domain.item_events import emit
 
@@ -133,6 +135,7 @@ class StepContext:
             step=getattr(self.node, "id", None),
             outcome=outcome,
             detail=detail,
+            codes=codes,
             data_classes=getattr(self.flow, "data_classes", None),
         )
 
