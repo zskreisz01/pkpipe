@@ -199,8 +199,8 @@ class SecurityLogPort(Protocol):
     ``deny_domain`` adds a domain to the deny-list once; flagging it again increments its counter
     (``{"domain", "added", "count"}``). ``denied_domains`` is what the handler has deny-listed so far (the URL
     filter merges it with the config's deny-list file). A ``MaliciousUrlEntry`` may carry
-    ``detail`` (spec 029). ``deny_domain`` is only called for unprotected hosts: ``security.record_flag`` skips
-    ``security.url_filter.protected_domains`` (spec 028)."""
+    ``detail`` (spec 029). ``deny_domain`` is only called for unprotected hosts:
+    ``security.record_flag`` skips ``security.url_filter.protected_domains`` (spec 028)."""
 
     def log_malicious_url(self, entry: dict[str, Any]) -> None: ...
 
