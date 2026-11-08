@@ -222,6 +222,21 @@ class SanitizeStep(StepExecutor):
 
 
 # -- scan ---------------------------------------------------------------------------------------------------
+def _member_scores(m: dict[str, Any]) -> dict[str, Any]:
+    """The numbers and labels of one classifier model (spec 029): chunk scores, safety label, categories.
+    No text."""
+    out: dict[str, Any] = {
+        "model": m.get("model"),
+        "max_score": float(m.get("max_score") or 0.0),
+        "chunks": int(m.get("chunks") or 0),
+        "scores": [round(float(s), 4) for s in m.get("scores") or []],
+    }
+    if m.get("label"):
+        out["label"] = str(m["label"])
+        out["categories"] = [str(c) for c in m.get("categories") or []][:8]
+    return out
+
+
 def scan_page(page: dict[str, Any], classifier: Any | None) -> dict[str, Any]:
     """Heuristics and classifier scores of a sanitized page (shared with the security eval)."""
     meta = " ".join(str(v) for v in (page.get("meta") or {}).values())
@@ -242,10 +257,9 @@ def scan_page(page: dict[str, Any], classifier: Any | None) -> dict[str, Any]:
                 "chunks": int(res.get("chunks") or 0),
             }
             if isinstance(res.get("members"), list):  # scores per model of a combined classifier
-                result["members"] = [
-                    {"model": m.get("model"), "max_score": float(m.get("max_score") or 0.0)}
-                    for m in res["members"]
-                ]
+                result["members"] = [_member_scores(m) for m in res["members"]]
+            else:
+                result["scores"] = [round(float(s), 4) for s in res.get("scores") or []]
         except ClassifierUnavailable as exc:
             result = {"available": False, "reason": "unavailable", "error": str(exc)[:200]}
     return {"heuristics": found.as_dict(), "classifier": result, "removed": removed}
@@ -322,6 +336,19 @@ def _extract(page: dict[str, Any] | None, read: dict[str, Any] | None) -> dict[s
     }
 
 
+def _flag_dict(name: str, v: Verdict) -> dict[str, Any]:
+    """One flag of the verdict as the flag handler reads it: detector, reason code and (classifier) the
+    score and the evidence of both models (spec 029)."""
+    flag: dict[str, Any] = {"detector": name, "reason_code": v.flag_reasons[name]}
+    if name == "classifier" and isinstance(v.scores.get("classifier"), int | float):
+        flag["score"] = round(float(v.scores["classifier"]), 4)
+        if v.evidence.get("classifier"):
+            flag["detail"] = v.evidence["classifier"]
+    elif isinstance(v.scores.get(name), int | float):
+        flag["score"] = round(float(v.scores[name]), 4)
+    return flag
+
+
 def decide(
     security: dict[str, Any],
     *,
@@ -330,6 +357,7 @@ def decide(
     scan: dict[str, Any] | None,
     read: dict[str, Any] | None,
     classifier_required: bool | None = None,
+    classifier_waived: bool = False,
 ) -> Verdict:
     """The verdict with the thresholds of ``security.json`` (shared with the security eval)."""
     guard = security.get("classifier") or {}
@@ -344,6 +372,8 @@ def decide(
         heuristic_threshold=float((security.get("heuristics") or {}).get("threshold", 1.0)),
         classifier_threshold=float(guard.get("threshold", 0.5)),
         classifier_required=required,
+        review_enabled=bool((guard.get("review") or {}).get("enabled", False)),
+        classifier_waived=classifier_waived,
     )
 
 
@@ -369,15 +399,25 @@ def verdict(
             ("read", read),
         )
     }
-    v = decide(ctx.snapshot.section("security", {}) or {}, **{k: parts[k] for k in parts if k != "sanitize"})
+    reviews = ctx.ports.extra.get("classifier_reviews")
+    waived = bool(reviews and (ctx.item or {}).get("id") and reviews.waived(str(ctx.item["id"])))
+    v = decide(
+        ctx.snapshot.section("security", {}) or {},
+        **{k: parts[k] for k in parts if k != "sanitize"},
+        classifier_waived=waived,
+    )
     out = v.model_dump()
     item: dict[str, Any] = {"fetch_status": v.status}
     if v.clean:
         out["extract"] = _extract(parts["sanitize"], parts["read"])
         item["extract"] = out["extract"]
     if v.flags:
-        flags = [{"detector": f, "reason_code": v.flag_reasons[f]} for f in v.flags]
+        flags = [_flag_dict(f, v) for f in v.flags]
         for f in flags:
             ctx.ports.tracer.security_flag(f["detector"], action="flag", reason_code=f["reason_code"])
         item.update(flagged=True, security_flags=flags)
+    elif v.review:
+        # Spec 029: held for the owner, not quarantined. The evidence travels with the item; no page text.
+        ctx.ports.tracer.security_flag("classifier", action="review", reason_code=v.review)
+        item.update(classifier_review={"reason": v.review, "evidence": v.evidence.get("classifier")})
     return StepResult(output=out, item=item)

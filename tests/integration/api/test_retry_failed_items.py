@@ -66,7 +66,13 @@ def failed(stack):
 def test_the_summary_counts_failed_items_and_the_rows_say_which_can_be_retried(stack, failed):
     client = api_client(stack)
     summary = client.get("/api/triage/failed").json()
-    assert summary == {"failed": 3, "retryable": 2, "capped": 1, "max": 3}  # the quarantined one is capped
+    assert summary == {
+        "failed": 3,
+        "retryable": 2,
+        "held": 0,
+        "capped": 1,
+        "max": 3,
+    }  # the quarantined one is capped
     by_id = {r["item_id"]: r for r in client.get("/api/triage?state=processed").json()["rows"]}
     assert by_id[failed["a"]]["failed"] is True and by_id[failed["a"]]["retryable"] is True
     assert "failed" not in by_id[failed["ok"]]
@@ -176,6 +182,7 @@ def test_the_cli_lists_by_default_and_retries_on_request(stack, failed, capsys):
     args = SimpleNamespace(
         items=[],
         all=False,
+        accept_warning=False,
         pack=str(stack.pack),
         overlay=str(stack.overlay),
         db=str(stack.db),

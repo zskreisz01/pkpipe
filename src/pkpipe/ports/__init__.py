@@ -2,6 +2,7 @@
 
 from pkpipe.ports.ports import (
     ClassifierPort,
+    ClassifierReviewPort,
     ClassifierUnavailable,
     ClockPort,
     ConfigPort,
@@ -42,6 +43,7 @@ __all__ = [
     "ImageInput",
     "ImagePreparePort",
     "ImageStorePort",
+    "ClassifierReviewPort",
     "ProposalAttemptsPort",
     "ImagesNotSupported",
     "ModelError",

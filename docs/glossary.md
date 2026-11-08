@@ -18,6 +18,7 @@ title: Glossary
 | Reader | Session without tools that reads untrusted content and returns JSON |
 | Output guard | Checks before writing to the vault: harmful content, injection, canary |
 | Canary | Per-run random token in system instructions; its appearance signals a leak |
+| Held for review (classifier warning) | Spec 029: only the injection detector fired, the safety model said Safe; the item waits for the owner's decision instead of going to quarantine |
 | Quarantine | Inert storage of flagged content plus URL log and deny-list (protected domains excepted, spec 028) |
 | Learning gateway | MCP server hiding the learning backend (Open Notebook, NotebookLM, fake) |
 | Eval gate | Required green eval before a change is published |

@@ -10,6 +10,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from pkpipe.security.evidence import classifier_evidence, review_applies
+
 FlagName = Literal["url_filter", "heuristic", "classifier", "canary", "reader"]
 FetchStatus = Literal["ok", "blocked", "failed"]
 ContentKind = Literal["html", "text", "pdf", "video", "image", "audio", "other"]
@@ -54,12 +56,20 @@ class ReaderExtract(BaseModel):
 class Verdict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    status: Literal["clean", "flagged", "failed"]
+    status: Literal["clean", "flagged", "review", "failed"]
     clean: bool
     flags: list[FlagName] = Field(default_factory=list)
     reasons: list[str] = Field(default_factory=list, description="Reason codes, never page text")
     flag_reasons: dict[str, str] = Field(default_factory=dict, description="First reason code per flag")
     scores: dict[str, Any] = Field(default_factory=dict, description="Per-detector scores")
+    evidence: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Spec 029: what each classifier model said (scores, labels, chunk numbers; no page text)",
+    )
+    review: str | None = Field(
+        default=None,
+        description="Spec 029: reason code of a held item (status review); not quarantined",
+    )
 
 
 def security_json_schemas() -> dict[str, dict[str, Any]]:
@@ -81,12 +91,15 @@ def evaluate(
     heuristic_threshold: float = 1.0,
     classifier_threshold: float = 0.5,
     classifier_required: bool = True,
+    review_enabled: bool = False,
+    classifier_waived: bool = False,
 ) -> Verdict:
     """Combine every detector into one verdict. Missing parts mean the step did not run (an earlier stop)."""
     flags: list[str] = []
     first: dict[str, str] = {}
     reasons: list[str] = []
     scores: dict[str, Any] = {}
+    evidence: dict[str, Any] = {}
     failed = False
 
     def flag(name: str, reason: str) -> None:
@@ -120,6 +133,7 @@ def evaluate(
         if classifier.get("available"):
             score = float(classifier.get("max_score") or 0.0)
             scores["classifier"] = score
+            evidence["classifier"] = classifier_evidence(classifier, classifier_threshold)
             if score >= classifier_threshold:
                 flag("classifier", "classifier_threshold")
         elif classifier_required:
@@ -133,10 +147,38 @@ def evaluate(
             flag("reader", "reader_invalid_output")  # not a ReaderExtract: fail closed
         elif reader.get("injection_suspected"):
             flag("reader", "injection_suspected")
+    # Spec 029: the injection detector alone, with the safety model saying Safe, the heuristics clean and the
+    # Reader (a second opinion that ran on the same page) not suspicious, is held for the owner, not
+    # quarantined. Every other combination keeps the quarantine.
+    holdable = (
+        flags == ["classifier"]
+        and first.get("classifier") == "classifier_threshold"
+        and reader is not None
+        and review_applies(evidence.get("classifier"))
+    )
+    if holdable and classifier_waived:
+        scores["classifier_waived"] = True  # the owner accepted this warning (spec 029)
+        return Verdict(status="clean", clean=True, reasons=reasons, scores=scores, evidence=evidence)
+    if holdable and review_enabled:
+        return Verdict(
+            status="review",
+            clean=False,
+            reasons=reasons,
+            flag_reasons=first,
+            scores=scores,
+            evidence=evidence,
+            review="classifier_injection_only",
+        )
     if flags:
         return Verdict(
-            status="flagged", clean=False, flags=flags, reasons=reasons, flag_reasons=first, scores=scores
+            status="flagged",
+            clean=False,
+            flags=flags,
+            reasons=reasons,
+            flag_reasons=first,
+            scores=scores,
+            evidence=evidence,
         )
     if failed:
-        return Verdict(status="failed", clean=False, reasons=reasons, scores=scores)
-    return Verdict(status="clean", clean=True, reasons=reasons, scores=scores)
+        return Verdict(status="failed", clean=False, reasons=reasons, scores=scores, evidence=evidence)
+    return Verdict(status="clean", clean=True, reasons=reasons, scores=scores, evidence=evidence)

@@ -18,11 +18,27 @@
   <td>
     {% if r.failed %}
       <div class="warn" data-testid="failed-result">processing failed{% if r.retries %} · retried {{ r.retries }}&times;{% endif %}</div>
+      {% if r.review_open and r.review %}
+      <div class="evidence" data-testid="classifier-review">
+        <div><strong>Held for your decision</strong>: only the injection detector fired.</div>
+        <div class="muted">Address: <code>{{ r.review.url }}</code></div>
+        <ul>{% for line in r.review.lines %}<li>{{ line }}</li>{% endfor %}</ul>
+      </div>
       {% if r.retryable %}
+      <button hx-post="/ui/triage/{{ r.item_id }}/accept-warning" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML" hx-confirm="Accept the classifier warning and process this page? The other detectors still apply." data-testid="accept-warning">Accept warning and process</button>
+      {% else %}<div class="muted" data-testid="retry-limit">retry limit reached: fix the cause or process it by hand</div>{% endif %}
+      {% elif r.retryable %}
       <button hx-post="/ui/triage/{{ r.item_id }}/retry" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML" data-testid="retry">Retry</button>
       {% else %}<div class="muted" data-testid="retry-limit">retry limit reached: fix the cause or process it by hand</div>{% endif %}
     {% endif %}
     {% if r.state == "quarantined" %}
+      {% if r.quarantine %}
+      <div class="evidence" data-testid="quarantine-evidence">
+        {% if r.quarantine.source_url %}<div class="muted">Address: <code>{{ r.quarantine.source_url }}</code></div>{% endif %}
+        <div class="muted">Flags: {{ r.quarantine.flags|join(", ") }}{% if r.quarantine.reason_codes %} ({{ r.quarantine.reason_codes|join(", ") }}){% endif %}{% for k, v in (r.quarantine.scores or {}).items() %} · {{ k }} {{ "%.2f"|format(v) }}{% endfor %}</div>
+        {% if r.quarantine.lines %}<ul>{% for line in r.quarantine.lines %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+      {% endif %}
       <button hx-post="/ui/triage/{{ r.item_id }}/release" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML">Release from quarantine</button>
     {% elif r.state in ("suggested", "pending", "released", "awaiting_category") %}
       <form class="decide" hx-post="/ui/triage/{{ r.item_id }}/override" hx-target="#row-{{ r.item_id }}" hx-swap="outerHTML">

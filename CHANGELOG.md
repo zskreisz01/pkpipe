@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8 – 2026-11-08
+- Spec 029: every classifier flag now carries what each model said: the score of the DeBERTa injection detector and of Qwen3Guard, the safety label, the chunks over the threshold and fixed sentences that explain them (no page text). The quarantine note shows the page address and a *Why it was flagged* table, the malicious-URL log gets `detail` and a real `score` (it was `null`), the alert has an evidence line and the triage page shows address, flags, scores and the reading on every quarantined row.
+- Spec 029: `security.classifier.review.enabled` (pack default on): when only the injection detector is over the threshold, every safety model says Safe and heuristics and Reader are clean, the item is held for the owner (failed row *held for your decision*, evidence in the app DB) instead of quarantined; no deny-list entry. The owner accepts the warning per item (triage page, app MCP `accept_classifier_warning`, `pkpipe retry --accept-warning`) and the page passes the next run; all other detectors still apply. BPMN *Secure Fetch* and *Process Other Resource* updated.
+
 ## 0.1.7 – 2026-11-08
 - Spec 028: a released image item finds its cached description whatever prompt digest it was stored with (`cache_get_latest`, used only by `load_image_description`, which makes no model call). 32 production image items had failed with "no cached description" after the prompt digest changed.
 - Spec 028: `security.url_filter.protected_domains` (pack default: github.com, gitlab.com, huggingface.co, arxiv.org, pypi.org, npmjs.com, wikipedia.org, stackoverflow.com, youtube.com) lists hosts that a security flag never puts on the deny-list. The flag is still logged and its item quarantined. One flagged GitHub page had blocked every later GitHub link.

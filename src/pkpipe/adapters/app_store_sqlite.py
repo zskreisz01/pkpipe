@@ -77,6 +77,13 @@ CREATE TABLE IF NOT EXISTS item_retries (
     retries INTEGER NOT NULL,
     updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS classifier_reviews (
+    item_id TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    evidence TEXT NOT NULL,
+    held_at TEXT NOT NULL,
+    waived_at TEXT
+);
 CREATE TABLE IF NOT EXISTS proposal_attempts (
     item_id TEXT PRIMARY KEY,
     requested TEXT NOT NULL,
@@ -323,6 +330,44 @@ class AppStore:
                 (item_id, count, _now()),
             )
         return count
+
+    # -- classifier review (spec 029): ClassifierReviewPort --------------------------------------------
+    def hold(self, item_id: str, url: str, evidence: dict[str, Any]) -> None:
+        with self._conn() as c:
+            c.execute(
+                "INSERT INTO classifier_reviews (item_id, url, evidence, held_at, waived_at) "
+                "VALUES (?, ?, ?, ?, NULL) ON CONFLICT(item_id) DO UPDATE SET url = excluded.url, "
+                "evidence = excluded.evidence, held_at = excluded.held_at",
+                (item_id, url[:500], json.dumps(evidence, ensure_ascii=False), _now()),
+            )
+
+    @staticmethod
+    def _review_row(row: Any) -> dict[str, Any]:
+        return {
+            "item_id": row["item_id"],
+            "url": row["url"],
+            "evidence": json.loads(row["evidence"]),
+            "held_at": row["held_at"],
+            "waived": row["waived_at"] is not None,
+        }
+
+    def review_of(self, item_id: str) -> dict[str, Any] | None:
+        with self._conn() as c:
+            row = c.execute("SELECT * FROM classifier_reviews WHERE item_id = ?", (item_id,)).fetchone()
+        return self._review_row(row) if row else None
+
+    def held(self) -> dict[str, dict[str, Any]]:
+        with self._conn() as c:
+            rows = c.execute("SELECT * FROM classifier_reviews").fetchall()
+        return {r["item_id"]: self._review_row(r) for r in rows}
+
+    def waive(self, item_id: str) -> None:
+        with self._conn() as c:
+            c.execute("UPDATE classifier_reviews SET waived_at = ? WHERE item_id = ?", (_now(), item_id))
+
+    def waived(self, item_id: str) -> bool:
+        row = self.review_of(item_id)
+        return bool(row and row["waived"])
 
     # -- audit ----------------------------------------------------------------------------------------------
     def audit(self, actor: str, action: str, target: str | None = None, **detail: Any) -> None:

@@ -161,7 +161,8 @@ class EvalRunner:
         from pkpipe.adapters.classifiers import build_classifier, describe, is_available
 
         cfg = (self.snapshot.data.get("security") or {}).get("classifier") or {}
-        identity = json.dumps(cfg, sort_keys=True)
+        # ``review`` (spec 029) changes what a verdict does, not what the models score: same recordings
+        identity = json.dumps({k: v for k, v in cfg.items() if k != "review"}, sort_keys=True)
         real = None
         if self.mode != "replay":
             real = build_classifier(cfg)

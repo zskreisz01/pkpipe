@@ -141,10 +141,12 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         flags: list[dict] | None = None,
         run_id: str = "",
         flagged_at: str = "",
+        url: str = "",
     ) -> dict:
         """Move a flagged INBOX note to the quarantine folder in inert form (code block, security_flag front
-        matter). The only writer of the quarantine folder; never returns the note text."""
-        return _run(vault.quarantine_note, item_id, path, flags, run_id, flagged_at)
+        matter with flags, reason codes, scores and the source address, spec 029). The only writer of the
+        quarantine folder; never returns the note text."""
+        return _run(vault.quarantine_note, item_id, path, flags, run_id, flagged_at, url)
 
     return mcp
 

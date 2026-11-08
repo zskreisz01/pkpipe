@@ -10,6 +10,7 @@ from pkpipe import ports
 from pkpipe.engine.registry import config_version
 from tests.fakes import (
     FakeClassifier,
+    FakeClassifierReview,
     FakeClock,
     FakeContextStore,
     FakeImageStore,
@@ -39,6 +40,7 @@ FAKES = {
     "StatePort": InMemoryState(),
     "ConfigPort": InMemoryConfig(),
     "ClassifierPort": FakeClassifier(),
+    "ClassifierReviewPort": FakeClassifierReview(),
     "SecurityLogPort": FakeSecurityLog(),
     "ContextStorePort": FakeContextStore(),
     "ImageStorePort": FakeImageStore(),

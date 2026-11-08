@@ -16,6 +16,11 @@ from pkpipe.engine.registry import ConfigError
 
 def add_retry_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("items", nargs="*", help="item ids to retry (default: only list the failed items)")
+    p.add_argument(
+        "--accept-warning",
+        action="store_true",
+        help="accept the classifier warning of the given held items (spec 029) instead of a plain retry",
+    )
     p.add_argument("--all", action="store_true", help="retry every failed item that may still be retried")
     p.add_argument("--pack", help="pack directory (default: packs/learning-inbox or PKPIPE_PACK_DIR)")
     p.add_argument("--overlay", help="overlay directory (default: PKPIPE_OVERLAY_DIR)")
@@ -40,6 +45,13 @@ def retry_command(args: argparse.Namespace) -> int:
         if args.all and args.items:
             print("error: give item ids or --all, not both", file=sys.stderr)
             return 2
+        if args.accept_warning:
+            if not args.items or args.all:
+                print("error: --accept-warning needs item ids (not --all)", file=sys.stderr)
+                return 2
+            done = [services.accept_warning(i, actor="cli")["item_id"] for i in args.items]
+            print(json.dumps({"accepted": done}) if args.json else f"{len(done)} warning(s) accepted")
+            return 0
         if args.all or args.items:
             result = services.retry_failed(actor="cli", item_ids=list(args.items) if args.items else None)
             if args.json:
@@ -61,6 +73,7 @@ def retry_command(args: argparse.Namespace) -> int:
                 print(
                     f"{r['item_id']}  {r['category']:<18} retried {r['retries']}x"
                     + ("" if r["retryable"] else "  (limit)")
+                    + ("  (held: classifier warning, see --accept-warning)" if r.get("review_open") else "")
                 )
             print(
                 f"{failed['failed']} failed, {failed['retryable']} can be retried "

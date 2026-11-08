@@ -18,10 +18,11 @@ flowchart LR
     fb -. fallback failed .-> ff((Fetch failed<br/>no flag))
     fe --> gm{ }
     fb --> gm
-    gm --> cl[Sanitize: hidden HTML,<br/>zero-width, regex] --> pg[Classifier scan<br/>Qwen3Guard + DeBERTa] --> rd[Reader session<br/>no tools, canary, JSON] --> vd[Evaluate verdict - code] --> g2{Any flag?}
+    gm --> cl[Sanitize: hidden HTML,<br/>zero-width, regex] --> pg[Classifier scan<br/>Qwen3Guard + DeBERTa<br/>scores per model] --> rd[Reader session<br/>no tools, canary, JSON] --> vd[Evaluate verdict - code<br/>evidence of both models] --> g2{Flag, held or clean?}
     pg -- PDF, video, image: metadata only --> vd
-    g2 -- no --> ok((Clean extract))
-    g2 -- yes --> f2((Security flag))
+    g2 -- clean --> ok((Clean extract))
+    g2 -- flag --> f2((Security flag))
+    g2 -- held --> hd((Held for the owner<br/>injection detector only))
 ```
 
 ## Implementation (spec 008)
@@ -35,7 +36,7 @@ The pack flow `flows/secure_fetch.json` implements this page node by node:
 | Sanitize | `sanitize` | `sanitize` | Hidden elements, comments, script/style, zero-width and Unicode tag characters removed; hidden text kept aside for the heuristics. PDF, video, image: metadata only |
 | Classifier scan | `scan` | `code` `secure_fetch.scan` | Regex heuristics (visible and hidden text) and the classifier of `security.classifier` (reference: Qwen3Guard-Gen-0.6B + ProtectAI DeBERTa injection classifier, maximum score, token chunks with overlap; [decision 0001](../decisions/0001-injection-classifier.md)). Scores only |
 | Reader session | `read` | `reader` | No tools, no context pack, per-run canary, datamarked page, `reader_extract` schema |
-| Evaluate verdict | `verdict` | `code` `secure_fetch.verdict` | Flags: `url_filter`, `heuristic`, `classifier` (also when the classifier is unavailable and `security.classifier.required`), `canary`, `reader`. Sets `item.fetch_status`, `item.extract` (clean only) and `item.flagged` / `item.security_flags` |
+| Evaluate verdict | `verdict` | `code` `secure_fetch.verdict` | Flags: `url_filter`, `heuristic`, `classifier` (also when the classifier is unavailable and `security.classifier.required`), `canary`, `reader`. Sets `item.fetch_status` (`clean`, `flagged`, `review`, `failed`), `item.extract` (clean only), `item.flagged` / `item.security_flags` (each classifier flag carries its score and the evidence of both models, spec 029) or `item.classifier_review`. **Review** (spec 029, `security.classifier.review.enabled`): the injection detector alone is over the threshold, every safety model says `Safe`, the heuristics are clean, the Reader found nothing and did not leak the canary: the item is held for the owner, not flagged. With the owner's accepted warning the same page passes |
 
-A flagged verdict sets `item.flagged`; the calling flow hands the item to [Handle Security Flag](handle-security-flag.md). Only `verdict.extract` / `item.extract` may reach a session with tools: the compiler refuses `fetch`, `sanitize`, `reader` and `subflow` outputs as `llm_tools` inputs.
+A flagged verdict sets `item.flagged`; a held verdict sets `item.classifier_review` and `item.fetch_status = review` (the caller lists the item as failed with the reason *held for your decision*, [Process Other Resource](process-other-resource.md)); the calling flow hands the item to [Handle Security Flag](handle-security-flag.md). Only `verdict.extract` / `item.extract` may reach a session with tools: the compiler refuses `fetch`, `sanitize`, `reader` and `subflow` outputs as `llm_tools` inputs.
 

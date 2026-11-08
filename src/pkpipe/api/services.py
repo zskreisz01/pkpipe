@@ -236,6 +236,7 @@ class AppServices:
         layout = self._vault().policy.layout
         failed = self._failed_ids()
         retries = self.store.retry_counts() if failed else {}
+        held = self._held_ids() if failed else set()
         limit = self.retry_max()
         rows = []
         for r in data["rows"]:
@@ -253,6 +254,10 @@ class AppServices:
                 # spec 027: the processing of this item failed; the owner may send it through again
                 done = retries.get(r["item_id"], 0)
                 row.update(failed=True, retries=done, retryable=done < limit)
+                if r["item_id"] in held:  # spec 029: only the injection detector fired; the owner decides
+                    row.update(review=self.review_summary(r["item_id"]), review_open=True)
+            if r["state"] == ItemState.QUARANTINED.value:
+                row["quarantine"] = self.quarantine_summary(r["item_id"])
             if r["state"] == ItemState.AWAITING_CATEGORY.value and r["override"]:
                 kind, slug = resolve_category(r["override"], self.category_map())
                 if kind == "new" and slug:
@@ -279,17 +284,68 @@ class AppServices:
         done = self.store.retry_counts() if failed else {}
         limit = self.retry_max()
         rows = {r["item_id"]: r for r in self._vault().read_triage()["rows"]}
+        held = self._held_ids()
         retryable = sum(
             1
             for i in failed
-            if rows.get(i, {}).get("state") == ItemState.PROCESSED.value and done.get(i, 0) < limit
+            if rows.get(i, {}).get("state") == ItemState.PROCESSED.value
+            and done.get(i, 0) < limit
+            and i not in held
         )
         return {
             "failed": len(failed),
             "retryable": retryable,
-            "capped": len(failed) - retryable,
+            "held": len([i for i in failed if i in held]),
+            "capped": len(failed) - retryable - len([i for i in failed if i in held]),
             "max": limit,
         }
+
+    # -- classifier warnings held for the owner (spec 029) ------------------------------------------
+    def _held_ids(self) -> set[str]:
+        """Items held after a classifier warning that the owner has not accepted yet."""
+        try:
+            return {i for i, r in self.store.held().items() if not r["waived"]}
+        except Exception:  # an old app DB without the table is created on first use; never block a list
+            return set()
+
+    def review_summary(self, item_id: str) -> dict[str, Any] | None:
+        """The held item's address, evidence and the fixed sentences that explain it (no page text)."""
+        from pkpipe.security.evidence import interpret
+
+        rec = self.store.review_of(item_id)
+        if rec is None:
+            return None
+        return {
+            "url": rec["url"],
+            "waived": rec["waived"],
+            "evidence": rec["evidence"],
+            "lines": interpret(rec["evidence"]) if rec["evidence"] else [],
+        }
+
+    def accept_warning(self, item_id: str, *, actor: str) -> dict[str, Any]:
+        """Owner decision (spec 029): accept the classifier warning of a held item. The item goes through the
+        next release run again (like a retry, bounded by ``triage.retry_max``) and its secure fetch lets the
+        page pass when the injection detector is the only finding; every other detector still applies."""
+        if self.store.review_of(item_id) is None:
+            self.store.audit(actor, "accept_warning_refused", item_id, reason="no warning held")
+            raise Refused("no classifier warning is held for this item")
+        result = self.retry_item(item_id, actor=actor)
+        self.store.waive(item_id)
+        self.store.audit(actor, "accept_classifier_warning", item_id)
+        return {**result, "accepted": True}
+
+    def quarantine_summary(self, item_id: str) -> dict[str, Any]:
+        """Where the quarantined item came from and why (spec 029): address, flags, scores, the fixed
+        sentences that explain the classifier evidence. From the note's front matter, never its body."""
+        from pkpipe.security.evidence import interpret
+
+        try:
+            info = self._vault().quarantine_info(item_id)
+        except (VaultError, Refused):
+            return {}
+        if info and info.get("classifier"):
+            info["lines"] = interpret(info["classifier"])
+        return info
 
     def retry_item(self, item_id: str, *, actor: str) -> dict[str, Any]:
         """Owner decision (spec 027): a processed item whose processing failed goes back to ``released`` for
@@ -313,11 +369,15 @@ class AppServices:
         skipped = capped = 0
         done = self.store.retry_counts()
         limit = self.retry_max()
+        held = self._held_ids()
         for item_id in self._failed_ids():
             if wanted is not None and item_id not in wanted:
                 continue
             if done.get(item_id, 0) >= limit:
                 capped += 1
+                continue
+            if item_id in held:  # spec 029: a held warning is accepted one by one, never in bulk
+                skipped += 1
                 continue
             try:
                 self.retry_item(item_id, actor=actor)

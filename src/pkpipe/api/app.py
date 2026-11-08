@@ -261,6 +261,10 @@ def create_app(
     def api_retry(item_id: str):
         return services.retry_item(item_id, actor="ui")
 
+    @app.post("/api/triage/{item_id}/accept-warning")
+    def api_accept_warning(item_id: str):
+        return services.accept_warning(item_id, actor="ui")
+
     # -- JSON API: config drafts and publishes --------------------------------------------------------------
     @app.get("/api/config/files")
     def api_files():
@@ -492,6 +496,15 @@ def create_app(
             item_id,
             lambda: services.retry_item(item_id, actor="ui"),
             "released again for the next run",
+        )
+
+    @app.post("/ui/triage/{item_id}/accept-warning", response_class=HTMLResponse)
+    def ui_accept_warning(request: Request, item_id: str):
+        return triage_action(
+            request,
+            item_id,
+            lambda: services.accept_warning(item_id, actor="ui"),
+            "classifier warning accepted: released again for the next run",
         )
 
     @app.post("/ui/triage/{item_id}/release", response_class=HTMLResponse)
