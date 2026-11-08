@@ -52,9 +52,11 @@ def emit(
     step: str | None = None,
     outcome: str | None = None,
     detail: dict[str, Any] | None = None,
+    codes: dict[str, Any] | None = None,
     data_classes: object = None,
 ) -> None:
-    """Append one event. A broken log must never stop a run, so every failure is only logged."""
+    """Append one event. ``detail`` is dropped in a private flow; ``codes`` (fixed reason codes, flags and
+    counters, never text of an item) always stay. A broken log must never stop a run: failures are logged."""
     if port is None or not item_id:
         return
     try:
@@ -65,7 +67,10 @@ def emit(
             flow_id=flow_id,
             step=step,
             outcome=outcome,
-            detail=safe_detail(detail, private=is_private(data_classes)),
+            detail={
+                **safe_detail(detail, private=is_private(data_classes)),
+                **safe_detail(codes, private=False),
+            },
         )
     except Exception:  # noqa: BLE001
         log.warning("item event %s of %s was not recorded", kind, item_id, exc_info=True)
@@ -117,8 +122,10 @@ def timeline(events: list[dict[str, Any]], audit: list[dict[str, Any]]) -> list[
     return rows
 
 
-def ctx_event(ctx: Any, kind: str, outcome: str | None = None, **detail: Any) -> None:
+def ctx_event(
+    ctx: Any, kind: str, outcome: str | None = None, *, codes: dict[str, Any] | None = None, **detail: Any
+) -> None:
     """``ctx.event`` for code that may run with a bare context (a unit test)."""
     event = getattr(ctx, "event", None)
     if callable(event):
-        event(kind, outcome, **detail)
+        event(kind, outcome, codes=codes, **detail)

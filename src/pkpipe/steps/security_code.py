@@ -108,9 +108,11 @@ def record_flag(ctx: StepContext, read: str = "read") -> StepResult:
         "flagged",
         url=url,
         domain=domain,
-        reasons=out["flag_text"],
-        deny_listed=bool(deny and deny.get("added")),
-        protected=bool(deny and deny.get("protected")),
+        codes={
+            "reasons": out["flag_text"],
+            "deny_listed": bool(deny and deny.get("added")),
+            "protected": bool(deny and deny.get("protected")),
+        },
     )
     return StepResult(output=out, item={"security_domain": domain})
 
@@ -130,7 +132,9 @@ def hold_for_review(ctx: StepContext) -> StepResult:
     port = ctx.ports.extra.get("classifier_reviews")
     if port is not None and item.get("id"):
         port.hold(str(item["id"]), flagged_url(ctx, None), review.get("evidence") or {})
-    ctx_event(ctx, "held", "held", url=flagged_url(ctx, None), classifier=(review.get("evidence") or {}))
+    ctx_event(
+        ctx, "held", "held", url=flagged_url(ctx, None), codes={"classifier": review.get("evidence") or {}}
+    )
     fields = {"processing_status": "failed", "failure_reason": HELD_REASON}
     return StepResult(output={**fields, "held": True}, item=fields)
 

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.10 – 2026-11-08
+- Fix (spec 030): the item event log kept no details for flows of a private data class, so the quarantine events of `handle_security_flag` (image class) were empty. Events now carry `codes` (fixed reason codes, flags, counters, classifier scores; never text of an item) that stay in a private flow, while free `detail` is still dropped there.
+
 ## 0.1.9 – 2026-11-08
 - Spec 030: one history per item. Every step that touches an item appends an event (step, outcome, duration, error) to an append-only log in the app DB (`item_events`, `ItemEventPort`); the secure-fetch verdict (with the classifier scores), source searches, quarantine and hold add their own events, and the owner's audited actions are merged when it is read. Events carry ids, numbers, codes and addresses, never page or note text; a flow of a private data class logs content-free events. The log explains, it is not the source of truth (no event sourcing). Read it in the UI (`/items`, `/items/{id}`, a *history* link on every triage row), over HTTP (`GET /api/items/{id}/history`), in the app MCP (owner tool `item_history`) and with `pkpipe item [ID]`.
 - Spec 030: the overview has a *Start a process* card with a button per top-level process (triage, process_released, context_refresh, improvement_extract, improvement_review); a button is disabled while that flow runs.

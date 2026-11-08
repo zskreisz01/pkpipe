@@ -44,3 +44,18 @@ def test_events_are_stored_per_item_and_the_timeline_merges_the_audit(tmp_path):
 def test_describe_has_a_sentence_for_every_kind():
     for kind in ("step", "verdict", "source", "quarantined", "held", "owner", "other"):
         assert describe({"kind": kind, "outcome": "x", "detail": {}})
+
+
+def test_codes_stay_in_a_private_flow_but_detail_does_not():
+    from tests.fakes import FakeItemEvents
+
+    port = FakeItemEvents()
+    emit(
+        port,
+        "i1",
+        "quarantined",
+        detail={"url": "https://x.example/p"},
+        codes={"reasons": "classifier", "deny_listed": True},
+        data_classes=["image"],
+    )
+    assert port.events_of("i1")[0]["detail"] == {"reasons": "classifier", "deny_listed": True}
