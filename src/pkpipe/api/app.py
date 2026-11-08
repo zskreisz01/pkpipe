@@ -247,6 +247,10 @@ def create_app(
     def api_release(item_id: str):
         return services.release_quarantine(item_id, actor="ui")
 
+    @app.get("/api/items/{item_id}/history")
+    def api_item_history(item_id: str):
+        return services.item_history(item_id)
+
     @app.get("/api/triage/failed")
     def api_failed():
         return services.failed_summary()
@@ -372,7 +376,25 @@ def create_app(
             pending=len(pending),
             publishes=services.store.list_publishes()[:3],
             triage_error=triage["error"],
+            launch=services.launchable_flows(),
+            recent_items=services.recent_items(8),
         )
+
+    @app.get("/items/{item_id}", response_class=HTMLResponse)
+    def ui_item(request: Request, item_id: str):
+        return render(request, "item.html", h=services.item_history(item_id))
+
+    @app.get("/items", response_class=HTMLResponse)
+    def ui_items(request: Request, q: str = ""):
+        q = q.strip()
+        if q:
+            try:
+                return RedirectResponse(f"/items/{services.item_history(q)['item_id']}", status_code=303)
+            except NotFound:
+                message = f"no item {q}"
+        else:
+            message = None
+        return render(request, "items.html", items=services.recent_items(50), message=message)
 
     def triage_filters(state: str, category: str, needs_owner: str) -> dict[str, Any]:
         """The filters of the triage page from its query string (an empty value is no filter)."""

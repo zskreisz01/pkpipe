@@ -7,6 +7,7 @@ from tests.fakes.config import InMemoryConfig
 from tests.fakes.context_store import FakeContextStore
 from tests.fakes.image_preparer import FakePreparer
 from tests.fakes.image_store import FakeImageStore
+from tests.fakes.item_events import FakeItemEvents
 from tests.fakes.learning import FakeLearningBackend
 from tests.fakes.model import FakeModel
 from tests.fakes.notify import FakeNotify
@@ -24,6 +25,7 @@ from tests.fakes.web import FakeSearch, FakeWeb
 __all__ = [
     "FakeClassifier",
     "FakeClassifierReview",
+    "FakeItemEvents",
     "FakeClock",
     "FakeContextStore",
     "FakeImageStore",

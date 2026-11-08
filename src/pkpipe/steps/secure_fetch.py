@@ -21,6 +21,7 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, ValidationError
 
+from pkpipe.domain.item_events import ctx_event
 from pkpipe.ports import ClassifierUnavailable
 from pkpipe.security import heuristics
 from pkpipe.security.canary import canary_notice, leaked, new_canary
@@ -420,4 +421,12 @@ def verdict(
         # Spec 029: held for the owner, not quarantined. The evidence travels with the item; no page text.
         ctx.ports.tracer.security_flag("classifier", action="review", reason_code=v.review)
         item.update(classifier_review={"reason": v.review, "evidence": v.evidence.get("classifier")})
+    ctx_event(
+        ctx,
+        "verdict",
+        "review" if v.review else v.status,
+        flags=[str(f.get("reason_code") or f.get("detector")) for f in (item.get("security_flags") or [])],
+        classifier=v.evidence.get("classifier"),
+        url=(ctx.item or {}).get("source_url"),
+    )
     return StepResult(output=out, item=item)

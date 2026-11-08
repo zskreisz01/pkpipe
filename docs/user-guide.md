@@ -8,6 +8,8 @@ This guide is for the person who uses pkpipe every day. It explains the daily fl
 
 pkpipe never processes, files or adopts anything without you: it suggests, you decide.
 
+**Overview page.** Besides the pending count, the recent runs and publishes, the overview has a *Start a process* card (spec 030): one button each for `triage`, `process_released`, `context_refresh`, `improvement_extract` and `improvement_review`, with a short description and a confirmation. A button is greyed out while a run of that process is active. It is the same as starting the flow on the *Runs* page and is logged on the audit page; a processing run uses the models (and, for learning items, NotebookLM quota), so start it deliberately.
+
 ## The daily flow
 
 ```mermaid
@@ -68,6 +70,7 @@ Open `https://<your address>/triage` (see [Reaching the UI](#reaching-the-ui-fro
 - **Release from quarantine** appears on quarantined rows.
 - **Accept warning and process** appears on a failed row that was held after a classifier warning (spec 029): the row shows the page address and what both models said. It is never part of *Retry all failed*.
 - **Retry** appears on processed rows whose processing failed; **Retry all failed (N)** at the top of the page asks for a confirmation with the counts. A retry sends the item through the next 06:00 run again (or a manual `process_released` run); your confirm or override stays. Each item can be retried `triage.retry_max` times (default 3); after that the row says *retry limit reached*: fix the cause (for example the web-fetch server, or wait for the NotebookLM quota window) or process it by hand. The same action is the app MCP tool `retry_items` (owner token) and the command `pkpipe retry` (lists the failed items; `--all` or item ids retries them). A quarantined item is never retried; release it from quarantine first.
+- **history** (next to the item id on every row) opens the history of the item (spec 030): the current state, the address and scores of a held or quarantined page, and one timeline of everything that happened to it, oldest first: each flow step with its outcome, the secure-fetch verdict with what both classifier models said, source searches, quarantine or hold, your own decisions, and the run each event belongs to. The **Items** tab searches by item id and lists the items that were active most recently. The history never shows page or note text.
 
 The rules are enforced on the server, not in the page: an override is a configured category or a valid new name, a confirm works only on rows in an allowed state, and every decision is logged on the **Audit** page (the log keeps what you decided, never your comment text).
 

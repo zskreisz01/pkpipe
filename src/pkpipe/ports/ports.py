@@ -143,6 +143,31 @@ class ImageStorePort(Protocol):
 
 
 @runtime_checkable
+class ItemEventPort(Protocol):
+    """The append-only event log of one item (spec 030), in the app DB.
+
+    ``record`` appends one event (``kind`` is a short code such as ``step``, ``verdict``, ``quarantined``;
+    ``detail`` holds ids, numbers and codes, never page, note, journal or context text); ``events_of`` reads
+    one item's events oldest first. The log explains what happened; it is not the source of any state."""
+
+    def record(
+        self,
+        item_id: str,
+        kind: str,
+        *,
+        run_id: str | None = None,
+        flow_id: str | None = None,
+        step: str | None = None,
+        outcome: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None: ...
+
+    def events_of(self, item_id: str, limit: int = 500) -> list[dict[str, Any]]: ...
+
+    def recent_item_ids(self, limit: int = 50) -> list[str]: ...
+
+
+@runtime_checkable
 class ClassifierReviewPort(Protocol):
     """Items held after a classifier warning and the owner's acceptance (spec 029), in the app DB.
 

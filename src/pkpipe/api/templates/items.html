@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Items{% endblock %}
+{% block body %}
+<h1>Items</h1>
+<form class="card row" method="get" action="/items">
+  <label for="q" class="inline">Item id</label>
+  <input id="q" name="q" placeholder="e.g. 22d63d72bdb6" autocomplete="off">
+  <button class="primary" type="submit">Open history</button>
+</form>
+{% if message %}<p class="err" data-testid="items-message">{{ message }}</p>{% endif %}
+<h2>Recently active</h2>
+<div class="card">{% for i in items %}<div><a href="/items/{{ i }}"><code>{{ i }}</code></a></div>{% else %}<span class="muted">No item events yet.</span>{% endfor %}</div>
+{% endblock %}

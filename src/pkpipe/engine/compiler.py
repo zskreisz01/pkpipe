@@ -16,6 +16,7 @@ import contextlib
 import copy
 import os
 import threading
+import time
 from collections.abc import Callable, Mapping
 from typing import Annotated, Any, TypedDict
 
@@ -558,6 +559,18 @@ class FlowCompiler:
                 ) as span,
             ):
                 span.set("pkpipe.step.type", node.type)
+                started = time.monotonic()
+
+                def log_step(outcome: str, error: str | None = None) -> None:
+                    ctx.event(
+                        "step",
+                        outcome,
+                        type=node.type,
+                        element=node.bpmn_element,
+                        ms=round((time.monotonic() - started) * 1000),
+                        error=error,
+                    )
+
                 try:
                     result = executor.run(node, config, ctx)
                 except GraphBubbleUp:
@@ -571,6 +584,9 @@ class FlowCompiler:
                         "type": type(exc).__name__,
                         "message": "" if private else str(exc)[:500],
                     }
+                    log_step(
+                        "failed", failure["type"] + (": " + failure["message"] if failure["message"] else "")
+                    )
                     if node.for_each and node.on_item_error == "continue":
                         span.fail(type(exc).__name__)
                         entry = {"item": item, "status": "failed", "error": failure}
@@ -589,6 +605,8 @@ class FlowCompiler:
                     if isinstance(exc, StepFailed):
                         raise
                     raise StepFailed(flow.id, node.id, exc, content_free=private) from exc
+                if result.pending is None:
+                    log_step("done")
                 if result.pending is not None:
                     return Command(update={"waits": {node.id: result.pending}}, goto=node.id)
                 new_item = {**(item or {}), **(result.item or {})} if (item or result.item) else None

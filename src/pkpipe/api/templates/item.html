@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Item {{ h.item_id }}{% endblock %}
+{% block body %}
+<h1>Item <code>{{ h.item_id }}</code></h1>
+{% set r = h.row %}
+<div class="card" data-testid="item-state">
+  {% if r %}<span class="pill {{ r.state }}">{{ r.state }}</span> {{ r.kind }} · {{ r.category or r.ai_suggested_category or "no category" }}
+  <div class="resource">{{ r.resource }}</div>{% else %}<span class="muted">Not in the triage table any more.</span>{% endif %}
+  <div class="muted">retries used: {{ h.retries }}</div>
+</div>
+{% if h.review %}
+<div class="card evidence" data-testid="item-review">
+  <strong>Classifier warning{% if h.review.waived %} (accepted){% else %} (held){% endif %}</strong>
+  <div class="muted">Address: <code>{{ h.review.url }}</code></div>
+  <ul>{% for line in h.review.lines %}<li>{{ line }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+{% if h.quarantine %}
+<div class="card evidence" data-testid="item-quarantine">
+  <strong>Quarantine</strong>
+  {% if h.quarantine.source_url %}<div class="muted">Address: <code>{{ h.quarantine.source_url }}</code></div>{% endif %}
+  <div class="muted">Flags: {{ (h.quarantine.flags or [])|join(", ") }}</div>
+  {% if h.quarantine.lines %}<ul>{% for line in h.quarantine.lines %}<li>{{ line }}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endif %}
+<h2>Timeline</h2>
+<ol class="timeline" data-testid="timeline">
+  {% for e in h.timeline %}
+  <li class="ev {{ e.kind }} {{ e.outcome }}">
+    <div class="muted">{{ e.at[:19] }}{% if e.run_id %} · <a href="/runs/{{ e.run_id }}">run {{ e.run_id[:8] }}</a>{% endif %}{% if e.flow_id %} · {{ e.flow_id }}{% endif %}</div>
+    <div>{{ e.text }}</div>
+    {% if e.kind in ("verdict", "held") and e.detail.classifier %}
+    <details><summary>classifier scores</summary>
+      <div class="muted">threshold {{ e.detail.classifier.threshold }} · reading: {{ e.detail.classifier.reading }}</div>
+      <ul>{% for m in e.detail.classifier.members %}<li>{{ m.model }} ({{ m.kind }}): top {{ m.max_score }}{% if m.label %}, label {{ m.label }}{% endif %}{% if m.flagged_chunk_count %}, over threshold in {{ m.flagged_chunk_count }} of {{ m.chunks }} chunk(s){% endif %}</li>{% endfor %}</ul>
+    </details>
+    {% endif %}
+    {% if e.detail.url %}<div class="muted">Address: <code>{{ e.detail.url }}</code></div>{% endif %}
+    {% if e.kind == "source" and e.detail.urls %}<div class="muted">candidates: {% for u in e.detail.urls %}<code>{{ u }}</code> {% endfor %}</div>{% endif %}
+  </li>
+  {% else %}<li class="muted">No events recorded for this item yet.</li>{% endfor %}
+</ol>
+{% endblock %}

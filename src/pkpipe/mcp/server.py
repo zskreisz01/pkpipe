@@ -36,6 +36,7 @@ OWNER_TOOLS = (
     "release_quarantine",
     "retry_items",
     "accept_classifier_warning",
+    "item_history",
     "restore_run",
 )
 AGENT_TOOLS = ("run_flow", "list_triage", "get_run")
@@ -187,6 +188,13 @@ def build_app_mcp(services: AppServices, tokens: Tokens) -> FastMCP:
         return guarded(
             "retry_items", True, lambda actor: services.retry_failed(actor=actor, item_ids=item_ids)
         )
+
+    @mcp.tool
+    def item_history(item_id: str) -> dict:
+        """OWNER TOOL (read only). The whole history of one item in time order: every flow step with its
+        outcome and duration, the secure-fetch verdict with the classifier scores, source searches, quarantine
+        and hold events, and the owner's actions. Ids, numbers and codes only; never page or note text."""
+        return guarded("item_history", True, lambda actor: services.item_history(item_id))
 
     @mcp.tool
     def accept_classifier_warning(item_id: str) -> dict:

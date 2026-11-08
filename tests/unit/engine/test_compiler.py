@@ -452,3 +452,61 @@ def test_parallel_items_share_one_compiled_subflow():
     for t in threads:
         t.join()
     assert errors == [] and len({id(g) for g in results}) == 1
+
+
+# -- spec 030: every step of an item appends an event to the item log ----------------------------------------
+def _event_flow(**extra):
+    return {
+        "id": "ev",
+        "start": "work",
+        "nodes": [
+            {
+                "id": "work",
+                "type": "tool",
+                "for_each": "input.items",
+                "on_item_error": "continue",
+                "config": {"tool": "t:read", "arguments": {"id": "${item.id}"}},
+            }
+        ],
+        "edges": [],
+        **extra,
+    }
+
+
+def _read(id):
+    if id == "bad":
+        raise ValueError("cannot read")
+    return {"ok": id}
+
+
+def test_every_step_of_an_item_is_logged_with_its_outcome(tmp_path):
+    from pkpipe.adapters.app_store_sqlite import AppStore
+
+    store = AppStore(tmp_path / "app.db")
+    ports = make_ports(tools=FakeTools({"t:read": _read}), item_events=store)
+    svc = make_service(make_snapshot(_event_flow()), ports)
+    assert svc.start("ev", inputs={"items": [{"id": "a"}, {"id": "bad"}]}).ok
+    good, bad = store.events_of("a"), store.events_of("bad")
+    assert [(e["step"], e["kind"], e["outcome"]) for e in good] == [("work", "step", "done")]
+    assert bad[0]["outcome"] == "failed" and "ValueError" in bad[0]["detail"]["error"]
+    assert good[0]["flow_id"] == "ev" and good[0]["detail"]["type"] == "tool"
+
+
+def test_a_private_flow_logs_content_free_events(tmp_path):
+    from pkpipe.adapters.app_store_sqlite import AppStore
+
+    store = AppStore(tmp_path / "app.db")
+    ports = make_ports(tools=FakeTools({"t:read": _read}), item_events=store)
+    svc = make_service(make_snapshot(_event_flow(data_classes=["journal"])), ports)
+    svc.start("ev", inputs={"items": [{"id": "bad"}]})
+    event = store.events_of("bad")[0]
+    assert event["outcome"] == "failed" and event["detail"] == {}
+
+
+def test_a_broken_event_log_does_not_stop_the_flow():
+    class Broken:
+        def record(self, *a, **k):
+            raise RuntimeError("locked")
+
+    ports = make_ports(tools=FakeTools({"t:read": _read}), item_events=Broken())
+    assert make_service(make_snapshot(_event_flow()), ports).start("ev", inputs={"items": [{"id": "a"}]}).ok
