@@ -15,5 +15,6 @@
   "projects_dir": "1-Projects",
   "areas_dir": "2-Areas",
   "resources_dir": "3-Resources",
-  "context_review_dir": "2-Areas/Context-Review"
+  "context_review_dir": "2-Areas/Context-Review",
+  "inbox_in_progress_file": null
 }

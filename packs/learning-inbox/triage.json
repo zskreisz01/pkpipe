@@ -1,3 +1,8 @@
 {
-  "surface": "vault"
+  "surface": "vault",
+  "in_progress": {
+    "enabled": true,
+    "max_rows_per_run": 40,
+    "max_events": 10
+  }
 }

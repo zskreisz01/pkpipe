@@ -29,3 +29,6 @@ title: Glossary
 | Source discovery | Spec 025: for an item that names no URL, one guarded web search from the validated image description or the owner's text finds the page the category's sessions then evaluate; off by default (`source_discovery.json`) |
 | Owner | The single user of a pkpipe installation |
 | Config form | The generated edit form of a config section in the UI (spec 026); it edits the same draft as the JSON view |
+
+- **INBOX-InProgress** (spec 031): the machine-owned table `INBOX-InProgress.md` in the INBOX folder with one row per item that was worked on but not closed (processing failed, held for review, quarantined): the item's exact INBOX entry, a model-written *situation*, *cause* and *next step* built from pkpipe's own records, and a link to the item history. A closed item leaves it.
+- **Outcome** (spec 031): how a *processed* triage row went (done, ready, failed, held, unprocessed), derived from the processing list, the held review and the quarantine; the stored state stays `processed`.

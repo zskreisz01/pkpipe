@@ -1,0 +1,54 @@
+{
+  "id": "describe_in_progress",
+  "description": "Spec 031: one unfinished item. A tool-less session on a local model reads only the facts pkpipe knows about the item (state, processing status, the fixed failure reason, owner retries, classifier evidence of a hold, the notable events of its history; never page, note or image text) and writes its situation, the cause and the next step in short sentences. If the session fails, the fixed-sentence fallback built from the codes is used, so the table never blocks.",
+  "bpmn": "process-inbox-items",
+  "data_classes": [
+    "image"
+  ],
+  "start": "situation",
+  "nodes": [
+    {
+      "id": "situation",
+      "type": "llm",
+      "bpmn_element": "Describe the situation (LLM session)",
+      "inputs": [
+        "item.facts_text"
+      ],
+      "config": {
+        "system": "situation_writer",
+        "instruction": "in_progress/situation.md",
+        "output_schema": "in_progress_situation"
+      }
+    },
+    {
+      "id": "row",
+      "type": "code",
+      "bpmn_element": "Describe the situation (LLM session)",
+      "config": {
+        "function": "in_progress.row",
+        "args": {
+          "answer": "${situation}"
+        }
+      }
+    },
+    {
+      "id": "fallback",
+      "type": "code",
+      "bpmn_element": "Describe the situation (LLM session)",
+      "config": {
+        "function": "in_progress.fallback_row"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "situation",
+      "to": "row"
+    },
+    {
+      "from": "situation",
+      "to": "fallback",
+      "on": "error"
+    }
+  ]
+}

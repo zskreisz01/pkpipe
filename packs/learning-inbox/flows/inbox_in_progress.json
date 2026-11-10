@@ -1,0 +1,118 @@
+{
+  "id": "inbox_in_progress",
+  "description": "Spec 031, after the release run: keep the table INBOX-InProgress.md (layout.inbox_in_progress_file) up to date. Code reads the triage table, the processing list and the table, decides which items were worked on but not closed (failed, held for the owner, quarantined), has the situation of every new or changed item written by a tool-less local session (describe_in_progress; unchanged facts are not asked again), and writes the rows with the vault tool: the INBOX entry of an unfinished list item moves into its row (exact text kept), a closed item (done, ready) leaves the table and its entry goes to the dated archive, an item open again (released from the quarantine) gets its entry back in the list. Off unless triage.in_progress.enabled.",
+  "bpmn": "process-inbox-items",
+  "data_classes": [
+    "image"
+  ],
+  "start": "read_triage",
+  "nodes": [
+    {
+      "id": "read_triage",
+      "type": "tool",
+      "bpmn_element": "Move unfinished entries to INBOX-InProgress",
+      "config": {
+        "tool": "obsidian:read_triage"
+      }
+    },
+    {
+      "id": "read_processing",
+      "type": "tool",
+      "bpmn_element": "Move unfinished entries to INBOX-InProgress",
+      "config": {
+        "tool": "obsidian:read_processing_list"
+      }
+    },
+    {
+      "id": "read_progress",
+      "type": "tool",
+      "bpmn_element": "Move unfinished entries to INBOX-InProgress",
+      "config": {
+        "tool": "obsidian:read_in_progress"
+      }
+    },
+    {
+      "id": "plan",
+      "type": "code",
+      "bpmn_element": "Move unfinished entries to INBOX-InProgress",
+      "config": {
+        "function": "in_progress.plan",
+        "args": {
+          "triage": "${read_triage}",
+          "processing": "${read_processing}",
+          "progress": "${read_progress}"
+        }
+      }
+    },
+    {
+      "id": "describe",
+      "type": "subflow",
+      "bpmn_element": "Describe the situation (LLM session)",
+      "for_each": "plan.describe",
+      "on_item_error": "continue",
+      "config": {
+        "flow": "describe_in_progress"
+      }
+    },
+    {
+      "id": "collect",
+      "type": "code",
+      "bpmn_element": "Move unfinished entries to INBOX-InProgress",
+      "config": {
+        "function": "in_progress.collect",
+        "args": {
+          "plan": "${plan}",
+          "described": "${describe}"
+        }
+      }
+    },
+    {
+      "id": "write",
+      "type": "tool",
+      "bpmn_element": "Move unfinished entries to INBOX-InProgress",
+      "config": {
+        "tool": "obsidian:inbox_in_progress",
+        "arguments": {
+          "rows": "${collect.rows}",
+          "archive_ids": "${collect.archive_ids}",
+          "restore_ids": "${collect.restore_ids}"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "read_triage",
+      "to": "read_processing"
+    },
+    {
+      "from": "read_processing",
+      "to": "read_progress"
+    },
+    {
+      "from": "read_progress",
+      "to": "plan"
+    },
+    {
+      "from": "plan",
+      "to": "describe",
+      "when": {
+        "path": "plan.has_work",
+        "truthy": true
+      }
+    },
+    {
+      "from": "plan",
+      "to": "END",
+      "default": true
+    },
+    {
+      "from": "describe",
+      "to": "collect"
+    },
+    {
+      "from": "collect",
+      "to": "write"
+    }
+  ]
+}

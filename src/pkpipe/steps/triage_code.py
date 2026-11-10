@@ -120,7 +120,19 @@ def _row_item(row: dict[str, Any], listed: dict[str, dict[str, Any]]) -> dict[st
     """The item of an open triage row that is triaged again; ``None`` when a list entry is gone."""
     if (row.get("kind") or "note") == "note":
         return {"id": row["item_id"], "path": row["resource"], "resource": row["resource"]}
-    return listed.get(row["item_id"])
+    if row["item_id"] in listed:
+        return listed[row["item_id"]]
+    # spec 031: the entry may have moved into INBOX-InProgress; the triage row still knows the resource
+    return {
+        "id": row["item_id"],
+        "kind": row.get("kind") or "link",
+        "resource": row["resource"],
+        "title": "",
+        "raw": "",
+        "raws": [],
+        "line": 0,
+        "source": "list",
+    }
 
 
 @register_code("inbox.select_new")
@@ -610,8 +622,15 @@ def consume(ctx: StepContext, list_note: dict[str, Any], ids: list[str]) -> dict
     """The raw entries of processed items, read from the list as it is now (spec 020 FR-005).
 
     All duplicates of a processed resource are consumed with it. Entries the owner added meanwhile are not
-    in ``ids`` and stay. The raw text is what ``inbox_remove_entries`` matches against the file."""
+    in ``ids`` and stay. The raw text is what ``inbox_remove_entries`` matches against the file.
+
+    Spec 031: an item whose entry already moved into INBOX-InProgress (the rows of that table, read by the
+    ``read_moved`` node when it ran) is not ``missing``: its entry is archived from there when the table is
+    updated after this step."""
     wanted = set(ids or [])
+    table = ctx.resolve("read_moved", required=False)
+    rows = table.get("rows") if isinstance(table, dict) else None
+    in_table = {r.get("item_id") for r in rows or [] if isinstance(r, dict)}
     cfg = layout_of(ctx).inbox_list.to_config()
     entries = parse_list((list_note or {}).get("body", ""), cfg)
     hit = [e for e in entries if e.item_id in wanted]
@@ -620,7 +639,8 @@ def consume(ctx: StepContext, list_note: dict[str, Any], ids: list[str]) -> dict
         "entries": [e.raw for e in hit],
         "entry_ids": [e.item_id for e in hit],
         "count": len(hit),
-        "missing": sorted(wanted - found),
+        "missing": sorted(wanted - found - in_table),
+        "moved_ids": sorted((wanted - found) & in_table),
     }
 
 

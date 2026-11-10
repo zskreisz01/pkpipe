@@ -19,6 +19,7 @@ from typing import Any
 from pkpipe.adapters.app_store_sqlite import AppStore
 from pkpipe.api.publish import Publisher, PublishError
 from pkpipe.api.workspace import ConfigWorkspace, WorkspaceError, category_entry
+from pkpipe.domain import in_progress
 from pkpipe.domain import session_plan as plans
 from pkpipe.domain.triage import DEFAULT_MAX_RETRIES, ItemState, is_unreviewed, resolve_category
 from pkpipe.domain.vault_snapshot import SnapshotError, UnknownSnapshot
@@ -251,10 +252,12 @@ class AppServices:
         *,
         category: str | None = None,
         needs_owner: bool | None = None,
+        outcome: str | None = None,
         with_comment: bool = True,
     ) -> dict[str, Any]:
-        """The triage rows for the owner channels, optionally filtered by state, effective category and
-        ``needs_owner``. ``with_comment=False`` is for a caller that is not the owner (the agent token of the
+        """The triage rows for the owner channels, optionally filtered by state, effective category,
+        ``needs_owner`` and ``outcome`` (spec 031: how a processed item went: done, ready, failed, held,
+        unprocessed). ``with_comment=False`` is for a caller that is not the owner (the agent token of the
         app MCP): the owner's comment is for the owner and the sessions' declared input only."""
         data = self._vault().read_triage()
         layout = self._vault().policy.layout
@@ -262,16 +265,31 @@ class AppServices:
         retries = self.store.retry_counts() if failed else {}
         held = self._held_ids() if failed else set()
         limit = self.retry_max()
+        statuses = self._processing_statuses()
         rows = []
         for r in data["rows"]:
             effective = r["override"] or r["ai_suggested_category"]
+            code, label = in_progress.outcome(
+                r["state"],
+                statuses.get(r["item_id"], ""),
+                held=r["item_id"] in held,
+                failed=r["item_id"] in failed,
+            )
             if state and r["state"] != state:
+                continue
+            if outcome and code != outcome:
                 continue
             if category and effective != category:
                 continue
             if needs_owner is not None and bool(r["needs_owner"]) != needs_owner:
                 continue
-            row = {**r, "resource": r["resource"][:MAX_RESOURCE_CHARS], "category": effective}
+            row = {
+                **r,
+                "resource": r["resource"][:MAX_RESOURCE_CHARS],
+                "category": effective,
+                "outcome": code,
+                "outcome_label": label,
+            }
             if not with_comment:
                 row.pop("comment", None)
             if r["state"] == ItemState.PROCESSED.value and r["item_id"] in failed:
@@ -288,6 +306,13 @@ class AppServices:
                     row["proposal_note"] = plans.proposal_path(layout.proposals_dir, slug, r["item_id"])
             rows.append(row)
         return {"rows": rows, "invalid": len(data["invalid"]), "conflicts": data["conflicts"]}
+
+    def _processing_statuses(self) -> dict[str, str]:
+        """``{item id: status}`` of the processing list (spec 031); empty when it cannot be read."""
+        try:
+            return {i["item_id"]: i["status"] for i in self._vault().read_processing_list()["items"]}
+        except (VaultError, Refused):
+            return {}
 
     # -- retry of failed items (spec 027) -------------------------------------------------------------------
     def retry_max(self) -> int:
@@ -491,13 +516,14 @@ class AppServices:
         state: str | None = None,
         category: str | None = None,
         needs_owner: bool | None = None,
+        outcome: str | None = None,
     ) -> dict[str, Any]:
         """Confirm the suggested category of every row of the filtered set that still waits for the owner
         and has a configured suggestion (spec 023). An image that needs the owner, a row with an override
         and a row without a valid suggestion are skipped; the same rules as a single confirm apply."""
         valid = self.categories()
         confirmed, skipped = [], 0
-        for r in self.list_triage(state, category=category, needs_owner=needs_owner)["rows"]:
+        for r in self.list_triage(state, category=category, needs_owner=needs_owner, outcome=outcome)["rows"]:
             try:
                 unreviewed = is_unreviewed(ItemState(r["state"]), bool(r["confirm"]), r["override"])
             except ValueError:

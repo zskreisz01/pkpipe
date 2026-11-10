@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.11 – 2026-11-10
+- Spec 031: the triage no longer shows the bare state `processed`. A processed row shows how it went (`done`, `ready`, `failed`, `held for you`, `not finished`; `outcome` / `outcome_label` in the rows of `GET /api/triage`, a *Result* filter on the page and `outcome=` in the API); the stored state is unchanged.
+- Spec 031: the table `INBOX-InProgress.md` (`layout.inbox_in_progress_file`, default `<inbox_dir>/INBOX-InProgress.md`; `triage.in_progress.enabled`, pack default on). After every release run the INBOX entry of an item that was worked on but not closed (failed, held for review, quarantined) moves into one row of the table; its exact text stays in the row. A tool-less local session (`describe_in_progress.situation`, `situation_writer`, schema `in_progress_situation`, eval dataset and rubric) writes the situation, cause and next step from pkpipe's own records only (never page, note or image text); a fixed sentence replaces a failed or unusable answer; an unchanged item (facts hash) is not described again. A closed item (`done`, `ready`) leaves the table and its entry is archived; a released quarantine item gets its entry back in the list. New vault tools `read_in_progress`, `read_processing_list`, `inbox_in_progress`; the re-triage of a released item and `inbox.consume` tolerate an entry that already moved.
+
 ## 0.1.10 – 2026-11-08
 - Fix (spec 030): the item event log kept no details for flows of a private data class, so the quarantine events of `handle_security_flag` (image class) were empty. Events now carry `codes` (fixed reason codes, flags, counters, classifier scores; never text of an item) that stay in a private flow, while free `detail` is still dropped there.
 

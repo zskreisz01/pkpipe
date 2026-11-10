@@ -234,6 +234,7 @@ def ports_for(
         "proposal_attempts": make_proposal_attempts(db_path),
         "classifier_reviews": make_classifier_reviews(db_path),
         "item_events": make_item_events(db_path),
+        "item_retries": make_item_events(db_path),  # the same app DB: owner retry counts (spec 031)
     }
     store = make_context_store(overlay_dir)
     if store is not None:

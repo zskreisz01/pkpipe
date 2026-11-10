@@ -109,6 +109,28 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         return _run(vault.inbox_remove_entries, entries)
 
     @mcp.tool
+    def read_processing_list() -> dict:
+        """Every processing-list line: `{count, items: [{item_id, category, note, link, nb_id, status}]}`.
+        Read only. `link` holds an address or the fixed failure text; no note text is returned."""
+        return _run(vault.read_processing_list)
+
+    @mcp.tool
+    def read_in_progress() -> dict:
+        """The rows of the table of unfinished items (spec 031): `{count, rows}` with the situation, the cause
+        code, the next step and the facts hash. Read only, no page or note text."""
+        return _run(vault.read_in_progress)
+
+    @mcp.tool
+    def inbox_in_progress(
+        rows: list[dict], archive_ids: list[str] | None = None, restore_ids: list[str] | None = None
+    ) -> dict:
+        """Maintain the table of unfinished items and the INBOX list together. `rows` are upserted by item id
+        (`move_entry: true` takes the item's entries out of the INBOX list and keeps their exact text in the
+        row); `archive_ids` close items (the kept entry goes to the dated archive), `restore_ids` put the kept
+        entry back into the list. Writes only the table, the list and the dated archive."""
+        return _run(vault.inbox_in_progress, rows, archive_ids, restore_ids)
+
+    @mcp.tool
     def read_image(name: str) -> dict:
         """Read one embedded image of the attachments folder by file name (no path): `{name, media_type, size,
         data_base64}`. Read only; refusals are `not_found`, `bad_name`, `bad_type` (jpg, jpeg, png, webp, gif)
