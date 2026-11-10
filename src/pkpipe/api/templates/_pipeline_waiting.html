@@ -1,0 +1,17 @@
+{% set w = ov.waiting %}
+<section data-testid="waiting">
+  <h2>In progress / waiting</h2>
+  <ul class="plist">
+    <li data-testid="waiting-released"><strong>{{ w.released|length }}</strong> released for the next release run</li>
+    <li data-testid="waiting-quota"><strong>{{ w.waiting_quota|length }}</strong> waiting for NotebookLM quota
+      {% for it in w.waiting_quota %}<div class="muted"><a href="/items/{{ it.item_id }}"><code>{{ it.item_id }}</code></a>{% if it.waiting_until %} until {{ it.waiting_until }} UTC{% endif %}</div>{% endfor %}</li>
+    <li data-testid="waiting-generating"><strong>{{ w.generating|length }}</strong> notebook(s) or podcast(s) being generated
+      {% for g in w.generating %}<div class="muted"><a href="/items/{{ g.item_id }}"><code>{{ g.item_id }}</code></a>{% if g.since %} since {{ g.since }} UTC{% endif %}</div>{% endfor %}</li>
+  </ul>
+  {% if w.next_runs %}
+  <table class="ptable" data-testid="next-runs">
+    <thead><tr><th>Next run (UTC)</th><th>Flow</th><th>Schedule</th></tr></thead>
+    <tbody>{% for n in w.next_runs %}<tr><td>{{ n.at }}</td><td>{{ n.flow }}</td><td><code>{{ n.cron }}</code></td></tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+</section>

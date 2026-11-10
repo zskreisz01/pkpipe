@@ -13,6 +13,8 @@ Spec 020: the policy file has a `layout` block (folders and files, see `docs/con
 tool `inbox_remove_entries(entries)`, which removes processed entries (exact raw text) from the configured
 `inbox_list_file` and appends them to the dated archive file. It writes nothing else.
 
+Spec 033: `write_pipeline(text)` writes the pipeline overview note (`layout.pipeline_file`, default `<inbox_dir>/Pipeline.md`) only when it changed (the `Generated:` line is ignored); it refuses text that does not start with the pipeline heading, text over 200 kB and an existing file that is not a pipeline note. Its allow-list follows the layout (`write_pipeline`: the INBOX folder).
+
 Spec 031: `read_processing_list()` and `read_in_progress()` read the processing list and the table of unfinished items (ids, categories, addresses, fixed failure texts, short sentences; no note text); `inbox_in_progress(rows, archive_ids, restore_ids)` is the only writer of that table (`layout.inbox_in_progress_file`): it moves the exact entries of unfinished list items into their rows, archives the kept entries of closed items to the dated archive file and restores those of reopened ones to the list. It writes nothing else.
 
 Spec 021: the tool `read_image(name)` reads one embedded image of `layout.attachments_dir` by file name (no path;

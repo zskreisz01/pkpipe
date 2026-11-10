@@ -156,6 +156,14 @@
       }
     },
     {
+      "id": "pipeline_overview",
+      "type": "subflow",
+      "bpmn_element": "Refresh the pipeline overview note",
+      "config": {
+        "flow": "pipeline_overview"
+      }
+    },
+    {
       "id": "report_cfg",
       "type": "code",
       "bpmn_element": "Send run report",
@@ -316,10 +324,19 @@
     },
     {
       "from": "results_index",
-      "to": "report_cfg"
+      "to": "pipeline_overview"
     },
     {
       "from": "results_index",
+      "to": "pipeline_overview",
+      "on": "error"
+    },
+    {
+      "from": "pipeline_overview",
+      "to": "report_cfg"
+    },
+    {
+      "from": "pipeline_overview",
       "to": "report_cfg",
       "on": "error"
     },

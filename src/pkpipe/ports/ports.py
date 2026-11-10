@@ -168,6 +168,23 @@ class ItemEventPort(Protocol):
 
 
 @runtime_checkable
+class PipelineStatsPort(Protocol):
+    """What the pipeline overview (spec 033) reads from the app DB, besides the vault tables: the owner's
+    retry counts, the items held for a classifier warning, the items with an event of some kind, when every
+    item last had an event, and per run how many items it touched. Read only; no text of any item."""
+
+    def retry_counts(self) -> dict[str, int]: ...
+
+    def held(self) -> dict[str, dict[str, Any]]: ...
+
+    def item_ids_with_event(self, kind: str) -> set[str]: ...
+
+    def last_event_times(self) -> dict[str, str]: ...
+
+    def run_item_counts(self, run_ids: list[str]) -> dict[str, dict[str, int]]: ...
+
+
+@runtime_checkable
 class ClassifierReviewPort(Protocol):
     """Items held after a classifier warning and the owner's acceptance (spec 029), in the app DB.
 

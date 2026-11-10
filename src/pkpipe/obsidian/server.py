@@ -131,6 +131,13 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         return _run(vault.inbox_in_progress, rows, archive_ids, restore_ids)
 
     @mcp.tool
+    def write_pipeline(text: str) -> dict:
+        """Write the pipeline overview note (`layout.pipeline_file`, spec 033) from the text pkpipe built.
+        Written only when it changed (the `Generated:` line is ignored); refuses a file that is not a pipeline
+        note. Returns `{file, written}`."""
+        return _run(vault.write_pipeline, text)
+
+    @mcp.tool
     def write_results_index(folder: str) -> dict:
         """Rewrite `<folder>/_Index.md` from the pkpipe notes in that folder (resource and learning notes):
         a table of date, note, category, source, result and notebook link. Written only when it changed.

@@ -611,6 +611,21 @@ class InProgressConfig(_Strict):
     )
 
 
+class PipelineOverviewConfig(_Strict):
+    """The pipeline overview note in the INBOX folder (spec 033)."""
+
+    enabled: bool = Field(
+        default=False,
+        description="After every triage and release run, rewrite layout.pipeline_file: one note with the "
+        "funnel of all items, what needs you, what waits, what was closed lately and where things live. "
+        "The vault tool write_pipeline takes its allow-list from the layout unless the policy file lists it. "
+        "The web page /pipeline needs no switch: it is always there",
+    )
+    recent_days: int = Field(
+        default=14, ge=1, le=90, description="How many days back the list of closed items goes"
+    )
+
+
 class TriageConfig(_Strict):
     """Where the triage decisions are made and kept (spec 023)."""
 
@@ -630,6 +645,7 @@ class TriageConfig(_Strict):
         "by hand",
     )
     in_progress: InProgressConfig = Field(default_factory=InProgressConfig)
+    pipeline: PipelineOverviewConfig = Field(default_factory=PipelineOverviewConfig)
 
 
 class JournalTodosConfig(_Strict):

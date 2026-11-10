@@ -156,6 +156,14 @@
       }
     },
     {
+      "id": "pipeline_overview",
+      "type": "subflow",
+      "bpmn_element": "Refresh the pipeline overview note",
+      "config": {
+        "flow": "pipeline_overview"
+      }
+    },
+    {
       "id": "notify",
       "type": "notify",
       "bpmn_element": "Send run report",
@@ -285,7 +293,16 @@
     },
     {
       "from": "backlog",
+      "to": "pipeline_overview"
+    },
+    {
+      "from": "pipeline_overview",
       "to": "report_cfg"
+    },
+    {
+      "from": "pipeline_overview",
+      "to": "report_cfg",
+      "on": "error"
     },
     {
       "from": "report_cfg",

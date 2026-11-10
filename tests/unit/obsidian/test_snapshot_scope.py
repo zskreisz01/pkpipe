@@ -51,6 +51,7 @@ def test_real_layout_scope_follows_the_policy_not_the_pack_names(tmp_path):
             [
                 "1-Inbox/INBOX.md",
                 "1-Inbox/INBOX-InProgress.md",  # spec 031
+                "1-Inbox/Pipeline.md",  # spec 033
                 "1-Inbox/Inbox-Triage.md",
                 "1-Inbox/_pkpipe/triage-data.md",  # spec 023: the data file of the web surface
                 "1-Inbox/Manual-Resource-Processing-List.md",

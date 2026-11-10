@@ -94,6 +94,7 @@ def vault_tools(
             "obsidian:inbox_in_progress": lambda rows, archive_ids=None, restore_ids=None: (
                 vault.inbox_in_progress(rows, archive_ids, restore_ids)
             ),
+            "obsidian:write_pipeline": lambda text: vault.write_pipeline(text),  # spec 033
             "obsidian:write_results_index": lambda folder: vault.write_results_index(folder),  # spec 032
             "obsidian:import_audio": lambda src, name: vault.import_audio(src, name),  # spec 032
             "obsidian:read_image": lambda name: vault.read_image(name),

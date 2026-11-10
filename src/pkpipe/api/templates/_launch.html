@@ -1,0 +1,9 @@
+<div class="card launch" data-testid="launch">
+  {% for l in launch %}
+  <div class="launch-row">
+    <button class="primary" hx-post="/ui/runs" hx-vals='{"flow": "{{ l.flow }}"}' hx-target="#runs" hx-swap="innerHTML"
+            hx-confirm="Start {{ l.flow }} now?" data-testid="launch-{{ l.flow }}"{% if l.running %} disabled{% endif %}>{{ l.flow }}{% if l.running %} (running){% endif %}</button>
+    <span class="muted">{{ l.description }}</span>
+  </div>
+  {% endfor %}
+</div>

@@ -36,6 +36,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [030-item-event-log](030-item-event-log/spec.md) | One history per item (append-only event log) and process start buttons on the overview | Completed | data-model · plan · tasks |
 | [031-inbox-in-progress](031-inbox-in-progress/spec.md) | The triage shows how a processed item went; unfinished items live in INBOX-InProgress.md with an LLM-written situation | Completed | data-model · plan · tasks |
 | [032-results-in-vault](032-results-in-vault/spec.md) | Learning notes and result indexes in the vault, NotebookLM only with quota handling, image notes, auto-pass for the injection detector alone | Completed | data-model · plan · tasks |
+| [033-pipeline-overview](033-pipeline-overview/spec.md) | The whole system in one place: the Pipeline page, API, owner MCP tool, CLI and the vault note `Pipeline.md` (funnel, what needs you, what waits, what is done, where things live) | Completed | data-model · plan · tasks |
 | [025-find-and-evaluate-urlless-items](025-find-and-evaluate-urlless-items/spec.md) | Find the source of items without a URL and evaluate it | Completed | data-model |
 | [026-config-editor-forms](026-config-editor-forms/spec.md) | Config editor forms in the UI (schema-driven, shared draft with the JSON view) | Completed | data-model |
 

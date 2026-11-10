@@ -94,6 +94,12 @@ Image entries of the INBOX list are described by a local vision model ([Image in
 ## Evals
 
 
+### Pipeline overview (spec 033)
+
+`GET /pipeline` (UI), `GET /api/pipeline`, the owner MCP tool `pipeline_overview` and `pkpipe pipeline [--json]` return one overview built by `AppServices.pipeline_overview()` from pkpipe's own records: the triage table, the processing list, the unfinished-items table, the retry counts and held warnings and the item event log (app DB), the run records, the learning gateway's job store (opened read only) and the schedules. No model runs. Every triage row is in exactly one bucket, so the funnel adds up to the table.
+
+After every triage and release run the flow `pipeline_overview` rewrites the note `Pipeline.md` (`layout.pipeline_file`, default `<inbox_dir>/Pipeline.md`; switch `triage.pipeline.enabled`, pack default `true`) with the vault tool `write_pipeline`. The note is written only when it changed (its `Generated:` line does not count), so the vault's git history stays quiet; a file named `Pipeline.md` that does not start with the pipeline heading is never replaced. A failing refresh is logged and never fails the run. Closed items older than the event log are counted in the funnel but not listed under *Done recently*.
+
 ### INBOX-InProgress (spec 031)
 
 After every release run `INBOX-InProgress.md` in the INBOX folder lists the items pkpipe worked on but did not close, one row each with a short situation, the cause and the next step. Read it in Obsidian, or open the row's `history` link (the item's timeline). The entry of such an item is no longer in `INBOX.md`; its exact text is in the row's `entry` cell and goes to the dated archive when the item closes (after a successful retry or a release run), or back into `INBOX.md` when a released quarantine item is open again. Turn it off with `triage.in_progress.enabled: false`. The three vault tools the step uses (`read_in_progress`, `read_processing_list`, `inbox_in_progress`) get their folder allow-lists from the layout like every tool the policy file does not list (`allow` entries you wrote yourself win, so add them there if you narrowed the list). The pack's `mcp_servers.json` already allows them for the flows. If a tool is refused, the step fails, the run report says so and nothing else changes. The situation sentences are written by the default model profile on the loopback address; if it is down the table still updates with fixed sentences.

@@ -10,10 +10,22 @@ This page lists only what **you**, the owner, have to do by hand. Everything els
 
 Times are the defaults from `schedules.json`. If you change a schedule, the matching task moves with it.
 
+## Where to look: the Pipeline page
+
+One place shows the whole system: the web page **Pipeline** (`/pipeline`, first tab, and the top of the Overview page) and the same overview as a note, `Pipeline.md` in the INBOX folder, for the phone in Obsidian. It answers four questions:
+
+1. **Where is everything?** The funnel counts every item once: captured, triaged, released, processed (with how each one went: done, ready, held, failed, not finished, quota wait) and stopped (quarantined).
+2. **What needs me?** *Needs you* lists held warnings, quarantined items, failed or unfinished items, items at the retry limit and categories to decide, each with the situation, the next step and a button that does the same audited thing as in the triage (accept warning, release, retry).
+3. **What is waiting?** The next release run, NotebookLM quota waits (with the time the window opens), notebooks being generated, the next scheduled runs.
+4. **What is done?** What was closed in the last two weeks, with the link to its result (note, notebook, podcast status).
+
+Every item links to its history (`/items/<id>`), which starts with a *where it is now* line. If you only open one page a day, open this one; the other tasks below say which row of it to look at.
+
 ## At a glance
 
 | When | Task | Where | If you skip it |
 | --- | --- | --- | --- |
+| Any time | [Look at the Pipeline page](#where-to-look-the-pipeline-page) | `/pipeline`, `Pipeline.md` | Nothing breaks; you just do not see what waits for you |
 | Any time | [Capture resources](#capture-resources) | Obsidian `0-INBOX` | Nothing is processed |
 | End of day, before 21:30 | [Write the daily journal](#write-the-daily-journal) *(overlay)* | Obsidian journal | No improvement items that day |
 | After the 20:00 notification, before 06:00 | [Confirm or override triage](#confirm-or-override-triage) | `Inbox-Triage.md`, UI or chat agent | Items stay pending and come back in the next notification |

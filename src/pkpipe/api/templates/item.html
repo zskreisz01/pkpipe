@@ -3,6 +3,16 @@
 {% block body %}
 <h1>Item <code>{{ h.item_id }}</code></h1>
 {% set r = h.row %}
+{% if h.where %}
+<div class="card pwhere {{ h.where.bucket }}" data-testid="item-where">
+  <strong>Where it is now:</strong> <span class="pill {{ h.where.bucket }}">{{ h.where.label }}</span>
+  <span class="muted">({{ h.where.stage }})</span>
+  {% if h.where.waiting_until %}<div class="muted">waiting until {{ h.where.waiting_until }} UTC</div>{% endif %}
+  {% if h.where.situation %}<div>{{ h.where.situation }}</div>{% endif %}
+  <div class="muted">Next: {{ h.where.next_step }}</div>
+  <a class="btn" href="/pipeline#item-{{ h.item_id }}">Pipeline</a>
+</div>
+{% endif %}
 <div class="card" data-testid="item-state">
   {% if r %}<span class="pill {{ r.state }}">{{ r.state }}</span> {{ r.kind }} · {{ r.category or r.ai_suggested_category or "no category" }}
   <div class="resource">{{ r.resource }}</div>{% else %}<span class="muted">Not in the triage table any more.</span>{% endif %}

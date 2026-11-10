@@ -1,0 +1,157 @@
+{
+  "id": "pipeline_overview",
+  "description": "Spec 033, after every triage and release run: rewrite the pipeline overview note (layout.pipeline_file, default INBOX/Pipeline.md). Code builds it (the arguments name the nodes: the INBOX list is absent when the layout has no list file) from the triage table, the processing list, the unfinished-items table, the INBOX list, the retry counts, the held warnings, the run records and the learning job store: the funnel of all items, what needs the owner (with the situation text of the unfinished-items table), what waits, what was closed lately with the link to its result, and where things live. No model runs and no page, note or image text is in it. The vault tool writes it only when it changed. A failing read or write ends the flow quietly: the overview never fails the run it is attached to. Off unless triage.pipeline.enabled.",
+  "bpmn": "process-released",
+  "data_classes": [
+    "image"
+  ],
+  "start": "read_triage",
+  "nodes": [
+    {
+      "id": "read_triage",
+      "type": "tool",
+      "bpmn_element": "Refresh the pipeline overview note",
+      "config": {
+        "tool": "obsidian:read_triage"
+      }
+    },
+    {
+      "id": "read_processing",
+      "type": "tool",
+      "bpmn_element": "Refresh the pipeline overview note",
+      "config": {
+        "tool": "obsidian:read_processing_list"
+      }
+    },
+    {
+      "id": "read_progress",
+      "type": "tool",
+      "bpmn_element": "Refresh the pipeline overview note",
+      "config": {
+        "tool": "obsidian:read_in_progress"
+      }
+    },
+    {
+      "id": "read_inbox",
+      "type": "tool",
+      "bpmn_element": "Refresh the pipeline overview note",
+      "config": {
+        "tool": "obsidian:read_note",
+        "arguments": {
+          "path": "${config.layout.inbox_list_file}"
+        }
+      }
+    },
+    {
+      "id": "build",
+      "type": "code",
+      "bpmn_element": "Refresh the pipeline overview note",
+      "config": {
+        "function": "pipeline.build",
+        "args": {
+          "triage": "read_triage",
+          "processing": "read_processing",
+          "progress": "read_progress",
+          "inbox": "read_inbox"
+        }
+      }
+    },
+    {
+      "id": "write",
+      "type": "tool",
+      "bpmn_element": "Refresh the pipeline overview note",
+      "config": {
+        "tool": "obsidian:write_pipeline",
+        "arguments": {
+          "text": "${build.text}"
+        }
+      }
+    },
+    {
+      "id": "write_failed",
+      "type": "code",
+      "bpmn_element": "Refresh the pipeline overview note",
+      "config": {
+        "function": "pipeline.write_failed"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "read_triage",
+      "to": "read_processing"
+    },
+    {
+      "from": "read_triage",
+      "to": "END",
+      "on": "error"
+    },
+    {
+      "from": "read_processing",
+      "to": "read_progress"
+    },
+    {
+      "from": "read_processing",
+      "to": "END",
+      "on": "error"
+    },
+    {
+      "from": "read_progress",
+      "to": "read_inbox",
+      "when": {
+        "path": "config.layout.inbox_list_file",
+        "truthy": true
+      }
+    },
+    {
+      "from": "read_progress",
+      "to": "build",
+      "default": true
+    },
+    {
+      "from": "read_progress",
+      "to": "END",
+      "on": "error"
+    },
+    {
+      "from": "read_inbox",
+      "to": "build"
+    },
+    {
+      "from": "read_inbox",
+      "to": "build",
+      "on": "error"
+    },
+    {
+      "from": "build",
+      "to": "write",
+      "when": {
+        "path": "build.enabled",
+        "truthy": true
+      }
+    },
+    {
+      "from": "build",
+      "to": "END",
+      "default": true
+    },
+    {
+      "from": "build",
+      "to": "END",
+      "on": "error"
+    },
+    {
+      "from": "write",
+      "to": "END"
+    },
+    {
+      "from": "write",
+      "to": "write_failed",
+      "on": "error"
+    },
+    {
+      "from": "write_failed",
+      "to": "END"
+    }
+  ]
+}

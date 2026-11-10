@@ -34,6 +34,10 @@ An image of the INBOX is external content like a fetched page: text inside it ("
 - **No metadata survives preparation.** The prepared JPEG is rebuilt from the pixels alone: EXIF, XMP, ICC and the JPEG or GIF comments of the source are gone.
 - **Reading.** `read_image` takes a file name (no path), allows `jpg jpeg png webp gif`, checks the content against the extension, refuses a symbolic link, a name with `..`, a note and a file over the size limit with stable codes (`not_found`, `bad_name`, `bad_type`, `too_large`), and has its own allowlist entry; no write tool can reach `attachments_dir`.
 
+### What the pipeline overview shows (spec 033)
+
+The page `/pipeline`, the API, the owner MCP tool and the note `Pipeline.md` show ids, bucket and reason codes, resource addresses and file names as inline code, numbers, times, the fixed next-step sentences and the situation sentences of the unfinished-items table (already schema-checked and escaped when they were written; every table cell is escaped again). No page text, no note or image content, no classifier text and no secret is in it. The MCP tool is owner only (the agent token cannot call it). The vault tool `write_pipeline` only writes the pipeline heading note to the one configured file, refuses a file that is not a pipeline note and a text over 200 kB, and takes its folder from the vault policy allow-list.
+
 ### INBOX-InProgress situation session (spec 031)
 
 The sentences of the table `INBOX-InProgress.md` are written by a model session, so the same rules apply as for every session that writes to the vault, with a narrower input:

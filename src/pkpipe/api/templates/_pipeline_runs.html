@@ -1,0 +1,10 @@
+<section data-testid="last-runs">
+  <h2>Last runs</h2>
+  {% if not ov.runs %}<p class="muted">No run yet.</p>{% else %}
+  <table class="ptable">
+    <thead><tr><th>Flow</th><th>Status</th><th>Started (UTC)</th><th>Items</th><th>Failed steps</th></tr></thead>
+    <tbody>{% for r in ov.runs %}
+      <tr><td><a href="/runs/{{ r.run_id }}">{{ r.flow }}</a></td><td><span class="pill {{ r.status }}">{{ r.status }}</span></td>
+          <td>{{ r.started }}</td><td>{{ r.items }}</td><td>{{ r.failed_steps }}</td></tr>{% endfor %}</tbody>
+  </table>{% endif %}
+</section>

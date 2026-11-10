@@ -222,6 +222,43 @@ def make_item_events(db_path: Path | None = None):
     return AppStore(db_path or default_db_path())
 
 
+def learning_jobs_path(data: dict | None = None) -> Path:
+    """Where the learning gateway keeps its jobs (``mcp_servers.json`` ``learning.options.data_dir``, else
+    ``$PKPIPE_DATA_DIR/learning``): the same rule as the gateway's own settings."""
+    options = (((data or {}).get("mcp_servers") or {}).get("learning") or {}).get("options") or {}
+    base = (
+        options.get("data_dir") or Path(os.environ.get(DATA_DIR_ENV) or "~/.local/share/pkpipe") / "learning"
+    )
+    return Path(base).expanduser() / "jobs.db"
+
+
+def make_learning_jobs(snapshot_data: dict | None = None):
+    """A callable returning the newest notebook job per item from the gateway's job store (read only)."""
+    from pkpipe.learning.jobs_view import read_jobs
+
+    path = learning_jobs_path(snapshot_data)
+    return lambda: read_jobs(path)
+
+
+def make_next_runs():
+    """``fn(schedules, now) -> [{flow, cron, at}]``: when the scheduled runs fire next (spec 033)."""
+    from pkpipe.scheduler import next_fire_times
+
+    return next_fire_times
+
+
+def make_pipeline_stats(db_path: Path | None = None):
+    """What the pipeline overview reads from the app DB (spec 033): retry counts, held items, events."""
+    from pkpipe.adapters.app_store_sqlite import AppStore
+
+    return AppStore(db_path or default_db_path())
+
+
+def make_run_history(db_path: Path | None = None):
+    """Run records for the overview's 'last runs' (the same DB as the run service)."""
+    return SqliteRunStore(db_path or default_db_path())
+
+
 def ports_for(
     snapshot: ConfigSnapshot, overlay_dir: Path | None = None, db_path: Path | None = None
 ) -> StepPorts:
@@ -235,6 +272,10 @@ def ports_for(
         "classifier_reviews": make_classifier_reviews(db_path),
         "item_events": make_item_events(db_path),
         "item_retries": make_item_events(db_path),  # the same app DB: owner retry counts (spec 031)
+        "pipeline_stats": make_pipeline_stats(db_path),  # spec 033
+        "run_history": make_run_history(db_path),  # spec 033
+        "learning_jobs": make_learning_jobs(snapshot.data),  # spec 033
+        "next_runs": make_next_runs(),  # spec 033
     }
     store = make_context_store(overlay_dir)
     if store is not None:

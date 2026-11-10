@@ -13,7 +13,7 @@
 {% if owner %}
 <header>
   <strong>pkpipe</strong>
-  <a href="/">Overview</a><a href="/triage">Triage</a><a href="/items">Items</a><a href="/runs">Runs</a><a href="/config">Config</a><a href="/audit">Audit</a>
+  <a href="/pipeline" data-testid="nav-pipeline">Pipeline</a><a href="/">Overview</a><a href="/triage">Triage</a><a href="/items">Items</a><a href="/runs">Runs</a><a href="/config">Config</a><a href="/audit">Audit</a>
   <form method="post" action="/logout" hx-boost="false"><button type="submit">Log out</button></form>
 </header>
 {% endif %}

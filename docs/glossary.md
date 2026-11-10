@@ -30,6 +30,8 @@ title: Glossary
 | Owner | The single user of a pkpipe installation |
 | Config form | The generated edit form of a config section in the UI (spec 026); it edits the same draft as the JSON view |
 
+- **Pipeline overview** (spec 033): the one-place view of the whole system: the page `/pipeline` and the machine-owned note `Pipeline.md`. It shows the funnel of all items, what needs the owner, what waits, what was closed lately and where things live, built from pkpipe's own records without a model.
+- **Funnel / bucket** (spec 033): every triage row is in exactly one bucket (waiting for your confirmation, awaiting a category, released, waiting for quota, done, ready, held, failed, not finished, result unknown, quarantined); the buckets group into the stages triaged, released, processed and stopped, and add up to the triage table.
 - **INBOX-InProgress** (spec 031): the machine-owned table `INBOX-InProgress.md` in the INBOX folder with one row per item that was worked on but not closed (processing failed, held for review, quarantined): the item's exact INBOX entry, a model-written *situation*, *cause* and *next step* built from pkpipe's own records, and a link to the item history. A closed item leaves it.
 - **Learning note** (spec 032): the note a ready notebook gets in the learning folder (`<name>-<item id>.md`, `type: learning_note`): the source address, the notebook link, the podcast file and the history link; only facts of pkpipe's own, never page text.
 - **Result index** (spec 032): the machine-owned `_Index.md` in every result folder (Tools, Learning, Marketing, Misc, ...): a plain Markdown table of the notes pkpipe wrote there, newest first, rewritten after a release run only when it changed.

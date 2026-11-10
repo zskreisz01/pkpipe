@@ -31,6 +31,7 @@ TOOLS = {
     "read_processing_list",  # spec 031
     "read_in_progress",  # spec 031
     "inbox_in_progress",  # spec 031
+    "write_pipeline",  # spec 033
     "write_results_index",  # spec 032
     "import_audio",  # spec 032
     "read_image",  # spec 021

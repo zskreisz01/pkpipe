@@ -256,6 +256,10 @@ def create_app(
     def api_item_history(item_id: str):
         return services.item_history(item_id)
 
+    @app.get("/api/pipeline")
+    def api_pipeline():
+        return services.pipeline_overview()
+
     @app.get("/api/triage/failed")
     def api_failed():
         return services.failed_summary()
@@ -370,6 +374,45 @@ def create_app(
             },
         )
 
+    def pipeline_ctx(message: str | None = None, error: bool = False) -> dict[str, Any]:
+        try:
+            return {
+                "ov": services.pipeline_overview(),
+                "pipeline_error": None,
+                "message": message,
+                "error": error,
+            }
+        except Refused as exc:
+            return {"ov": None, "pipeline_error": str(exc), "message": message, "error": error}
+
+    @app.get("/pipeline", response_class=HTMLResponse)
+    def ui_pipeline(request: Request):
+        return render(request, "pipeline.html", launch=services.launchable_flows(), **pipeline_ctx())
+
+    @app.get("/pipeline/body", response_class=HTMLResponse)
+    def ui_pipeline_body(request: Request):
+        return render(request, "_pipeline_body.html", **pipeline_ctx())
+
+    @app.post("/ui/pipeline/{item_id}/{action}", response_class=HTMLResponse)
+    def ui_pipeline_action(request: Request, item_id: str, action: str):
+        """The audited owner actions of the services, from a card of the Pipeline page (spec 033): no decision
+        logic of its own."""
+        acts = {
+            "accept": services.accept_warning,
+            "release": services.release_quarantine,
+            "retry": services.retry_item,
+            "confirm": services.confirm_item,
+        }
+        message, error = None, False
+        try:
+            if action not in acts:
+                raise NotFound(f"unknown action '{action}'")
+            acts[action](item_id, actor="ui")
+            message = f"{action}: {item_id} done"
+        except (Refused, NotFound) as exc:
+            message, error = str(exc), True
+        return render(request, "_pipeline_body.html", **pipeline_ctx(message, error))
+
     @app.get("/", response_class=HTMLResponse)
     def ui_index(request: Request):
         triage = triage_ctx()
@@ -377,6 +420,7 @@ def create_app(
         return render(
             request,
             "index.html",
+            **pipeline_ctx(),
             runs=services.list_runs(limit=5),
             pending=len(pending),
             publishes=services.store.list_publishes()[:3],

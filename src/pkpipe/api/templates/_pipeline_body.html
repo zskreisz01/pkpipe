@@ -1,0 +1,11 @@
+{% if message %}<p class="{{ 'err' if error else 'ok' }}" data-testid="pipeline-message">{{ message }}</p>{% endif %}
+{% if pipeline_error %}<p class="err" data-testid="pipeline-error">{{ pipeline_error }}</p>
+{% else %}
+{% include "_pipeline_funnel.html" %}
+{% include "_pipeline_needs.html" %}
+{% include "_pipeline_waiting.html" %}
+{% include "_pipeline_done.html" %}
+{% include "_pipeline_runs.html" %}
+{% include "_pipeline_where.html" %}
+<p class="muted">Generated {{ ov.generated_at }} UTC</p>
+{% endif %}

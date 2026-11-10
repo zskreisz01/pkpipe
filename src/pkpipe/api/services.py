@@ -20,6 +20,7 @@ from pkpipe.adapters.app_store_sqlite import AppStore
 from pkpipe.api.publish import Publisher, PublishError
 from pkpipe.api.workspace import ConfigWorkspace, WorkspaceError, category_entry
 from pkpipe.domain import in_progress
+from pkpipe.domain import pipeline as pipeline_domain
 from pkpipe.domain import session_plan as plans
 from pkpipe.domain.triage import DEFAULT_MAX_RETRIES, ItemState, is_unreviewed, resolve_category
 from pkpipe.domain.vault_snapshot import SnapshotError, UnknownSnapshot
@@ -133,6 +134,8 @@ class AppServices:
     #: Decodes an INBOX image for the UI thumbnail (spec 023): the metadata-free scaled JPEG; None = the
     #: file as is.
     image_preparer: ImagePreparePort | None = None
+    #: The newest notebook job per item from the learning gateway's store (spec 033); None = not shown.
+    learning_jobs: Callable[[], dict[str, dict[str, Any]]] | None = None
 
     # -- runs -----------------------------------------------------------------------------------------------
     def flows(self) -> list[str]:
@@ -354,6 +357,61 @@ class AppServices:
             "max": limit,
         }
 
+    # -- the pipeline overview (spec 033) ------------------------------------------------------------------
+    def _pipeline_sources(self) -> dict[str, Any]:
+        """The vault tables the overview is built from (the same reads the flow step does through the vault
+        tools). A table that cannot be read is empty."""
+        vault = self._vault()
+
+        def rows(fn: Callable[[], dict[str, Any]], key: str) -> list[dict[str, Any]]:
+            try:
+                return list(fn()[key])
+            except (VaultError, Refused, OSError):
+                return []
+
+        return {
+            "triage_rows": rows(vault.read_triage, "rows"),
+            "processing_items": rows(vault.read_processing_list, "items"),
+            "progress_rows": rows(vault.read_in_progress, "rows"),
+        }
+
+    def pipeline_overview(self, *, with_items: bool = False) -> dict[str, Any]:
+        """One overview of the whole pipeline: the funnel, what needs the owner, what waits, what was closed
+        lately, where things live (spec 033). Pure aggregation of our own records: no model, no page text.
+        ``with_items`` keeps the per-item records (the history page uses them)."""
+        from pkpipe.scheduler import next_fire_times
+
+        vault = self._vault()
+        data = self.runs.config().data
+        layout = vault.policy.layout
+        cfg = (data.get("triage") or {}).get("pipeline") or {}
+        results = []
+        for cat in data.get("categories", []):
+            if cat.get("enabled", True) and cat.get("para_path"):
+                folder = layout.expand(str(cat["para_path"])).rstrip("/")
+                if folder and folder not in {r["folder"] for r in results}:
+                    results.append({"folder": folder, "index": f"{folder}/_Index.md"})
+        try:
+            inbox_ids = vault.inbox_entry_ids()
+        except (VaultError, OSError):
+            inbox_ids = None
+        ui = vault.policy.ui_public_url
+        ov = pipeline_domain.assemble(
+            **self._pipeline_sources(),
+            stats=self.store,
+            run_history=self.runs.store,
+            learning_jobs=self.learning_jobs,
+            next_runs=next_fire_times(data.get("schedules") or []),
+            inbox_ids=inbox_ids,
+            retry_max=self.retry_max(),
+            where=pipeline_domain.where_map(layout, results),
+            recent_days=int(cfg.get("recent_days", pipeline_domain.DEFAULT_RECENT_DAYS)),
+        )
+        ov["ui_url"] = ui
+        if not with_items:
+            ov.pop("items", None)
+        return ov
+
     # -- item history (spec 030) --------------------------------------------------------------------------
     def item_history(self, item_id: str) -> dict[str, Any]:
         """Everything known about one item in time order: its flow events, the owner's audited actions, and
@@ -369,9 +427,14 @@ class AppServices:
             pass
         if not events and not audit and row is None:
             raise NotFound(f"no item {item_id}")
+        try:  # spec 033: where the item is now, from the same overview the pipeline page shows
+            where = pipeline_domain.position(self.pipeline_overview(with_items=True), item_id)
+        except (VaultError, Refused):
+            where = None
         return {
             "item_id": item_id,
             "row": row,
+            "where": where,
             "retries": self.store.retry_count(item_id),
             "review": self.review_summary(item_id),
             "quarantine": self.quarantine_summary(item_id) or None,
@@ -410,7 +473,7 @@ class AppServices:
         if self.store.review_of(item_id) is None:
             self.store.audit(actor, "accept_warning_refused", item_id, reason="no warning held")
             raise Refused("no classifier warning is held for this item")
-        result = self.retry_item(item_id, actor=actor)
+        result = self.retry_item(item_id, actor=actor, ignore_limit=True)
         self.store.waive(item_id)
         self.store.audit(actor, "accept_classifier_warning", item_id)
         return {**result, "accepted": True}
@@ -428,12 +491,15 @@ class AppServices:
             info["lines"] = interpret(info["classifier"])
         return info
 
-    def retry_item(self, item_id: str, *, actor: str) -> dict[str, Any]:
+    def retry_item(self, item_id: str, *, actor: str, ignore_limit: bool = False) -> dict[str, Any]:
         """Owner decision (spec 027): a processed item whose processing failed goes back to ``released`` for
         the next release run. Bounded by ``triage.retry_max`` per item; audited."""
         done = self.store.retry_count(item_id)
+        # an explicit owner decision about one item (accepting a held warning) is not a retry loop: the limit
+        # exists to stop bulk retries from hammering a page that keeps failing
+        limit = done + 1 if ignore_limit else self.retry_max()
         try:
-            row = self._vault().owner_retry(item_id, retries=done, max_retries=self.retry_max())
+            row = self._vault().owner_retry(item_id, retries=done, max_retries=limit)
         except VaultError as exc:
             self.store.audit(actor, "retry_item_refused", item_id, reason=str(exc))
             raise Refused(str(exc)) from None

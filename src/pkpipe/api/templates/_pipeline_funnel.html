@@ -1,0 +1,19 @@
+{% set f = ov.funnel %}
+<section class="pfunnel" data-testid="funnel">
+  <p class="muted">
+    {% if f.captured is not none %}<span data-testid="captured">{{ f.captured }}</span> captured, not yet triaged &rarr; {% endif %}
+    <strong data-testid="funnel-total">{{ f.total }}</strong> item(s) in the triage table
+  </p>
+  <div class="pstages">
+    {% for st in f.stages %}
+    <div class="pstage" data-stage="{{ st.stage }}">
+      <div class="pstage-head"><span class="pcount" data-testid="stage-{{ st.stage }}">{{ st.count }}</span> {{ st.label }}</div>
+      {% for b in st.buckets if b.count %}
+      <a class="pchip {{ b.code }}" data-testid="bucket-{{ b.code }}"
+         href="{% if b.code in ('done', 'ready', 'held', 'failed', 'unprocessed') %}/triage?outcome={{ b.code }}{% elif b.code == 'result_unknown' %}/triage?outcome=processed{% elif b.code in ('released', 'waiting_quota') %}/triage?state=released{% elif b.code == 'waiting_confirmation' %}/triage?state=suggested{% else %}/triage?state={{ b.code }}{% endif %}">
+        <strong>{{ b.count }}</strong> {{ b.label }}</a>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</section>

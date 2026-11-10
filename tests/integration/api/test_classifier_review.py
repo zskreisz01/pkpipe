@@ -90,3 +90,15 @@ def test_a_quarantined_item_shows_where_it_came_from_and_why(stack):
     assert any("false positive" in s for s in row["lines"])
     note = (stack.vault / "0-INBOX/_quarantine" / f"{ids['q']}.md").read_text()
     assert "Source: `https://example.org/repo`" in note and "## Why it was flagged" in note
+
+
+def test_accepting_a_warning_works_after_the_retry_limit_was_used_up(stack, held):
+    """The retry limit stops bulk retries; an explicit accept of one held item is not a retry loop."""
+    store = stack.services.store
+    for _ in range(stack.services.retry_max()):
+        store.bump_retry(held["h"])
+    client = api_client(stack)
+    assert client.post(f"/api/triage/{held['f']}/retry").status_code == 200  # others still counted normally
+    out = client.post(f"/api/triage/{held['h']}/accept-warning")
+    assert out.status_code == 200 and out.json()["accepted"] is True
+    assert rows(stack)[held["h"]]["state"] == "released" and store.waived(held["h"]) is True
