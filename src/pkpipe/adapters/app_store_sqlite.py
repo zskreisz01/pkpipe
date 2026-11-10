@@ -429,6 +429,26 @@ class AppStore:
             rows = c.execute("SELECT DISTINCT item_id FROM item_events WHERE kind = ?", (kind,)).fetchall()
         return {r["item_id"] for r in rows}
 
+    def last_event_times(self) -> dict[str, str]:
+        """``{item id: time of its newest event}`` (spec 033: when a closed item finished)."""
+        with self._conn() as c:
+            rows = c.execute("SELECT item_id, MAX(at) AS at FROM item_events GROUP BY item_id").fetchall()
+        return {r["item_id"]: r["at"] for r in rows}
+
+    def run_item_counts(self, run_ids: list[str]) -> dict[str, dict[str, int]]:
+        """Per run: how many items it touched and how many of its steps failed (spec 033)."""
+        out: dict[str, dict[str, int]] = {}
+        with self._conn() as c:
+            for run_id in run_ids:
+                row = c.execute(
+                    "SELECT COUNT(DISTINCT item_id) AS items, "
+                    "SUM(CASE WHEN outcome = 'failed' THEN 1 ELSE 0 END) AS failed "
+                    "FROM item_events WHERE run_id = ?",
+                    (run_id,),
+                ).fetchone()
+                out[run_id] = {"items": int(row["items"] or 0), "failed_steps": int(row["failed"] or 0)}
+        return out
+
     def audit_of(self, item_id: str, limit: int = 200) -> list[dict[str, Any]]:
         """The owner actions on one item (the audit rows that name it as target), oldest first."""
         with self._conn() as c:

@@ -22,6 +22,7 @@ TOOLS = {
     "retry_items",  # spec 027
     "accept_classifier_warning",  # spec 029
     "item_history",  # spec 030
+    "pipeline_overview",  # spec 033
     "restore_run",
 }
 TRIAGE_FILE = "0-INBOX/Inbox-Triage.md"

@@ -14,7 +14,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from pkpipe.domain import in_progress, results
+from pkpipe.domain import in_progress, pipeline, results
 from pkpipe.domain.inbox_list import archive_text, list_items, parse_list, remove_entries
 from pkpipe.domain.journal_todos import DEFAULT_HEADING, JournalTodoError, replace_block
 from pkpipe.security import quarantine
@@ -55,6 +55,9 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
             return fn(self, *args, **kwargs)
 
     return wrapper
+
+
+MAX_PIPELINE_BYTES = 200_000
 
 
 #: Notes ``unreviewed_notes`` looks at per call (a folder of an owner can be large).
@@ -397,6 +400,39 @@ class Vault:
         return target
 
     @_traced
+    def write_pipeline(self, text: str) -> dict[str, Any]:
+        """Write the pipeline overview note (spec 033) to ``layout.pipeline_file``, only when it changed.
+        Two texts are the same when they differ only in their ``Generated:`` line, so a refresh that finds
+        nothing new leaves the vault (and its git history) alone. The text is the owner's overview of ids,
+        codes and URLs built by pkpipe; it is capped, and a note that is not ours is never replaced: the
+        file is only written when it is missing or starts with the pipeline heading."""
+        if not isinstance(text, str) or len(text) > MAX_PIPELINE_BYTES:
+            raise PathRejected("give the pipeline note as text of at most 200 kB")
+        if not text.startswith(pipeline.HEADING):
+            raise PathRejected("the pipeline note must start with its heading")
+        layout = self.policy.layout
+        target = self.policy.resolve(layout.pipeline, "write_pipeline")
+        if is_conflict_name(target.name) or self.policy.in_quarantine(target):
+            raise PathRejected("refusing to write the pipeline note there")
+        existing = target.read_text(encoding="utf-8") if target.is_file() else None
+        if existing is not None and not existing.startswith(pipeline.HEADING):
+            raise PathRejected("the pipeline file exists and is not a pipeline note; move it away first")
+        if existing is not None and pipeline.normalize(existing) == pipeline.normalize(text):
+            return {"file": layout.pipeline, "written": False}
+        update_text(target, lambda _existing: text)
+        return {"file": layout.pipeline, "written": True}
+
+    def inbox_entry_ids(self) -> list[str] | None:
+        """The item ids of the INBOX list entries (owner channels only, not a tool): ``None`` when the layout
+        has no list file. Ids only, no entry text."""
+        layout = self.policy.layout
+        if not layout.inbox_list_file:
+            return None
+        target = self.policy.resolve(layout.inbox_list_file, "read_note")
+        text = target.read_text(encoding="utf-8") if target.is_file() else ""
+        return [i.id for i in list_items(parse_list(text, layout.inbox_list.to_config()))]
+
+    @_traced
     def write_results_index(self, folder: str) -> dict[str, Any]:
         """Rewrite ``<folder>/_Index.md`` from the notes pkpipe wrote there (spec 032): one table row per note
         with ``type: resource_note`` or ``learning_note`` and a ``pkpipe_item``. The file is written only when
@@ -623,6 +659,7 @@ class Vault:
             p.triage_file,
             p.layout.triage_data,
             p.layout.in_progress,
+            p.layout.pipeline,
             p.processing_list,
             p.improvement_file,
             p.tool_candidates_file,

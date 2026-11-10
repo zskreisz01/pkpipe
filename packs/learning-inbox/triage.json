@@ -4,5 +4,9 @@
     "enabled": true,
     "max_rows_per_run": 40,
     "max_events": 10
+  },
+  "pipeline": {
+    "enabled": true,
+    "recent_days": 14
   }
 }

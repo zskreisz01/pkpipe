@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,33 @@ class SyncReport:
     unchanged: list[str] = field(default_factory=list)
     removed: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
+
+
+def next_fire_times(
+    schedules: Iterable[Mapping[str, Any]], now: datetime | None = None
+) -> list[dict[str, str]]:
+    """The next fire time of every enabled schedule, soonest first (spec 033: the overview shows when the
+    next triage and release run start). ``at`` is UTC ``YYYY-MM-DD HH:MM``; a bad schedule is skipped."""
+    now = now or datetime.now(UTC)
+    out: list[tuple[datetime, dict[str, str]]] = []
+    for raw in schedules or []:
+        try:
+            s = Schedule.model_validate(dict(raw))
+            if not s.enabled:
+                continue
+            trigger = (
+                CronTrigger.from_crontab(s.cron, timezone=s.timezone)
+                if s.timezone
+                else (CronTrigger.from_crontab(s.cron))
+            )
+            nxt = trigger.get_next_fire_time(None, now)
+        except Exception:  # noqa: BLE001 - one broken schedule must not hide the others
+            continue
+        if nxt is not None:
+            out.append(
+                (nxt, {"flow": s.flow, "cron": s.cron, "at": nxt.astimezone(UTC).strftime("%Y-%m-%d %H:%M")})
+            )
+    return [row for _, row in sorted(out, key=lambda x: x[0])]
 
 
 def sqlite_jobstore(path: Path) -> BaseJobStore:

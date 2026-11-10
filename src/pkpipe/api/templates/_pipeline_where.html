@@ -1,0 +1,13 @@
+{% set wh = ov.where %}
+<section data-testid="where">
+  <h2>Where things live</h2>
+  <ul class="plist">
+    <li>Decide and act: <a href="/pipeline">this page</a>, <a href="/triage">Triage</a>, <a href="/items">Items</a></li>
+    <li>Capture list: <code>{{ wh.inbox_list }}</code></li>
+    <li>Unfinished items: <code>{{ wh.in_progress }}</code></li>
+    <li>Processing list: <code>{{ wh.processing_list }}</code></li>
+    <li>Quarantine folder: <code>{{ wh.quarantine }}</code></li>
+    <li>This overview as a note: <code>{{ wh.pipeline_file }}</code></li>
+    {% for r in wh.results %}<li>Results: <code>{{ r.folder }}</code> (index <code>{{ r.index }}</code>)</li>{% endfor %}
+  </ul>
+</section>

@@ -85,6 +85,7 @@ def build_services(
         candidates_dir=app.candidates_dir(overlay),
         snapshots=snapshots,
         image_preparer=_image_preparer(app),
+        learning_jobs=app.make_learning_jobs(runs.config().data),
     )
 
 

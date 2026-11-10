@@ -50,6 +50,7 @@ Spec 020. Every folder or file of the vault that pkpipe names comes from one `la
 | `inbox_dir` | Folder of the INBOX notes | `0-INBOX` |
 | `inbox_list_file` | A single list file whose bullet entries are the triage items (empty: one note per item) | none |
 | `triage_file`, `processing_list` | The triage table (on the `web` surface: the generated summary page) and the manual processing list | `0-INBOX/Inbox-Triage.md`, `0-INBOX/Manual-Resource-Processing-List.md` |
+| `pipeline_file` | Spec 033: the machine-owned pipeline overview note (`Pipeline.md`); default `<inbox_dir>/Pipeline.md`; a `.md` file below the INBOX folder (the vault tool `write_pipeline` takes its allow-list from the layout unless the policy file lists it) |
 | `inbox_in_progress_file` | Spec 031: the machine-owned table of items worked on but not closed (`INBOX-InProgress.md`); validated like the other paths, a managed file (never an item), allowed for `read_in_progress` / `inbox_in_progress`, in the snapshot scope | `<inbox_dir>/INBOX-InProgress.md` |
 | `triage_data_file` | Spec 023: where the machine-owned triage table lives on the `web` surface; validated like the other paths, allowed for `read_triage` / `update_triage`, in the snapshot scope | `<inbox_dir>/_pkpipe/triage-data.md` |
 | `archive_dir` | Where a processed INBOX note moves to | `4-Archive/Inbox` |
@@ -125,6 +126,10 @@ After an item is processed, its entries (duplicates included) are removed from t
 ### The table of unfinished items (`triage.json` `in_progress`)
 
 Spec 031. `triage.in_progress` controls the table `INBOX-InProgress.md`: `enabled` (model default `false`, pack default `true`), `max_rows_per_run` (default 40: rows the model describes per run; the others get the fixed sentence and are asked again next run), `max_events` (default 10: notable events of an item's history the model reads). The vault tools `read_in_progress`, `read_processing_list` (folder `inbox_dir`) and `inbox_in_progress` (`inbox_dir` and the archive root) take their allow-lists from the layout unless the policy file lists them; `pkpipe validate` checks the layout path like the others. The columns are `item`, `kind`, `resource`, `category`, `state`, `situation`, `cause`, `next step`, `since`, `last run`, `history` (a link to `/items/<id>` of the web UI when `ui_public_url` is set), `entry` (the item's exact INBOX entry, in a code span) and `facts` (a hash: an unchanged hash is not described again). Do not edit the file by hand.
+
+### The pipeline overview note (`triage.json` `pipeline`)
+
+Spec 033. `triage.pipeline` controls the note `Pipeline.md`: `enabled` (model default `false`, pack default `true`) rewrites it after every triage and release run, `recent_days` (default 14, 1 to 90) is how far back *Done recently* goes. The web page `/pipeline`, the API, the MCP tool and the CLI need no switch. The note's folder and name come from `layout.pipeline_file`.
 
 ### The run report and the journal todo block (`report.json`)
 

@@ -63,3 +63,34 @@ ol.timeline { list-style:none; padding-left:0; }
 ol.timeline li.ev { border-left:3px solid var(--line, #8884); padding:.2rem .6rem; margin:.3rem 0; overflow-wrap:anywhere; }
 ol.timeline li.ev.failed, ol.timeline li.ev.quarantined, ol.timeline li.ev.flagged { border-color:var(--bad); }
 ol.timeline li.ev.verdict, ol.timeline li.ev.held, ol.timeline li.ev.owner { border-color:var(--accent, #58f); }
+/* spec 033: the pipeline overview */
+a.btn { display:inline-block; padding:.35rem .8rem; border:1px solid var(--line); background:var(--card); border-radius:4px; text-decoration:none; color:var(--fg); }
+.pstages { display:grid; grid-template-columns:repeat(auto-fit, minmax(14rem, 1fr)); gap:.75rem; margin:.5rem 0; }
+.pstage { background:var(--card); border:1px solid var(--line); padding:.6rem .8rem; }
+.pstage-head { font-weight:600; margin-bottom:.3rem; }
+.pcount { font-size:1.4rem; margin-right:.3rem; }
+.pchip { display:block; padding:.25rem 0; text-decoration:none; }
+.pchip.held, .pchip.failed, .pchip.quarantined { color:var(--bad); }
+.pchip.unprocessed, .pchip.waiting_quota, .pchip.waiting_confirmation, .pchip.awaiting_category { color:var(--warn); }
+.pchip.done, .pchip.ready { color:var(--ok); }
+.pcard { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--line); padding:.6rem .8rem; margin:.6rem 0; overflow-wrap:anywhere; }
+.pcard.held, .pcard.failed, .pcard.quarantined { border-left-color:var(--bad); }
+.pcard.unprocessed, .pcard.awaiting_category, .pcard.waiting_confirmation { border-left-color:var(--warn); }
+.pcard.done { border-left-color:var(--ok); }
+.pcard-head { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+.pactions { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.5rem; }
+.plist { padding-left:1.1rem; }
+.pwhere { border-left:4px solid var(--line); }
+.pwhere.held, .pwhere.failed, .pwhere.quarantined { border-left-color:var(--bad); }
+.pwhere.done, .pwhere.ready { border-left-color:var(--ok); }
+details.launch-box { margin:.5rem 0; }
+.ptable { display:block; overflow-x:auto; }
+@media (max-width: 600px) {
+  main { padding:.75rem; }
+  header { gap:.6rem; padding:.5rem .75rem; }
+  header a { padding:.4rem .2rem; }
+  .pstages { grid-template-columns:1fr; }
+  .pactions button, .pactions a.btn, .launch-row button { min-height:44px; flex:1 1 100%; text-align:center; }
+  .pchip { padding:.5rem 0; }
+  h1 { font-size:1.2rem; }
+}

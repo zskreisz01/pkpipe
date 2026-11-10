@@ -37,6 +37,7 @@ OWNER_TOOLS = (
     "retry_items",
     "accept_classifier_warning",
     "item_history",
+    "pipeline_overview",
     "restore_run",
 )
 AGENT_TOOLS = ("run_flow", "list_triage", "get_run")
@@ -195,6 +196,17 @@ def build_app_mcp(services: AppServices, tokens: Tokens) -> FastMCP:
         outcome and duration, the secure-fetch verdict with the classifier scores, source searches, quarantine
         and hold events, and the owner's actions. Ids, numbers and codes only; never page or note text."""
         return guarded("item_history", True, lambda actor: services.item_history(item_id))
+
+    @mcp.tool
+    def pipeline_overview() -> dict:
+        """OWNER TOOL (read only). The whole pipeline in one answer: the funnel of all items (captured,
+        triaged,
+        released, processed with how each one went, stopped), what needs the owner (held warnings, quarantine,
+        failed or unfinished items, the retry limit, categories to decide) with the situation and the next
+        step of each, what waits (next run, NotebookLM quota, notebooks being generated), what was closed
+        lately with the link to its result, the last runs and where things live. Ids, codes, URLs and short
+        fixed sentences only; never page or note text."""
+        return guarded("pipeline_overview", True, lambda actor: services.pipeline_overview())
 
     @mcp.tool
     def accept_classifier_warning(item_id: str) -> dict:

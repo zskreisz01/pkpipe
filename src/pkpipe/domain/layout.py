@@ -25,6 +25,7 @@ _PATH_FIELDS = (
     "inbox_dir",
     "inbox_list_file",
     "inbox_in_progress_file",
+    "pipeline_file",
     "triage_file",
     "triage_data_file",
     "processing_list",
@@ -96,6 +97,8 @@ class VaultLayout(BaseModel):
     #: Spec 031: the machine-owned table of the items worked on but not closed. ``None``:
     #: ``<inbox_dir>/INBOX-InProgress.md``.
     inbox_in_progress_file: str | None = None
+    #: Spec 033: the machine-owned pipeline overview note. ``None``: ``<inbox_dir>/Pipeline.md``.
+    pipeline_file: str | None = None
     triage_file: str = "0-INBOX/Inbox-Triage.md"
     #: Spec 023: where the machine-owned triage table lives when ``triage.surface`` is ``web`` (the triage
     #: file is then a generated summary page without a table). ``None``:
@@ -127,6 +130,7 @@ class VaultLayout(BaseModel):
         if value is None and info.field_name in (
             "inbox_list_file",
             "inbox_in_progress_file",
+            "pipeline_file",
             "triage_data_file",
         ):
             return None
@@ -149,6 +153,7 @@ class VaultLayout(BaseModel):
     @field_validator(
         "inbox_list_file",
         "inbox_in_progress_file",
+        "pipeline_file",
         "triage_file",
         "triage_data_file",
         "processing_list",
@@ -169,6 +174,7 @@ class VaultLayout(BaseModel):
             "triage_file": self.triage_file,
             "triage_data_file": self.triage_data,
             "in_progress_file": self.in_progress,
+            "pipeline_file": self.pipeline,
             "processing_list": self.processing_list,
             "improvement_file": self.improvement_file,
             "tool_candidates_file": self.tool_candidates_file,
@@ -214,6 +220,11 @@ class VaultLayout(BaseModel):
         return self.inbox_in_progress_file or f"{self.inbox_dir}/INBOX-InProgress.md"
 
     @property
+    def pipeline(self) -> str:
+        """The pipeline overview note (spec 033): the configured file, else below the INBOX folder."""
+        return self.pipeline_file or f"{self.inbox_dir}/Pipeline.md"
+
+    @property
     def archive_root(self) -> str:
         """Top level folder of the archive (the folder the archive notes live below)."""
         return check_relative(self.archive_dir, what="archive_dir")[0]
@@ -225,6 +236,7 @@ class VaultLayout(BaseModel):
             PurePosixPath(self.triage_file).name,
             PurePosixPath(self.triage_data).name,
             PurePosixPath(self.in_progress).name,
+            PurePosixPath(self.pipeline).name,
             PurePosixPath(self.processing_list).name,
         ]
         if self.inbox_list_file:
@@ -239,6 +251,7 @@ class VaultLayout(BaseModel):
             self.triage_file,
             self.triage_data,
             self.in_progress,
+            self.pipeline,
             self.processing_list,
             self.improvement_file,
             self.tool_candidates_file,
@@ -302,6 +315,7 @@ class VaultLayout(BaseModel):
             "read_processing_list": [self.inbox_dir],
             "read_in_progress": [self.inbox_dir],
             "inbox_in_progress": [self.inbox_dir, self.archive_root],
+            "write_pipeline": [self.inbox_dir],  # spec 033: the pipeline overview note
             # spec 032: the index of a result folder (writes only ``_Index.md``) and the podcast copy
             "write_results_index": list(write),
             "import_audio": [self.attachments_dir],
@@ -332,6 +346,7 @@ class VaultLayout(BaseModel):
             ("read_processing_list", "processing_list", self.processing_list),
             ("read_in_progress", "in_progress_file", self.in_progress),
             ("inbox_in_progress", "in_progress_file", self.in_progress),
+            ("write_pipeline", "pipeline_file", self.pipeline),
             ("read_improvements", "improvement_file", self.improvement_file),
             ("update_improvements", "improvement_file", self.improvement_file),
             ("read_tool_candidates", "tool_candidates_file", self.tool_candidates_file),

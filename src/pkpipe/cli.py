@@ -166,6 +166,12 @@ def _item(args: argparse.Namespace) -> int:
     return item_command(args)
 
 
+def _pipeline(args: argparse.Namespace) -> int:
+    from pkpipe.pipeline_cli import pipeline_command
+
+    return pipeline_command(args)
+
+
 def _serve(args: argparse.Namespace) -> int:
     from pkpipe.serve import serve_command
 
@@ -189,6 +195,7 @@ HANDLERS: dict[str, Handler] = {
     "restore": _restore,
     "retry": _retry,
     "item": _item,
+    "pipeline": _pipeline,
     "validate": _validate,
     "schema": _schema,
 }
@@ -249,6 +256,12 @@ def build_parser() -> argparse.ArgumentParser:
     from pkpipe.item_cli import add_item_arguments
 
     add_item_arguments(itm)
+    pip = sub.add_parser(
+        "pipeline", help="the whole pipeline in one view: funnel, what needs you, what waits"
+    )
+    from pkpipe.pipeline_cli import add_pipeline_arguments
+
+    add_pipeline_arguments(pip)
     val = sub.add_parser("validate", help="validate the layered config (pack + overlay)")
     val.add_argument("--pack", help="pack directory (default: packs/learning-inbox or PKPIPE_PACK_DIR)")
     val.add_argument("--overlay", help="overlay directory (default: PKPIPE_OVERLAY_DIR)")

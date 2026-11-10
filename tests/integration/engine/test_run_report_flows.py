@@ -181,14 +181,14 @@ def test_a_failing_report_subflow_never_fails_the_run(synthetic_vault, pack_dir,
 
     def flaky(**kw):
         calls["n"] += 1
-        if calls["n"] >= 2:  # the report's own read comes after the triage read of the flow
+        if calls["n"] >= 2:  # the overview note's read (spec 033) and the report's own read come after
             raise RuntimeError("vault is gone")
         return original(**kw)
 
     real.tools["obsidian:read_triage"] = flaky
     result = run.svc.start("triage")
     assert result.ok, result.error
-    assert calls["n"] == 2 and run.notify.sent == []  # the report was lost, the run was not
+    assert calls["n"] == 3 and run.notify.sent == []  # the report was lost, the run was not
 
 
 def test_report_off_keeps_the_earlier_one_line_messages(synthetic_vault, pack_dir):

@@ -1,0 +1,16 @@
+{% set done = ov.done_recent %}
+<section data-testid="done-recent">
+  <h2>Done in the last {{ ov.recent_days }} days ({{ done|length }})</h2>
+  {% if not done %}<p class="muted">Nothing was closed in this time (items closed before the event log are not listed).</p>{% endif %}
+  {% for it in done %}
+  <article class="pcard done" data-testid="done-card" data-item="{{ it.item_id }}">
+    <div class="pcard-head"><a href="/items/{{ it.item_id }}"><code>{{ it.item_id }}</code></a>
+      <span class="pill {{ it.bucket }}">{{ it.label }}</span> <span class="muted">{{ it.category }} &middot; {{ it.finished_at }} UTC</span></div>
+    <div class="muted">
+      {% if it.note %}note <code>{{ it.note }}</code>{% endif %}
+      {% if it.link %}<a href="{{ it.link }}" rel="noreferrer noopener" target="_blank">notebook</a>{% endif %}
+      {% if it.podcast %}podcast {{ it.podcast }}{% endif %}
+    </div>
+  </article>
+  {% endfor %}
+</section>

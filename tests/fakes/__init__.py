@@ -11,6 +11,7 @@ from tests.fakes.item_events import FakeItemEvents
 from tests.fakes.learning import FakeLearningBackend
 from tests.fakes.model import FakeModel
 from tests.fakes.notify import FakeNotify
+from tests.fakes.pipeline_stats import FakePipelineStats
 from tests.fakes.proposal_attempts import FakeProposalAttempts
 from tests.fakes.runs import InMemoryRunStore
 from tests.fakes.security_log import FakeSecurityLog
@@ -26,6 +27,7 @@ __all__ = [
     "FakeClassifier",
     "FakeClassifierReview",
     "FakeItemEvents",
+    "FakePipelineStats",
     "FakeClock",
     "FakeContextStore",
     "FakeImageStore",

@@ -1,0 +1,29 @@
+{% set needs = ov.needs_you %}
+<section class="pneeds" data-testid="needs-you">
+  <h2>Needs you ({{ needs|length }})</h2>
+  {% if not needs %}<p class="muted" data-testid="needs-empty">Nothing waits for you.</p>{% endif %}
+  {% for it in (needs[:needs_limit] if needs_limit else needs) %}
+  <article class="pcard {{ it.bucket }}" id="item-{{ it.item_id }}" data-testid="needs-card" data-item="{{ it.item_id }}">
+    <div class="pcard-head">
+      <code>{{ it.item_id }}</code>
+      <span class="pill {{ it.bucket }}">{{ it.label }}</span>
+      <span class="muted">{{ it.reason }}</span>
+      {% if it.auto_passed %}<span class="pill passed">auto-passed</span>{% endif %}
+    </div>
+    {% if it.resource %}<div class="resource"><code>{{ it.resource }}</code></div>{% endif %}
+    {% if it.situation %}<div class="situation">{{ it.situation }}</div>{% endif %}
+    <div class="muted">Next: {{ it.next_step }}</div>
+    <div class="pactions">
+      <a class="btn" href="/items/{{ it.item_id }}" data-testid="history">History</a>
+      {% if it.action %}
+      <button class="primary" hx-post="/ui/pipeline/{{ it.item_id }}/{{ it.action.kind }}" hx-target="#pipeline-body" hx-swap="innerHTML"
+              hx-confirm="{{ it.action.label }}: {{ it.item_id }}?" data-testid="act-{{ it.action.kind }}">{{ it.action.label }}</button>
+      {% endif %}
+      {% if it.bucket in ('awaiting_category', 'waiting_confirmation') %}
+      <a class="btn" href="/triage?state={{ 'awaiting_category' if it.bucket == 'awaiting_category' else 'suggested' }}" data-testid="decide">Decide in triage</a>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+  {% if needs_limit and needs|length > needs_limit %}<p><a href="/pipeline">+{{ needs|length - needs_limit }} more on the Pipeline page</a></p>{% endif %}
+</section>

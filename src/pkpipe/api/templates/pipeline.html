@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Pipeline{% endblock %}
+{% block body %}
+<h1>Pipeline</h1>
+<details class="launch-box"><summary>Start a process</summary>{% include "_launch.html" %}<div id="runs" class="muted">Started runs appear under <a href="/runs">Runs</a>.</div></details>
+<div id="pipeline-body">{% include "_pipeline_body.html" %}</div>
+{% endblock %}
