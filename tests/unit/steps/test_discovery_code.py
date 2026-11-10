@@ -11,7 +11,7 @@ from pkpipe.steps.discovery_code import discovery_applies
 from tests.fakes import FakeSearch, FakeTools, RecordingTracer
 from tests.support.flows import make_ports, make_snapshot
 
-CONFIG = {"enabled": True, "categories": ["tool"]}
+CONFIG = {"enabled": True, "categories": ["tool"], "from_images": True}
 IMAGE = {
     "id": "i1",
     "kind": "image",

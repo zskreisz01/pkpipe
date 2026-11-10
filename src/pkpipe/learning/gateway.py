@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .backend import BackendHandle, LearningBackend
-from .errors import BackendUnavailable, LearningError, NotReady, UnknownJob, UrlBlocked
+from .errors import BackendUnavailable, LearningError, NotReady, QuotaExceeded, UnknownJob, UrlBlocked
+from .failures import until_text
 from .models import JobStatus, NotebookJob
 from .store import JobStore
 from .urlcheck import Resolver, _resolve, check_url
@@ -91,13 +92,21 @@ class LearningGateway:
         template = (template or "").strip()
         if len(template) > cfg.max_template_chars:
             raise LearningError("template too long")
+        now = self.clock()
+        waiting: NotebookJob | None = None
         if item_id:  # a restart or a repeated run must not create a second notebook for the same item
             existing = self.store.active_for_item(item_id)
-            if existing:
+            if existing and existing.status is JobStatus.WAITING_QUOTA:
+                waiting = existing
+            elif existing:
                 return existing.public()
-        now = self.clock()
         try:
-            handle = self.backend.create(url, template, item_id)
+            if waiting is not None:
+                handle = self._resume(waiting, template, now)
+            else:
+                handle = self.backend.create(url, template, item_id)
+        except QuotaExceeded as exc:
+            return self._wait_for_quota(exc, waiting, item_id, now)
         except LearningError as exc:
             reason = clean_reason(exc)
             self.store.save(
@@ -120,8 +129,44 @@ class LearningGateway:
             backend_ref=handle.ref,
             started_at=now,
         )
+        if waiting is not None and waiting.job_id != job.job_id:
+            self._finish(waiting, JobStatus.FAILED, "superseded: the audio overview was started again")
         self.store.save(job)
         return job.public()
+
+    def _resume(self, job: NotebookJob, template: str, now: float) -> BackendHandle:
+        """A job that waited for the quota: still waiting -> the same refusal (nothing is called); the wait is
+        over -> the backend starts only the audio overview of the notebook it already has."""
+        if job.retry_after and now < job.retry_after:
+            raise QuotaExceeded(
+                f"quota: NotebookLM usage limit reached, waiting until {until_text(job.retry_after)}",
+                retry_after=job.retry_after,
+                nb_id=job.nb_id,
+            )
+        resume = getattr(self.backend, "resume", None)
+        if resume is None or not job.nb_id:
+            raise BackendUnavailable("the backend cannot resume a notebook; the item is started again")
+        return resume(job.nb_id, template)
+
+    def _wait_for_quota(
+        self, exc: QuotaExceeded, waiting: NotebookJob | None, item_id: str, now: float
+    ) -> dict[str, Any]:
+        """Not a failure (spec 032): keep the notebook as ``waiting_quota`` (when one exists) and tell the
+        flow to leave the item released; the next run after ``retry_after`` continues. Raises the typed
+        error."""
+        reason = clean_reason(exc)
+        nb_id = exc.nb_id or (waiting.nb_id if waiting else None)
+        if nb_id:
+            job = waiting or NotebookJob(
+                job_id=f"wait-{uuid.uuid4().hex[:12]}",
+                item_id=item_id,
+                backend=self.backend.name,
+                nb_id=nb_id,
+                started_at=now,
+            )
+            job.status, job.reason, job.retry_after = JobStatus.WAITING_QUOTA, reason, exc.retry_after
+            self.store.save(job)
+        raise QuotaExceeded(reason, retry_after=exc.retry_after, nb_id=nb_id)
 
     def status(self, job_id: str) -> dict[str, Any]:
         job = self._job(job_id)

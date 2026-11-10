@@ -131,6 +131,19 @@ def build_server(policy: VaultPolicy) -> FastMCP:
         return _run(vault.inbox_in_progress, rows, archive_ids, restore_ids)
 
     @mcp.tool
+    def write_results_index(folder: str) -> dict:
+        """Rewrite `<folder>/_Index.md` from the pkpipe notes in that folder (resource and learning notes):
+        a table of date, note, category, source, result and notebook link. Written only when it changed.
+        Returns `{folder, notes, written}`; no note text."""
+        return _run(vault.write_results_index, folder)
+
+    @mcp.tool
+    def import_audio(src: str, name: str) -> dict:
+        """Copy a finished podcast from an allowed audio folder (`audio_import_dirs` of the vault policy) into
+        the vault's podcast folder under `name`. Refuses any other source, type or an oversized file."""
+        return _run(vault.import_audio, src, name)
+
+    @mcp.tool
     def read_image(name: str) -> dict:
         """Read one embedded image of the attachments folder by file name (no path): `{name, media_type, size,
         data_base64}`. Read only; refusals are `not_found`, `bad_name`, `bad_type` (jpg, jpeg, png, webp, gif)

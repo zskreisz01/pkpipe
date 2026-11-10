@@ -96,6 +96,7 @@ def summarize_results(results: Iterable[Mapping[str, Any]] | None) -> dict[str, 
         "notebooks": 0,
         "podcasts": 0,
         "notebooks_failed": 0,
+        "auto_passed": 0,
     }
     for r in results or []:
         item = r.get("item") or {}
@@ -106,6 +107,8 @@ def summarize_results(results: Iterable[Mapping[str, Any]] | None) -> dict[str, 
             out["quarantined"] += 1
             continue
         by_category[str(item.get("category") or "unknown")] += 1
+        if item.get("auto_passed"):
+            out["auto_passed"] += 1  # spec 032: the injection detector alone fired, the rule let it pass
         failed = item.get("processing_status") == "failed"
         if item.get("nb_id"):
             if failed:
@@ -169,6 +172,8 @@ def render_report(
         line = f"**Processed ({summary.get('processed', 0)}):** {_counts(by_cat) or 'none'}"
         if summary.get("quarantined") or summary.get("failed"):
             line += f" · quarantined {summary.get('quarantined', 0)} · failed {summary.get('failed', 0)}"
+        if summary.get("auto_passed"):
+            line += f" · auto-passed {summary['auto_passed']} (detector only, see the item history)"
         detail.append(line)
         created = [
             f"{summary[k]} {name}"

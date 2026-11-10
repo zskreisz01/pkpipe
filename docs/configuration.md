@@ -145,7 +145,7 @@ After every triage and release run the pipeline sends one report as the `daily_s
 ### Source discovery (`source_discovery.json`)
 
 ```json
-{"enabled": false, "categories": ["tool"], "from_images": true, "from_notes": true, "max_candidates": 2, "max_results": 5, "max_query_chars": 120, "query_template": "{topic} {text}"}
+{"enabled": false, "categories": ["tool"], "from_images": false, "from_notes": true, "max_candidates": 2, "max_results": 5, "max_query_chars": 120, "query_template": "{topic} {text}"}
 ```
 
 An item that a category's sessions need a page for but that names no URL (a screenshot, a text without a link) fails with "no source URL in the note". With `enabled: true` the pipeline searches for the source instead (spec 025): one query from the validated image description (`{topic}`, `{text}` = visible text) or from the owner's text, checked by `security.query_guard`, sent to `websearch:search`; the first `max_candidates` result URLs that pass the URL policy are fetched by secure fetch in order and the category's own sessions (`categories.json`, the evaluation stays configuration) evaluate the first clean page. An address shown in an image is used without a search.
@@ -154,7 +154,7 @@ An item that a category's sessions need a page for but that names no URL (a scre
 | --- | --- | --- |
 | `enabled` | The switch. Off by default: a search query leaves the machine | `false` |
 | `categories` | Category ids that search. Only categories whose `subflow` is `other_resource` can; `learning-material` is not supported (a found URL would go to the notebook service) | `["tool"]` |
-| `from_images`, `from_notes` | Which kinds of item are searched for. An image needs a cached description (the triage described it) | `true`, `true` |
+| `from_images`, `from_notes` | Which kinds of item are searched for. An image needs a cached description (the triage described it). Spec 032: `from_images` is off by default; an image without an address then becomes its own note from the description (guarded) instead of leaving the machine as a query | `false`, `true` |
 | `max_candidates` | Pages fetched, in order, until one is clean (1 to 5) | `2` |
 | `max_results` | Results asked from the search tool (1 to 10) | `5` |
 | `max_query_chars` | Longest query, cut after a whole word (20 to 300) | `120` |
@@ -208,6 +208,7 @@ Webhook and Apprise URLs contain secrets, so the config accepts only `env:NAME` 
 | `classifier.chunk_tokens` (also per member) | Tokens per scanned chunk (≤ 4096; DeBERTa ≤ 512) | 1024 / 512 |
 | `classifier.threshold` | Score that raises a flag (secure fetch and output guard) | 0.5 |
 | `classifier.review.enabled` | Spec 029: hold an item for the owner (not quarantine it) when only the injection detector is over the threshold, every safety model says Safe, heuristics and Reader are clean. Needs a combined classifier with a safety model; off in the model, on in the pack | pack: `true` |
+| `classifier.review.mode` | Spec 032: `hold` (the item waits for the owner, spec 029) or `auto_pass` (exactly that case passes, logged with its evidence, shown as *auto-passed*; every other finding still quarantines). `auto_pass` works without `enabled`. Engine and pack default stay `hold`; the owner turns `auto_pass` on in the overlay | `hold` |
 | `classifier.required` | Without a usable classifier every fetch and every guarded output is flagged (fail closed) | `true` |
 | `heuristics.threshold` | Heuristic score that raises a flag | 1.0 |
 
@@ -301,11 +302,21 @@ The `learning` entry of `mcp_servers.json` selects and tunes the backend of the 
 
 | Setting | Meaning | Default |
 | --- | --- | --- |
-| `backend` | `open_notebook`, `notebooklm_browser` (needs `backend_options.driver`), `fake` (tests) | `open_notebook` |
+| `backend` | `notebooklm_browser` (default since spec 032; uses the shipped `nlm` CLI driver unless `backend_options.driver` names another), `fake` (tests), `open_notebook` (deprecated, kept for owners who run it) | `notebooklm_browser` |
 | `options.timeout_s` | A generation that is still running after this many seconds fails with the reason `timeout after N min`; keep `learning_material.wait_generation.deadline_s` (6000) above it | 5400 (90 minutes, local TTS is slow) |
 | `options.data_dir` | Job store (`jobs.db`) and, below it, `audio/` | `$PKPIPE_DATA_DIR/learning` |
 | `options.audio_dir` | Where downloaded podcasts go | `<data_dir>/audio` |
-| `options.backend_options` | Passed to the backend. Open Notebook: `api_url` (`http://127.0.0.1:5055`), `ui_url` (`http://127.0.0.1:8502`), `episode_profile` (`pkpipe_overview`), `speaker_profile` (`pkpipe_duo`), `password_env` (name of the environment variable that holds the API password, if authentication is on), `request_timeout_s`. NotebookLM: `driver` (`module:factory`), `options` (passed to the factory), `call_timeout_s` (120) | see the left |
+| `options.backend_options` | Passed to the backend. Open Notebook: `api_url` (`http://127.0.0.1:5055`), `ui_url` (`http://127.0.0.1:8502`), `episode_profile` (`pkpipe_overview`), `speaker_profile` (`pkpipe_duo`), `password_env` (name of the environment variable that holds the API password, if authentication is on), `request_timeout_s`. NotebookLM: `driver` (`module:factory`), `options` (passed to the factory), `call_timeout_s` (120) | see the left. NotebookLM (spec 032): `driver` (`module:factory`, default `pkpipe.learning.drivers.nlm_cli:make_driver`), `options`, `call_timeout_s` (120, every driver call), `retries` (2) and `backoff_s` (`[5, 20]`) for a transient error, `min_remaining_percent` (5: below this a `nlm usage` window blocks new work until it resets), `reason_detail` (false: add the driver's cleaned short message to a failure reason; `true` is recommended for the owner's own `nlm` because its messages are short and name no page element) |
+
+**NotebookLM quota and failures (spec 032).** Before a notebook is created the backend asks `nlm usage --json` (driver method `usage()`); a rolling or weekly window with less than `min_remaining_percent` left refuses the work with the reset time and nothing is created. A refusal after the notebook exists parks it as `waiting_quota`; the item stays released and the next run after the reset starts only the audio overview. A failure is classified (`quota`, `auth` = run `nlm login`, `page_changed`, `transient` = retried, `unknown`) and the reason names the class.
+
+### Learning notes (`learning.json`)
+
+```json
+{"copy_audio_to_vault": false}
+```
+
+When a notebook is ready the flow writes a learning note into the category folder (source, notebook link, podcast file, history link; no page text). `copy_audio_to_vault: true` also copies the podcast into `<attachments>/Podcasts/` and embeds it in the note; it is off by default because an episode is about 30 MB and the vault is committed to git every night. The copy needs `audio_import_dirs` in the vault policy file (absolute folders the vault server may copy from, for example the gateway's `audio/` folder; empty = every copy is refused) and respects `max_audio_bytes` (200 MB). Every result folder also gets a machine-owned `_Index.md` after each release run.
 
 The URL filter comes from `security.json` `url_filter` (`block_private_networks`, `deny_list`). Run the server with `uv run python -m pkpipe.learning.server` (port 8703, loopback only); the stack is described in `deploy/open-notebook/README.md`. Unknown option names are rejected.
 

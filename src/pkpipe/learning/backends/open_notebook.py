@@ -1,5 +1,9 @@
 """Open Notebook backend (REST, spec 012 T003): notebook + link source + podcast generation with local TTS.
 
+DEPRECATED (spec 032): ``notebooklm_browser`` is the supported learning backend (better results, no local TTS
+to maintain). This adapter stays for owners who run Open Notebook; it is not the default and gets no new
+features.
+
 Endpoints used: ``POST /api/notebooks``, ``POST /api/sources/json``, ``POST /api/podcasts/generate``,
 ``GET /api/podcasts/jobs/{id}``, ``GET /api/podcasts/episodes/{id}/audio``. The models, voices and the
 episode / speaker profiles are configured once by ``deploy/open-notebook/setup.py``.

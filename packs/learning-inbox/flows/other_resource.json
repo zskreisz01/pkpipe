@@ -1,6 +1,6 @@
 {
   "id": "other_resource",
-  "description": "Process one released item of a category with a session plan (Tool, Marketing, Misc, overlay categories): load the plan from categories.json, run secure fetch when a session reads the page extract (raw page text only reaches the Reader), run the sessions in plan order (spec 010; each is an isolated session with its declared inputs, the run canary and its own span), check everything they produced with the output guard, then store the note in the category's PARA folder (with its system relevance, spec 016), add a new-category suggestion to the agent tasks, add a system tool candidate to System-Tool-Candidates (a rejected or adopted tool is never added again), set the processing-list status and archive the INBOX note. A flag hands the item to handle_security_flag; a classifier warning of the injection detector alone is held for the owner (hold_review, spec 029) instead of being quarantined; a failed session or fetch lists the item as failed with the reason. Spec 025: an image item first loads its cached description (subflow load_image_description); an item without a URL in a category with source_discovery is not failed: item.find_sources searches the web with a guarded query built from the validated description or text, the found pages go through secure fetch one after the other (the next one when a fetch fails) and the category's own sessions evaluate the first clean page.",
+  "description": "Process one released item of a category with a session plan (Tool, Marketing, Misc, overlay categories): load the plan from categories.json, run secure fetch when a session reads the page extract (raw page text only reaches the Reader), run the sessions in plan order (spec 010; each is an isolated session with its declared inputs, the run canary and its own span), check everything they produced with the output guard, then store the note in the category's PARA folder (with its system relevance, spec 016), add a new-category suggestion to the agent tasks, add a system tool candidate to System-Tool-Candidates (a rejected or adopted tool is never added again), set the processing-list status and archive the INBOX note. A flag hands the item to handle_security_flag; a classifier warning of the injection detector alone is held for the owner (hold_review, spec 029) instead of being quarantined; a failed session or fetch lists the item as failed with the reason. Spec 025: an image item first loads its cached description (subflow load_image_description); an item without a URL in a category with source_discovery is not failed: item.find_sources searches the web with a guarded query built from the validated description or text, the found pages go through secure fetch one after the other (the next one when a fetch fails) and the category's own sessions evaluate the first clean page. Spec 032: an image item that names no address and is not searched for (or whose search found nothing) becomes its own result note from the validated description (guarded like any text derived from external content) instead of failing with 'no source found'.",
   "bpmn": "process-other-resource",
   "nodes": [
     {
@@ -256,6 +256,74 @@
           "archived": false
         }
       }
+    },
+    {
+      "id": "image_note",
+      "type": "code",
+      "bpmn_element": "Write image note from the description",
+      "config": {
+        "function": "image.result_note"
+      }
+    },
+    {
+      "id": "image_guard",
+      "type": "output_guard",
+      "bpmn_element": "Output guard (canary, heuristics, Qwen3Guard + DeBERTa)",
+      "config": {
+        "input": [
+          "image_note"
+        ],
+        "canary": false
+      }
+    },
+    {
+      "id": "write_image",
+      "type": "tool",
+      "bpmn_element": "Write image note from the description",
+      "config": {
+        "tool": "obsidian:write_note",
+        "arguments": {
+          "path": "${image_note.path}",
+          "body": "${image_note.body}",
+          "front_matter": "${image_note.front_matter}",
+          "overwrite": true
+        }
+      }
+    },
+    {
+      "id": "record_image",
+      "type": "code",
+      "bpmn_element": "Add to processing list (status = unprocessed)",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "note": "${image_note.path}",
+          "processing_status": "done"
+        }
+      }
+    },
+    {
+      "id": "archive_image",
+      "type": "tool",
+      "bpmn_element": "Archive item in INBOX",
+      "config": {
+        "tool": "obsidian:move_note",
+        "arguments": {
+          "src": "${item.path}",
+          "dst": "${image_note.archive_path}"
+        }
+      }
+    },
+    {
+      "id": "archive_image_failed",
+      "type": "code",
+      "bpmn_element": "Archive item in INBOX",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "archived": false
+        }
+      }
     }
   ],
   "edges": [
@@ -311,11 +379,32 @@
     },
     {
       "from": "plan",
+      "to": "image_note",
+      "when": {
+        "path": "plan.status",
+        "eq": "image_note"
+      }
+    },
+    {
+      "from": "plan",
       "to": "no_url",
       "when": {
         "path": "plan.status",
         "eq": "no_url"
       }
+    },
+    {
+      "from": "image_note",
+      "to": "image_guard",
+      "when": {
+        "path": "image_note.status",
+        "eq": "ok"
+      }
+    },
+    {
+      "from": "image_note",
+      "to": "no_url",
+      "default": true
     },
     {
       "from": "plan",
@@ -381,6 +470,14 @@
       "when": {
         "path": "discover.status",
         "eq": "ok"
+      }
+    },
+    {
+      "from": "discover",
+      "to": "image_note",
+      "when": {
+        "path": "discover.describable",
+        "truthy": true
       }
     },
     {
@@ -485,6 +582,41 @@
     {
       "from": "archive",
       "to": "archive_failed",
+      "on": "error"
+    },
+    {
+      "from": "image_guard",
+      "to": "security_flag",
+      "when": {
+        "path": "image_guard.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "image_guard",
+      "to": "write_image",
+      "default": true
+    },
+    {
+      "from": "write_image",
+      "to": "record_image"
+    },
+    {
+      "from": "record_image",
+      "to": "archive_image",
+      "when": {
+        "path": "item.path",
+        "exists": true
+      }
+    },
+    {
+      "from": "record_image",
+      "to": "END",
+      "default": true
+    },
+    {
+      "from": "archive_image",
+      "to": "archive_image_failed",
       "on": "error"
     }
   ]

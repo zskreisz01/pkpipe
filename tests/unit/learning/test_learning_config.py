@@ -25,7 +25,7 @@ def settings(overlay_servers=None, **kw):
 def test_the_public_pack_selects_open_notebook_with_a_90_minute_timeout(pack_dir):
     cfg = load_effective(pack_dir, None)
     s = GatewaySettings.from_config(cfg.data, environ={"PKPIPE_DATA_DIR": "/data"})
-    assert s.backend == "open_notebook" and s.timeout_s == 5400
+    assert s.backend == "notebooklm_browser" and s.timeout_s == 5400
     assert str(s.data_dir) == "/data/learning" and s.block_private_networks is True
     assert cfg.data["mcp_servers"]["learning"]["allow"] == ["create", "status", "link", "audio"]
 

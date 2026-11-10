@@ -35,6 +35,8 @@ WRITING_VAULT_TOOLS = frozenset(
         "inbox_remove_entries",
         "inbox_in_progress",  # spec 031: the table of unfinished items, and the entries it moves
         "write_journal_todos",  # spec 024: one block of the daily journal
+        "write_results_index",  # spec 032: ``_Index.md`` of a result folder
+        "import_audio",  # spec 032: a podcast copied into the attachments folder (no snapshot scope)
     }
 )
 #: Vault tools that only read. Together with the writing tools this is every tool of the vault policy; a test

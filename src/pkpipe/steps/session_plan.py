@@ -23,6 +23,7 @@ from typing import Any
 
 from pydantic import Field
 
+from pkpipe.domain import results
 from pkpipe.domain import session_plan as plans
 from pkpipe.domain import tool_candidate as tcs
 from pkpipe.domain.data_classes import is_private
@@ -200,13 +201,25 @@ class _Guarded:
 
 
 # -- code functions of the flow --------------------------------------------------------------------------
+def image_has_description(item: dict[str, Any] | None) -> bool:
+    """Spec 032: an image item with a validated description and a category folder can be its own note."""
+    item = item or {}
+    return (
+        item.get("kind") == "image"
+        and results.usable_description(item.get("description"))
+        and bool(item.get("para_path"))
+    )
+
+
 @register_code("category.plan")
 def plan(ctx: StepContext, note: dict[str, Any]) -> StepResult:
     """What ``other_resource`` runs for this item: ``status`` ``ok``, ``no_plan`` (no such category or no
     sessions), ``no_url`` (a session reads the page extract but the note names no URL) or
     ``discover`` (the same,
-    and ``source_discovery`` searches for the source of this category, spec 025). ``needs_fetch``
-    routes through secure fetch; the URL is kept on the item as ``source_url`` (never as ``resource``)."""
+    and ``source_discovery`` searches for the source of this category, spec 025) or ``image_note`` (spec 032:
+    an image with a description and no address, not searched for: the description becomes the note).
+    ``needs_fetch`` routes through secure fetch; the URL is kept on the item as ``source_url`` (never as
+    ``resource``)."""
     category = categories_of(ctx).get((ctx.item or {}).get("category") or "")
     if category is None or not category.get("sessions"):
         return StepResult(output={"status": "no_plan", "needs_fetch": False, "uses_text": False})
@@ -223,7 +236,10 @@ def plan(ctx: StepContext, note: dict[str, Any]) -> StepResult:
         # spec 025: a category that opted in searches for the source instead of failing the item
         from pkpipe.steps.discovery_code import discovery_applies
 
-        out["status"] = "discover" if discovery_applies(ctx, category, ctx.item) else "no_url"
+        if discovery_applies(ctx, category, ctx.item):
+            out["status"] = "discover"
+        else:
+            out["status"] = "image_note" if image_has_description(ctx.item) else "no_url"
     return StepResult(output=out, item={"source_url": url} if url else None)
 
 

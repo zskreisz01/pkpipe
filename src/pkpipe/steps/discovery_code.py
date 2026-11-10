@@ -43,9 +43,15 @@ def discovery_applies(ctx: StepContext, category: dict[str, Any] | None, item: d
 
 
 def _fail(code: str, ctx: StepContext | None = None) -> StepResult:
+    describable = False
     if ctx is not None:
         ctx_event(ctx, "source", code, reason=sd.failure_reason(code))
-    return StepResult(output={"status": code, "found": 0, "reason": sd.failure_reason(code)})
+        from pkpipe.steps.session_plan import image_has_description
+
+        describable = image_has_description(ctx.item)  # spec 032: such an image still gets its own note
+    return StepResult(
+        output={"status": code, "found": 0, "reason": sd.failure_reason(code), "describable": describable}
+    )
 
 
 @register_code("item.find_sources")

@@ -36,7 +36,10 @@ def prepare(ctx: StepContext, note: dict[str, Any], instruction: str) -> StepRes
         raise StepError(f"instruction 'instructions/{instruction}' not found")
     url = find_source_url((note or {}).get("front_matter"), (note or {}).get("body", ""))
     if url is None:
-        return StepResult(output={"status": "no_url", "reason": "no_url", "url": "", "template": ""})
+        from pkpipe.steps.session_plan import image_has_description
+
+        status = "image_note" if image_has_description(ctx.item) else "no_url"  # spec 032
+        return StepResult(output={"status": status, "reason": "no_url", "url": "", "template": ""})
     from pkpipe.steps.secure_fetch import url_policy
 
     # the deny-list of the config plus the domains the security-flag handler deny-listed (spec 009)
@@ -54,6 +57,15 @@ def prepare(ctx: StepContext, note: dict[str, Any], instruction: str) -> StepRes
     return StepResult(output={"status": "ok", "reason": "", "url": url, "template": template.strip()})
 
 
+_CLASSIFIED = re.compile(r"(?:^|[\s'\"(])(quota|auth): ")
+
+
+def _failure_kind(message: str) -> str | None:
+    """``quota`` or ``auth`` when the gateway message starts with that class (spec 032)."""
+    found = _CLASSIFIED.search(message)
+    return found.group(1) if found else None
+
+
 _URL_BLOCKED = re.compile(r"\burl_blocked: ([a-z_]{1,40})\b")
 
 
@@ -69,6 +81,11 @@ def create_failed(ctx: StepContext, error: dict[str, Any] | None) -> StepResult:
     message = str((error or {}).get("message") or "")
     match = _URL_BLOCKED.search(message)
     if match is None:
+        kind = _failure_kind(message)
+        if kind:
+            # spec 032: a quota wait or an expired login is not the item's failure; the item stays released
+            # and the next run tries again. The event says which one it is and until when.
+            ctx.event("learning_wait", kind, reason=message[:300])
         raise StepError(f"learning service: {message[:300] or 'create failed'}")
     reason = match.group(1)
     ctx.ports.tracer.security_flag("url_filter", action="flag", reason_code=reason)

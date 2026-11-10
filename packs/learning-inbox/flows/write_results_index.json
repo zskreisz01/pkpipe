@@ -1,0 +1,17 @@
+{
+  "id": "write_results_index",
+  "description": "Spec 032: after a release run refresh the machine-owned index (`_Index.md`) of every category folder: one table of the notes pkpipe wrote there (resource and learning notes: date, note, category, source, result, notebook link), so the results are findable without a plugin. Code lists the folders of the enabled categories and calls the vault tool for each; the tool reads the notes of one folder, renders the table and writes the file only when its text changed. A folder the vault policy does not allow, or one without any pkpipe note, is skipped and never stops the run. No note text leaves the vault server.",
+  "bpmn": "process-inbox-items",
+  "start": "indexes",
+  "nodes": [
+    {
+      "id": "indexes",
+      "type": "code",
+      "bpmn_element": "Refresh result indexes",
+      "config": {
+        "function": "results.write_indexes"
+      }
+    }
+  ],
+  "edges": []
+}

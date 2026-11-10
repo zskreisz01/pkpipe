@@ -93,6 +93,7 @@ def test_schema_command_writes_one_schema_per_config_file(tmp_path, capsys):
             "ui",
             "report",
             "source_discovery",
+            "learning",
             "telemetry",
             "evals",
             "flow",

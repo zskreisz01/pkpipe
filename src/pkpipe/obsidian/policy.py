@@ -37,6 +37,8 @@ TOOLS = (
     "read_processing_list",
     "read_in_progress",
     "inbox_in_progress",
+    "write_results_index",
+    "import_audio",
     "read_image",
     "unreviewed_notes",
     "write_journal_todos",
@@ -67,6 +69,11 @@ class VaultPolicy(BaseModel):
     ui_public_url: str | None = None
     #: ``read_image`` refuses a larger file (``too_large``)
     max_image_bytes: int = Field(default=DEFAULT_MAX_IMAGE_BYTES, gt=0)
+    #: Spec 032: absolute folders ``import_audio`` may copy a podcast from (the gateway's audio folder).
+    #: Empty = the tool refuses every copy.
+    audio_import_dirs: list[Path] = Field(default_factory=list)
+    #: ``import_audio`` refuses a larger file
+    max_audio_bytes: int = Field(default=200 * 1024 * 1024, gt=0)
 
     @model_validator(mode="before")
     @classmethod

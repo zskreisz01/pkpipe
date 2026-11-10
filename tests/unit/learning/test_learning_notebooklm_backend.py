@@ -46,9 +46,12 @@ def test_a_changed_ui_fails_fast_with_a_clear_error(step):
     assert "TimeoutError" in msg and "aria-label" not in msg  # the type, not page internals
 
 
-def test_driver_is_loaded_from_configuration_only():
+def test_driver_is_loaded_from_configuration_and_defaults_to_the_nlm_cli_driver():
+    from pkpipe.learning.drivers.nlm_cli import NlmDriver
+
+    assert isinstance(build_backend("notebooklm_browser", {}).driver, NlmDriver)  # spec 032 default
     with pytest.raises(BackendUnavailable, match="needs 'driver'"):
-        build_backend("notebooklm_browser", {})
+        build_backend("notebooklm_browser", {"driver": 5})
     with pytest.raises(BackendUnavailable, match="needs 'driver'"):
         NotebookLMBrowserBackend.from_config({"driver": "os.system"})  # not module:factory
     with pytest.raises(BackendUnavailable, match="could not be loaded"):
