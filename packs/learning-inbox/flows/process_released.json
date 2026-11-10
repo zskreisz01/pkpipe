@@ -1,6 +1,6 @@
 {
   "id": "process_released",
-  "description": "06:00: release confirmed or overridden items, process each released item in its own instance (parallel, limited), write states and the processing list, remove the entries of processed list items from the INBOX list file (spec 020), send the run report (spec 024; the earlier one-line daily summary when report.enabled is false).",
+  "description": "06:00: release confirmed or overridden items, process each released item in its own instance (parallel, limited), write states and the processing list, remove the entries of processed list items from the INBOX list file (spec 020), keep the table of unfinished items (spec 031: INBOX-InProgress.md), send the run report (spec 024; the earlier one-line daily summary when report.enabled is false).",
   "bpmn": "process-inbox-items",
   "start": "read_triage",
   "max_parallel": 2,
@@ -89,6 +89,14 @@
       }
     },
     {
+      "id": "read_moved",
+      "type": "tool",
+      "bpmn_element": "Remove processed entry from the INBOX list",
+      "config": {
+        "tool": "obsidian:read_in_progress"
+      }
+    },
+    {
       "id": "read_list",
       "type": "tool",
       "bpmn_element": "Remove processed entry from the INBOX list",
@@ -129,6 +137,14 @@
       "config": {
         "function": "inbox.report",
         "args": {}
+      }
+    },
+    {
+      "id": "in_progress",
+      "type": "subflow",
+      "bpmn_element": "Move unfinished entries to INBOX-InProgress",
+      "config": {
+        "flow": "inbox_in_progress"
       }
     },
     {
@@ -231,11 +247,20 @@
     },
     {
       "from": "write_processing",
-      "to": "read_list",
+      "to": "read_moved",
       "when": {
         "path": "finalize.consume_ids.0",
         "exists": true
       }
+    },
+    {
+      "from": "read_moved",
+      "to": "read_list"
+    },
+    {
+      "from": "read_moved",
+      "to": "read_list",
+      "on": "error"
     },
     {
       "from": "write_processing",
@@ -270,7 +295,16 @@
     },
     {
       "from": "list_report",
+      "to": "in_progress"
+    },
+    {
+      "from": "in_progress",
       "to": "report_cfg"
+    },
+    {
+      "from": "in_progress",
+      "to": "report_cfg",
+      "on": "error"
     },
     {
       "from": "report_cfg",

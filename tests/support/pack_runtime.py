@@ -89,6 +89,11 @@ def vault_tools(
             "obsidian:update_tool_candidates": lambda rows: vault.update_tool_candidates(rows),
             "obsidian:quarantine_note": vault.quarantine_note,
             "obsidian:inbox_remove_entries": lambda entries: vault.inbox_remove_entries(entries),
+            "obsidian:read_processing_list": lambda: vault.read_processing_list(),
+            "obsidian:read_in_progress": lambda: vault.read_in_progress(),
+            "obsidian:inbox_in_progress": lambda rows, archive_ids=None, restore_ids=None: (
+                vault.inbox_in_progress(rows, archive_ids, restore_ids)
+            ),
             "obsidian:read_image": lambda name: vault.read_image(name),
             "learning:create": learning.create,
             "learning:status": learning.status,
@@ -145,6 +150,13 @@ def fake_model_reply(
             return {"category": "misc", "confidence": 0.3, "reason": "unclear"}
         props = set((schema or {}).get("properties", {}))
         data = prompt_inputs(user)
+        if props == {"situation", "cause", "next_step"}:  # spec 031: the situation of an unfinished item
+            facts = data.get("item.facts_text") or ""
+            return {
+                "situation": "Scripted situation: " + " ".join(facts.split())[:120],
+                "cause": "scripted cause",
+                "next_step": "scripted next step",
+            }
         if props == {"action", "tool", "arguments", "answer"}:  # the tool loop (llm_tools)
             if "## Tool results" in user:
                 return {"action": "final", "answer": "done"}

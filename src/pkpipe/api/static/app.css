@@ -19,7 +19,9 @@ button { padding:.35rem .8rem; border:1px solid var(--line); background:var(--ca
 button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
 button.danger { color:var(--bad); }
 .pill { display:inline-block; padding:0 .5rem; border-radius:999px; border:1px solid var(--line); font-size:.8rem; }
-.pill.done, .pill.passed, .pill.released, .pill.processed { color:var(--ok); }
+.pill.done, .pill.ready, .pill.passed, .pill.released { color:var(--ok); }
+.pill.processed, .pill.unprocessed { color:var(--warn); }
+.pill.held { color:var(--bad); }
 .pill.failed, .pill.blocked, .pill.quarantined { color:var(--bad); }
 .pill.running, .pill.waiting, .pill.pending, .pill.overridden { color:var(--warn); }
 .err { color:var(--bad); } .ok { color:var(--ok); } .muted { color:var(--muted); }

@@ -13,7 +13,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from pkpipe.domain.inbox_list import archive_text, remove_entries
+from pkpipe.domain import in_progress
+from pkpipe.domain.inbox_list import archive_text, list_items, parse_list, remove_entries
 from pkpipe.domain.journal_todos import DEFAULT_HEADING, JournalTodoError, replace_block
 from pkpipe.security import quarantine
 from pkpipe.telemetry import set_span_attributes, tool_span
@@ -39,6 +40,7 @@ def _traced(fn: Callable[..., Any]) -> Callable[..., Any]:
             span.set_attribute("tool.server", "obsidian-vault")
             rows = kwargs.get("rows", args[0] if args else None)
             if fn.__name__ in (
+                "inbox_in_progress",
                 "update_triage",
                 "upsert_processing_list",
                 "update_improvements",
@@ -385,6 +387,159 @@ class Vault:
             }
         raise WriteConflict(f"{layout.inbox_list_file} kept changing while removing entries; retry")
 
+    # -- unfinished items (spec 031) -------------------------------------------------------------------
+    def _in_progress_path(self, tool: str) -> Path:
+        layout = self.policy.layout
+        target = self.policy.resolve(layout.in_progress, tool)
+        if is_conflict_name(target.name) or self.policy.in_quarantine(target):
+            raise PathRejected("refusing to write the in-progress file there")
+        return target
+
+    @_traced
+    def read_in_progress(self) -> dict[str, Any]:
+        """The rows of the unfinished-items table (spec 031), cells unescaped. Read only; no note text: the
+        table holds ids, resources, codes and the short sentences of the situation."""
+        target = self._in_progress_path("read_in_progress")
+        text = target.read_text(encoding="utf-8") if target.is_file() else ""
+        rows = in_progress.parse_table(text)
+        return {"rows": rows, "count": len(rows), "file": self.policy.layout.in_progress}
+
+    @_traced
+    def read_processing_list(self) -> dict[str, Any]:
+        """Item id, category, note, link and status of every processing-list line (spec 031). Read only; a
+        link or reason column holds addresses and fixed failure texts, never a note body."""
+        try:
+            rows = lists.read_processing_list(self._processing_path())
+        except (OSError, lists.InvalidRows):
+            rows = []
+        items = [
+            {
+                "item_id": r.item_id,
+                "category": r.category,
+                "note": r.obsidian_link,
+                "link": r.link or "",
+                "nb_id": r.nb_id or "",
+                "status": r.status.value,
+            }
+            for r in rows
+        ]
+        return {"items": items, "count": len(items)}
+
+    def _list_entries(self) -> tuple[Path | None, str]:
+        layout = self.policy.layout
+        if not layout.inbox_list_file:
+            return None, ""
+        target = self.policy.resolve(layout.inbox_list_file, "inbox_in_progress")
+        if is_conflict_name(target.name) or self.policy.in_quarantine(target):
+            raise PathRejected("refusing to rewrite the list file there")
+        if self._is_managed_other_than(target):
+            raise PathRejected("the list file must not be one of the managed files")
+        return target, (target.read_text(encoding="utf-8") if target.is_file() else "")
+
+    @_traced
+    def inbox_in_progress(
+        self,
+        rows: list[dict[str, Any]],
+        archive_ids: list[str] | None = None,
+        restore_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Spec 031: maintain the unfinished-items table and the INBOX list together.
+
+        * ``rows`` are upserted by item id. A row with ``move_entry`` takes the item's entries out of the
+          INBOX list (their exact raw text is kept in the row's ``entry`` cell, so nothing is lost); a row of
+          an item whose entry is not in the list (already moved, or an item without an entry) keeps what it
+          had.
+        * ``archive_ids``: the items closed (done, ready): their kept entry goes to the dated archive file
+          like a consumed one and the row leaves the table.
+        * ``restore_ids``: items that are open again (released from the quarantine): their kept entry goes
+          back to the INBOX list (unless the list has it) and the row leaves the table.
+
+        Order is crash safe: an entry is first in its new place, then out of the old one (at least once,
+        never lost). Only the table, the list and the dated archive are written."""
+        layout = self.policy.layout
+        if not isinstance(rows, list) or len(rows) > MAX_ENTRIES * 4:
+            raise PathRejected("give a list of rows")
+        archive_ids, restore_ids = list(archive_ids or []), list(restore_ids or [])
+        progress = self._in_progress_path("inbox_in_progress")
+        list_path, list_text = self._list_entries()
+        config = layout.inbox_list.to_config()
+        existing = in_progress.parse_table(progress.read_text(encoding="utf-8") if progress.is_file() else "")
+        by_id = {r["item_id"]: r for r in existing}
+        sep = "\x1e"
+        # 1. closed items: archive or restore the kept entry first
+        day = self._today()
+        outcome = {"upserted": 0, "moved": 0, "archived": 0, "restored": 0, "dropped": 0}
+
+        def kept(i: str) -> list[str]:
+            return [raw for raw in (by_id.get(i, {}).get("entry") or "").split(sep) if raw]
+
+        to_archive = [raw for i in archive_ids for raw in kept(i)]
+        if to_archive:
+            archive_rel = layout.inbox_archive_path(day)
+            archive = self.policy.resolve(archive_rel, "inbox_in_progress")
+            if is_conflict_name(archive.name) or self.policy.in_quarantine(archive):
+                raise PathRejected("refusing to write the archive there")
+            if self._is_managed(archive_rel, archive):
+                raise PathRejected("the archive must not be a managed file")
+            update_text(archive, self._archive_appender(to_archive, day))
+            outcome["archived"] = len(to_archive)
+        if restore_ids and list_path is not None:
+            have = {e.raw for e in parse_list(list_text, config)}
+            back = [raw for i in restore_ids for raw in kept(i) if raw not in have]
+            if back:
+
+                def restore(text: str | None) -> str:
+                    base = text or ""
+                    base += "" if not base or base.endswith("\n") else "\n"
+                    return base + "".join(f"{raw}\n" for raw in back)
+
+                update_text(list_path, restore)
+                outcome["restored"] = len(back)
+        # 2. the table: upsert, drop closed rows (entries of moved items come from the list as it is now)
+        moves: list[str] = []
+        entries_by_id: dict[str, list[str]] = {}
+        if list_path is not None:
+            for item in list_items(parse_list(list_text, config)):
+                entries_by_id[item.id] = list(item.raws)
+        ui_url = self.policy.ui_public_url
+        gone = set(archive_ids) | set(restore_ids)
+
+        def transform(text: str | None) -> str:
+            current = {r["item_id"]: r for r in in_progress.parse_table(text or "")}
+            for i in gone:
+                if current.pop(i, None) is not None:
+                    outcome["dropped"] += 1
+            for row in rows:
+                item_id = str(row.get("item_id") or "")
+                if not ITEM_ID_RE.fullmatch(item_id):
+                    continue
+                prior = current.get(item_id, {})
+                entry = prior.get("entry", "")
+                if row.get("move_entry") and entries_by_id.get(item_id):
+                    entry = sep.join(entries_by_id[item_id])
+                    moves.append(item_id)
+                current[item_id] = {
+                    **{k: row.get(k) for k in ("kind", "resource", "category", "state")},
+                    "situation": row.get("situation"),
+                    "cause": row.get("cause"),
+                    "item_id": item_id,
+                    "next_step": row.get("next_step"),
+                    "since": prior.get("since") or row.get("since"),
+                    "last_run": row.get("last_run"),
+                    "facts": row.get("facts"),
+                    "entry": entry,
+                }
+                outcome["upserted"] += 1
+            return in_progress.render_table(list(current.values()), ui_url=ui_url)
+
+        update_text(progress, transform)
+        # 3. only now the moved entries leave the list
+        if moves and list_path is not None:
+            raws = [raw for i in moves for raw in entries_by_id[i]]
+            update_text(list_path, lambda text: remove_entries(text or "", raws, config).text)
+            outcome["moved"] = len(raws)
+        return {**outcome, "file": layout.in_progress}
+
     def _archive_appender(self, raws: list[str], day: date) -> Callable[[str | None], str]:
         return lambda existing: archive_text(existing, raws, day)
 
@@ -395,6 +550,7 @@ class Vault:
         for managed in (
             p.triage_file,
             p.layout.triage_data,
+            p.layout.in_progress,
             p.processing_list,
             p.improvement_file,
             p.tool_candidates_file,

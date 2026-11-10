@@ -34,6 +34,9 @@ TOOLS = (
     "update_tool_candidates",
     "quarantine_note",
     "inbox_remove_entries",
+    "read_processing_list",
+    "read_in_progress",
+    "inbox_in_progress",
     "read_image",
     "unreviewed_notes",
     "write_journal_todos",
@@ -143,6 +146,7 @@ class VaultPolicy(BaseModel):
         files = [
             self.triage_file,
             self.layout.triage_data,
+            self.layout.in_progress,
             self.processing_list,
             self.improvement_file,
             self.tool_candidates_file,

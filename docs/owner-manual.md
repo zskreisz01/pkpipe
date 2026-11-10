@@ -89,6 +89,7 @@ flowchart LR
   | `manual` | You took it over | Set `done` when finished |
   | `done` | Finished | – |
 
+- **INBOX-InProgress (spec 031):** `<inbox_dir>/INBOX-InProgress.md` is the table of items that were worked on but not closed (processing failed, held for your decision, quarantined). After every release run the INBOX entry of such an item moves into its row (the exact text stays in the `entry` cell) together with a *situation*, a *cause* and a *next step* that a local model writes from pkpipe's own records (state, processing status and failure reason, retries, classifier scores, the item's history; never page or note text); if the model is down, a fixed sentence is written. The row's `history` link opens the item's timeline. A closed item (`done`, `ready`) leaves the table and its entry goes to the dated archive; a released quarantine item gets its entry back in `INBOX.md`. The file is machine-owned: do not edit it. The triage page shows the same facts as a *Result* (done, ready, failed, held for you, not finished) instead of the bare state `processed`.
 - **What else appears:** the INBOX note of a processed item moves to `4-Archive/Inbox/`; a Misc item that suggests a new theme adds a note `2-Areas/Agent-Tasks/new-category-<name>-<id>.md` with an open task: add the category to `categories.json` (UI or overlay) or delete the note.
 - **Tip:** if a note is wrong or weak, correct it in place. Corrected notes are a feedback signal for the session eval datasets (see [Evaluation](evaluation.md)).
 

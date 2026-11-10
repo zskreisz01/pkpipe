@@ -34,6 +34,15 @@ An image of the INBOX is external content like a fetched page: text inside it ("
 - **No metadata survives preparation.** The prepared JPEG is rebuilt from the pixels alone: EXIF, XMP, ICC and the JPEG or GIF comments of the source are gone.
 - **Reading.** `read_image` takes a file name (no path), allows `jpg jpeg png webp gif`, checks the content against the extension, refuses a symbolic link, a name with `..`, a note and a file over the size limit with stable codes (`not_found`, `bad_name`, `bad_type`, `too_large`), and has its own allowlist entry; no write tool can reach `attachments_dir`.
 
+### INBOX-InProgress situation session (spec 031)
+
+The sentences of the table `INBOX-InProgress.md` are written by a model session, so the same rules apply as for every session that writes to the vault, with a narrower input:
+
+- **Only our own records.** The session sees the item's triage state, processing status and fixed failure reason, owner retry count, the classifier scores and labels of a hold, and the notable events of the item's history (step outcomes, source search outcomes, verdicts, error types). It never sees page, note, image or description text. The resource (an address, an embed target, or the owner's own line) is named as data; the instruction says to ignore anything written in it.
+- **No tools, local only.** The session has no tools and runs in the subflow `describe_in_progress`, a flow of data class `image`: validation refuses a non-loopback model profile, and no prompt or answer is offered to a trace backend.
+- **Output is schema-validated and cut.** `situation`, `cause` and `next_step` are short strings with length limits; code cuts them again and escapes the table cell (pipes, newlines, markup), so a reply cannot break the table, render an embed or run markup. A reply that is missing or not usable is replaced by a fixed sentence built from the cause code.
+- **The entry is kept exactly.** The item's raw INBOX entry sits in a code span of its row (escaped, restorable byte for byte) and is archived when the item closes or put back when it is open again; the move writes the table first and removes the entry from the list second, so an entry is never lost.
+
 ## Canary and authenticated instructions
 
 - A random canary is placed in each system instruction per run, with the instruction never to output it. If it appears in any output, the item is stopped: that is a reliable sign of a prompt leak.

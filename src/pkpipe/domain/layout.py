@@ -24,6 +24,7 @@ from pkpipe.domain.inbox_list import InboxListConfig
 _PATH_FIELDS = (
     "inbox_dir",
     "inbox_list_file",
+    "inbox_in_progress_file",
     "triage_file",
     "triage_data_file",
     "processing_list",
@@ -92,6 +93,9 @@ class VaultLayout(BaseModel):
     inbox_dir: str = "0-INBOX"
     #: A single list file whose bullet entries are the triage items; ``None`` = one note per item.
     inbox_list_file: str | None = None
+    #: Spec 031: the machine-owned table of the items worked on but not closed. ``None``:
+    #: ``<inbox_dir>/INBOX-InProgress.md``.
+    inbox_in_progress_file: str | None = None
     triage_file: str = "0-INBOX/Inbox-Triage.md"
     #: Spec 023: where the machine-owned triage table lives when ``triage.surface`` is ``web`` (the triage
     #: file is then a generated summary page without a table). ``None``:
@@ -120,7 +124,11 @@ class VaultLayout(BaseModel):
     @field_validator(*_PATH_FIELDS, mode="before")
     @classmethod
     def _relative(cls, value: Any, info: Any) -> Any:
-        if value is None and info.field_name in ("inbox_list_file", "triage_data_file"):
+        if value is None and info.field_name in (
+            "inbox_list_file",
+            "inbox_in_progress_file",
+            "triage_data_file",
+        ):
             return None
         check_relative(value, what=info.field_name)
         return value.rstrip("/") if isinstance(value, str) else value
@@ -140,6 +148,7 @@ class VaultLayout(BaseModel):
 
     @field_validator(
         "inbox_list_file",
+        "inbox_in_progress_file",
         "triage_file",
         "triage_data_file",
         "processing_list",
@@ -159,6 +168,7 @@ class VaultLayout(BaseModel):
         managed = {
             "triage_file": self.triage_file,
             "triage_data_file": self.triage_data,
+            "in_progress_file": self.in_progress,
             "processing_list": self.processing_list,
             "improvement_file": self.improvement_file,
             "tool_candidates_file": self.tool_candidates_file,
@@ -199,6 +209,11 @@ class VaultLayout(BaseModel):
         return self.triage_data_file or f"{self.inbox_dir}/_pkpipe/triage-data.md"
 
     @property
+    def in_progress(self) -> str:
+        """The unfinished-items table (spec 031): the configured file, else below the INBOX folder."""
+        return self.inbox_in_progress_file or f"{self.inbox_dir}/INBOX-InProgress.md"
+
+    @property
     def archive_root(self) -> str:
         """Top level folder of the archive (the folder the archive notes live below)."""
         return check_relative(self.archive_dir, what="archive_dir")[0]
@@ -209,6 +224,7 @@ class VaultLayout(BaseModel):
         names = [
             PurePosixPath(self.triage_file).name,
             PurePosixPath(self.triage_data).name,
+            PurePosixPath(self.in_progress).name,
             PurePosixPath(self.processing_list).name,
         ]
         if self.inbox_list_file:
@@ -222,6 +238,7 @@ class VaultLayout(BaseModel):
         paths = [
             self.triage_file,
             self.triage_data,
+            self.in_progress,
             self.processing_list,
             self.improvement_file,
             self.tool_candidates_file,
@@ -282,6 +299,9 @@ class VaultLayout(BaseModel):
             "read_triage": [self.inbox_dir],
             "update_triage": [self.inbox_dir],
             "upsert_processing_list": [self.inbox_dir],
+            "read_processing_list": [self.inbox_dir],
+            "read_in_progress": [self.inbox_dir],
+            "inbox_in_progress": [self.inbox_dir, self.archive_root],
             "read_notes": list(para),
             "read_improvements": [self.areas_dir],
             "update_improvements": [self.areas_dir],
@@ -306,6 +326,9 @@ class VaultLayout(BaseModel):
             ("read_triage", "triage_data_file", self.triage_data),
             ("update_triage", "triage_data_file", self.triage_data),
             ("upsert_processing_list", "processing_list", self.processing_list),
+            ("read_processing_list", "processing_list", self.processing_list),
+            ("read_in_progress", "in_progress_file", self.in_progress),
+            ("inbox_in_progress", "in_progress_file", self.in_progress),
             ("read_improvements", "improvement_file", self.improvement_file),
             ("update_improvements", "improvement_file", self.improvement_file),
             ("read_tool_candidates", "tool_candidates_file", self.tool_candidates_file),
@@ -320,6 +343,8 @@ class VaultLayout(BaseModel):
                 ("read_note", "inbox_list_file", self.inbox_list_file),
                 ("inbox_remove_entries", "inbox_list_file", self.inbox_list_file),
                 ("inbox_remove_entries", "inbox_archive_pattern", self.inbox_archive_pattern),
+                ("inbox_in_progress", "inbox_list_file", self.inbox_list_file),
+                ("inbox_in_progress", "inbox_archive_pattern", self.inbox_archive_pattern),
             ]
         return out
 

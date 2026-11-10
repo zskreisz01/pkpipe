@@ -33,6 +33,7 @@ WRITING_VAULT_TOOLS = frozenset(
         "update_tool_candidates",
         "quarantine_note",
         "inbox_remove_entries",
+        "inbox_in_progress",  # spec 031: the table of unfinished items, and the entries it moves
         "write_journal_todos",  # spec 024: one block of the daily journal
     }
 )
@@ -49,6 +50,8 @@ READ_ONLY_VAULT_TOOLS = frozenset(
         "read_image",
         "unreviewed_notes",
         "failed_items",  # spec 027
+        "read_processing_list",  # spec 031
+        "read_in_progress",  # spec 031
     }
 )
 

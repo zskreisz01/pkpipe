@@ -53,6 +53,7 @@ WRITING_FLOWS = {
     "run_report": "triage",  # spec 024: the todo block of the daily journal (only when it is switched on)
     "handle_security_flag": "process_released",
     "process_released": "process_released",
+    "inbox_in_progress": "process_released",  # spec 031: the table of unfinished items, the list, the archive
     "propose_category": "process_released",  # spec 022: the proposal note and the awaiting_category row
     "process_item": "process_released",
     "other_resource": "process_released",

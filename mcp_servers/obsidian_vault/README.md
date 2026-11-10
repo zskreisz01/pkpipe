@@ -13,6 +13,8 @@ Spec 020: the policy file has a `layout` block (folders and files, see `docs/con
 tool `inbox_remove_entries(entries)`, which removes processed entries (exact raw text) from the configured
 `inbox_list_file` and appends them to the dated archive file. It writes nothing else.
 
+Spec 031: `read_processing_list()` and `read_in_progress()` read the processing list and the table of unfinished items (ids, categories, addresses, fixed failure texts, short sentences; no note text); `inbox_in_progress(rows, archive_ids, restore_ids)` is the only writer of that table (`layout.inbox_in_progress_file`): it moves the exact entries of unfinished list items into their rows, archives the kept entries of closed items to the dated archive file and restores those of reopened ones to the list. It writes nothing else.
+
 Spec 021: the tool `read_image(name)` reads one embedded image of `layout.attachments_dir` by file name (no path;
 `jpg jpeg png webp gif`; content checked against the extension; a symbolic link, a note, a name with `..` or a file
 over `max_image_bytes` of the policy file, default 10 MiB, is refused with the code `bad_name`, `bad_type` or

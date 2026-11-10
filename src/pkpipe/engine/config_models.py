@@ -581,6 +581,29 @@ class ImagesConfig(_Strict):
 
 
 # triage.json / ui.json -------------------------------------------------------------------------------------
+class InProgressConfig(_Strict):
+    """The table of unfinished items in the INBOX folder (spec 031)."""
+
+    enabled: bool = Field(
+        default=False,
+        description="After every release run, move the INBOX entries of items that were worked on but not "
+        "closed (failed, held for your decision, quarantined) into layout.inbox_in_progress_file as one "
+        "table row each, with a short situation a tool-less local model writes from pkpipe's own "
+        "records. The vault tools read_in_progress, read_processing_list and inbox_in_progress take their "
+        "allow-lists from the layout unless the policy file lists them",
+    )
+    max_rows_per_run: int = Field(
+        default=40,
+        ge=1,
+        le=500,
+        description="How many rows the model describes in one run; the others get the fixed-sentence "
+        "situation and are asked again next run",
+    )
+    max_events: int = Field(
+        default=10, ge=1, le=50, description="How many recent notable events of an item the model reads"
+    )
+
+
 class TriageConfig(_Strict):
     """Where the triage decisions are made and kept (spec 023)."""
 
@@ -599,6 +622,7 @@ class TriageConfig(_Strict):
         "The count per item is kept in the app database; at the limit the item has to be fixed or processed "
         "by hand",
     )
+    in_progress: InProgressConfig = Field(default_factory=InProgressConfig)
 
 
 class JournalTodosConfig(_Strict):

@@ -24,6 +24,10 @@
     <select name="state"><option value="">any</option>
       {% for s in states %}<option value="{{ s }}" {{ "selected" if filters.state == s }}>{{ s }}</option>{% endfor %}
     </select></label>
+  <label class="inline">Result
+    <select name="outcome" data-testid="outcome-filter"><option value="">any</option>
+      {% for o in outcomes %}<option value="{{ o }}" {{ "selected" if filters.outcome == o }}>{{ o }}</option>{% endfor %}
+    </select></label>
   <label class="inline">Category
     <select name="category"><option value="">any</option>
       {% for c in categories %}<option value="{{ c }}" {{ "selected" if filters.category == c }}>{{ c }}</option>{% endfor %}
@@ -43,6 +47,7 @@
   <input type="hidden" name="state" value="{{ filters.state }}">
   <input type="hidden" name="category" value="{{ filters.category }}">
   <input type="hidden" name="needs_owner" value="{{ filters.needs_owner }}">
+  <input type="hidden" name="outcome" value="{{ filters.outcome }}">
   <button type="submit" class="primary" data-testid="bulk-confirm">Confirm all suggested in this set</button>
   <span class="muted">Rows with an override, images that need you and rows without a configured suggestion are left alone.</span>
 </form>

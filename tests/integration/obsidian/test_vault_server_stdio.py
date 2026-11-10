@@ -28,6 +28,9 @@ TOOLS = {
     "update_tool_candidates",
     "quarantine_note",
     "inbox_remove_entries",
+    "read_processing_list",  # spec 031
+    "read_in_progress",  # spec 031
+    "inbox_in_progress",  # spec 031
     "read_image",  # spec 021
 }
 

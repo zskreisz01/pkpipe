@@ -138,7 +138,8 @@ def _kind(schema: dict | None) -> str:
 
 def _sessions(model, marker_free=False):
     """The (system prompt first line, user prompt) of the category sessions, in call order."""
-    return [c for c in model.calls if "Reader" not in c["system"] and "sort captured" not in c["system"]]
+    skipped = ("Reader", "sort captured", "status line of one INBOX item")  # the last one: spec 031
+    return [c for c in model.calls if not any(s in c["system"] for s in skipped)]
 
 
 def test_tool_item_runs_its_plan_in_order_and_lands_in_para_and_the_list(world):

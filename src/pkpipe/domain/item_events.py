@@ -22,6 +22,7 @@ KIND_SOURCE = "source"
 KIND_QUARANTINED = "quarantined"
 KIND_HELD = "held"
 KIND_OWNER = "owner"
+KIND_IN_PROGRESS = "in_progress"
 MAX_TEXT = 300
 
 
@@ -96,6 +97,15 @@ def describe(event: dict[str, Any]) -> str:
         return f"quarantined ({d.get('reasons') or 'security flag'})"
     if kind == KIND_HELD:
         return "held for the owner: classifier warning of the injection detector only"
+    if kind == KIND_IN_PROGRESS:
+        labels = {
+            "described": "situation written in INBOX-InProgress",
+            "carried": "INBOX-InProgress row kept (nothing changed)",
+            "fallback": "INBOX-InProgress row written with the fixed sentence",
+            "closed": "closed: left INBOX-InProgress, entry archived",
+            "reopened": "open again: left INBOX-InProgress, entry back in the INBOX list",
+        }
+        return labels.get(str(outcome), f"INBOX-InProgress: {outcome}")
     if kind == KIND_OWNER:
         return f"owner: {d.get('action')}"
     return f"{kind}: {outcome or ''}".strip()

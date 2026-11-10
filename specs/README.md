@@ -34,6 +34,7 @@ Each spec has `spec.md`, `plan.md`, `tasks.md`; `research.md` and `data-model.md
 | [028-cache-any-version-and-protected-domains](028-cache-any-version-and-protected-domains/spec.md) | Cached image descriptions at release, protected hosts in the deny-list | Completed | plan · tasks |
 | [029-classifier-evidence-and-review](029-classifier-evidence-and-review/spec.md) | Classifier evidence in every flag, and a review hold for injection-detector-only warnings | Completed | data-model · plan · tasks |
 | [030-item-event-log](030-item-event-log/spec.md) | One history per item (append-only event log) and process start buttons on the overview | Completed | data-model · plan · tasks |
+| [031-inbox-in-progress](031-inbox-in-progress/spec.md) | The triage shows how a processed item went; unfinished items live in INBOX-InProgress.md with an LLM-written situation | Completed | data-model · plan · tasks |
 | [025-find-and-evaluate-urlless-items](025-find-and-evaluate-urlless-items/spec.md) | Find the source of items without a URL and evaluate it | Completed | data-model |
 | [026-config-editor-forms](026-config-editor-forms/spec.md) | Config editor forms in the UI (schema-driven, shared draft with the JSON view) | Completed | data-model |
 

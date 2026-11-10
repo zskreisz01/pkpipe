@@ -93,6 +93,11 @@ Image entries of the INBOX list are described by a local vision model ([Image in
 
 ## Evals
 
+
+### INBOX-InProgress (spec 031)
+
+After every release run `INBOX-InProgress.md` in the INBOX folder lists the items pkpipe worked on but did not close, one row each with a short situation, the cause and the next step. Read it in Obsidian, or open the row's `history` link (the item's timeline). The entry of such an item is no longer in `INBOX.md`; its exact text is in the row's `entry` cell and goes to the dated archive when the item closes (after a successful retry or a release run), or back into `INBOX.md` when a released quarantine item is open again. Turn it off with `triage.in_progress.enabled: false`. The three vault tools the step uses (`read_in_progress`, `read_processing_list`, `inbox_in_progress`) get their folder allow-lists from the layout like every tool the policy file does not list (`allow` entries you wrote yourself win, so add them there if you narrowed the list). The pack's `mcp_servers.json` already allows them for the flows. If a tool is refused, the step fails, the run report says so and nothing else changes. The situation sentences are written by the default model profile on the loopback address; if it is down the table still updates with fixed sentences.
+
 `pkpipe eval --suite <suite|all>` runs the eval suites and exits 1 when a gate is red ([Evaluation](evaluation.md)). Reports (JSON + Markdown) go to `$PKPIPE_DATA_DIR/evals`; every eval span carries `eval.run_id`. CI replays recorded model responses (`--cassette replay`); after a prompt, instruction or model change, re-record them against the real model with `--cassette record --concurrency 4` and commit the changed `evals/cassettes/*.json`. The weekly health check is `pkpipe eval --suite production --db <app DB> --vault <vault>`: it alerts on failed runs, override, quarantine and learning-failure rates above the gates in `evals.json`.
 
 ## System preflight

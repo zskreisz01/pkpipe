@@ -218,8 +218,13 @@ def create_app(
         return services.restore_run(run_id, apply=body.apply, force=body.force, actor="ui")
 
     @app.get("/api/triage")
-    def api_triage(state: str | None = None, category: str | None = None, needs_owner: bool | None = None):
-        return services.list_triage(state, category=category, needs_owner=needs_owner)
+    def api_triage(
+        state: str | None = None,
+        category: str | None = None,
+        needs_owner: bool | None = None,
+        outcome: str | None = None,
+    ):
+        return services.list_triage(state, category=category, needs_owner=needs_owner, outcome=outcome)
 
     @app.post("/api/triage/bulk-confirm")
     def api_bulk_confirm(body: BulkConfirmRequest):
@@ -396,9 +401,10 @@ def create_app(
             message = None
         return render(request, "items.html", items=services.recent_items(50), message=message)
 
-    def triage_filters(state: str, category: str, needs_owner: str) -> dict[str, Any]:
+    def triage_filters(state: str, category: str, needs_owner: str, outcome: str = "") -> dict[str, Any]:
         """The filters of the triage page from its query string (an empty value is no filter)."""
         return {
+            "outcome": outcome or None,
             "state": state or None,
             "category": category or None,
             "needs_owner": {"yes": True, "no": False}.get(needs_owner),
@@ -410,10 +416,11 @@ def create_app(
         state: str = "",
         category: str = "",
         needs_owner: str = "",
+        outcome: str = "",
         bulk: str = "",
         retried: str = "",
     ):
-        filters = triage_filters(state, category, needs_owner)
+        filters = triage_filters(state, category, needs_owner, outcome)
         try:
             info = services.triage_info()
         except Refused:
@@ -424,7 +431,8 @@ def create_app(
             categories=sorted(services.categories()),
             failed=services.failed_summary() if info else {},
             states=[s.value for s in ItemState],
-            filters={"state": state, "category": category, "needs_owner": needs_owner},
+            filters={"state": state, "category": category, "needs_owner": needs_owner, "outcome": outcome},
+            outcomes=["done", "ready", "failed", "held", "unprocessed"],
             info=info,
             bulk=bulk,
             retried=retried,
