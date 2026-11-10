@@ -59,13 +59,15 @@ CORE_DEFAULTS: dict[str, Any] = {
     "source_discovery": {
         "enabled": False,
         "categories": ["tool"],
-        "from_images": True,
+        "from_images": False,
         "from_notes": True,
         "max_candidates": 2,
         "max_results": 5,
         "max_query_chars": 120,
         "query_template": "{topic} {text}",
     },
+    #: spec 032: learning notes in the vault (the audio stays outside unless the owner asks for the copy)
+    "learning": {"copy_audio_to_vault": False},
     "channels": {"channels": {}, "routes": {}},
     "telemetry": {"capture_content": {"flows": []}},
     # Code-only levels are all-or-nothing (docs/evaluation.md); LLM gates come from the pack.

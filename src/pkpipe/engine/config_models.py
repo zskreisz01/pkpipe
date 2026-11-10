@@ -70,7 +70,8 @@ class McpServer(_Strict):
     command: str | None = None
     args: list[str] = Field(default_factory=list)
     backend: str | None = Field(
-        default=None, description="learning server only: open_notebook | notebooklm_browser | fake"
+        default=None,
+        description="learning server only: notebooklm_browser (default) | fake | open_notebook (deprecated)",
     )
     options: dict[str, Any] = Field(
         default_factory=dict,
@@ -295,9 +296,15 @@ class ClassifierMember(_Strict):
 class ClassifierReview(_Strict):
     """``security.classifier.review`` (spec 029): hold an item for the owner instead of quarantining it when
     the injection detector alone is over the threshold, every safety model says Safe, the heuristics are
-    clean and the Reader found nothing. Every other flag keeps the quarantine."""
+    clean and the Reader found nothing. ``mode: auto_pass`` (spec 032) lets exactly that case pass instead of
+    holding it. Every other flag keeps the quarantine."""
 
     enabled: bool = Field(default=False, description="Hold such an item for the owner (pack default: on)")
+    mode: Literal["hold", "auto_pass"] = Field(
+        default="hold",
+        description="hold: the owner decides (spec 029, needs enabled). auto_pass (spec 032): such an item "
+        "passes, logged with its evidence; every other finding still quarantines",
+    )
 
 
 class ClassifierSettings(_Strict):
@@ -668,6 +675,17 @@ class ReportConfig(_Strict):
     journal_todos: JournalTodosConfig = Field(default_factory=JournalTodosConfig)
 
 
+class LearningConfig(_Strict):
+    """``learning.json`` (spec 032): what the learning flow writes into the vault when a notebook is ready."""
+
+    copy_audio_to_vault: bool = Field(
+        default=False,
+        description="Copy the finished podcast into the vault's podcast folder and embed it in the learning "
+        "note. Off by default: the audio is large (about 30 MB per episode) and the vault is committed to "
+        "git every night. The vault server needs `audio_import_dirs` (vault policy) to allow the copy",
+    )
+
+
 class SourceDiscoveryConfig(_Strict):
     """Items without a source URL: find one by web search (spec 025). Off by default: a search query leaves
     the machine, so the owner switches it on knowingly."""
@@ -684,9 +702,11 @@ class SourceDiscoveryConfig(_Strict):
         "can: learning-material would send a found URL to the notebook service and is not supported",
     )
     from_images: bool = Field(
-        default=True,
-        description="Image items: the query is built from the validated image description (topic and the "
-        "first words of the visible text). An address in the image wins over a search",
+        default=False,
+        description="Image items: search the web with a query built from the validated image description "
+        "(topic and the first words of the visible text) when the image shows no address (spec 032: off by "
+        "default, the description becomes the item's own result note instead). An address in the image "
+        "always wins over a search",
     )
     from_notes: bool = Field(
         default=True, description="Note and text items without a link: query from the text"
@@ -810,6 +830,7 @@ CONFIG_MODELS: dict[str, type[BaseModel]] = {
     "ui": UiConfig,
     "report": ReportConfig,
     "source_discovery": SourceDiscoveryConfig,
+    "learning": LearningConfig,
     "telemetry": TelemetrySettings,
     "evals": EvalsConfig,
 }

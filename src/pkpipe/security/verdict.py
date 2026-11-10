@@ -70,6 +70,11 @@ class Verdict(BaseModel):
         default=None,
         description="Spec 029: reason code of a held item (status review); not quarantined",
     )
+    auto_passed: bool = Field(
+        default=False,
+        description="Spec 032: the injection detector alone fired and the owner's config lets that pass "
+        "(security.classifier.review.mode auto_pass); status clean, the evidence is kept and logged",
+    )
 
 
 def security_json_schemas() -> dict[str, dict[str, Any]]:
@@ -93,6 +98,7 @@ def evaluate(
     classifier_required: bool = True,
     review_enabled: bool = False,
     classifier_waived: bool = False,
+    auto_pass: bool = False,
 ) -> Verdict:
     """Combine every detector into one verdict. Missing parts mean the step did not run (an earlier stop)."""
     flags: list[str] = []
@@ -159,6 +165,15 @@ def evaluate(
     if holdable and classifier_waived:
         scores["classifier_waived"] = True  # the owner accepted this warning (spec 029)
         return Verdict(status="clean", clean=True, reasons=reasons, scores=scores, evidence=evidence)
+    if holdable and auto_pass:
+        # Spec 032: the same narrow condition as the hold (detector alone, safety model Safe, heuristics
+        # clean, Reader ran and was not suspicious, canary intact) lets the page pass when the owner chose
+        # ``mode: auto_pass``. The evidence is kept and the caller logs the pass; the output guard still
+        # applies.
+        scores["classifier_auto_passed"] = True
+        return Verdict(
+            status="clean", clean=True, reasons=reasons, scores=scores, evidence=evidence, auto_passed=True
+        )
     if holdable and review_enabled:
         return Verdict(
             status="review",

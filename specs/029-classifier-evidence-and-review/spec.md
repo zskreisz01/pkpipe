@@ -48,3 +48,5 @@ updated: 2026-11-08
 - **SC-001**: a quarantined item shows its address, scores and reading on the triage page and in its note (`test_classifier_review`).
 - **SC-002**: only the exact conditions of clarification 4 hold an item; every other combination quarantines (`test_classifier_evidence`, `test_source_discovery_flows`).
 - **SC-003**: an accepted warning lets the same page through and nothing else (`test_classifier_evidence`, `test_source_discovery_flows`).
+
+> **Note (spec 032):** `security.classifier.review.mode: auto_pass` lets exactly the case held here (injection detector alone, safety model Safe, heuristics clean, Reader ran and not suspicious) pass without waiting for the owner, logged as an `auto_passed` event with this evidence. The default stays `hold`; every other finding still quarantines.

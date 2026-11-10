@@ -48,6 +48,7 @@ BUILTIN_MODULES = (
     "pkpipe.steps.context_code",
     "pkpipe.steps.image_code",
     "pkpipe.steps.in_progress_code",
+    "pkpipe.steps.results_code",
 )
 
 for _module in BUILTIN_MODULES:

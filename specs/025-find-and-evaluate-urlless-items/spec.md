@@ -85,3 +85,5 @@ updated: 2026-11-07
 - **SC-002**: no query text, description text or result text appears in any span, notification or reason of an end-to-end run (tests)
 - **SC-003**: a blocked term never reaches the search tool (tests)
 - **SC-004**: the 24 flow eval cases pass, including the new case, with the default config
+
+> **Note (spec 032):** `source_discovery.from_images` now defaults to `false`: an image item without an address becomes its own note from the validated description (after the output guard) instead of being searched for or failing with "no source found". With `from_images: true` the search runs first and the note is the fallback when it finds nothing.

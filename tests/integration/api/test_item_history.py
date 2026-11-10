@@ -42,3 +42,19 @@ def test_the_overview_offers_the_process_start_buttons(stack):
 
 def test_the_mcp_tool_is_an_owner_tool():
     assert "item_history" in OWNER_TOOLS
+
+
+def test_an_auto_passed_item_is_marked_in_the_triage_and_its_history(stack):
+    ids = seed_triage(stack, a="tool", b="tool")
+    stack.services.store.record(
+        ids["a"],
+        "auto_passed",
+        outcome="passed",
+        detail={"classifier": {"reading": "injection_detector_only"}},
+    )
+    client = api_client(stack)
+    rows = {r["item_id"]: r for r in client.get("/api/triage").json()["rows"]}
+    assert rows[ids["a"]]["auto_passed"] is True and "auto_passed" not in rows[ids["b"]]
+    assert 'data-testid="auto-passed"' in client.get("/triage").text
+    history = client.get(f"/api/items/{ids['a']}/history").json()["timeline"]
+    assert "auto-passed" in history[0]["text"] and "auto_pass rule" in history[0]["text"]

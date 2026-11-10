@@ -159,3 +159,30 @@ def test_prepare_refuses_a_domain_the_security_flag_handler_deny_listed():
     )
     assert out.output["status"] == "blocked" and out.output["reason"] == "deny_list"
     assert out.item["flagged"] is True
+
+
+@pytest.mark.parametrize(
+    ("message", "kind"),
+    [
+        ("create: quota: NotebookLM usage limit reached, waiting until 2026-11-10 11:37 UTC", "quota"),
+        ("auth: NotebookLM needs a new login (run 'nlm login'), failed at 'create notebook'", "auth"),
+    ],
+)
+def test_a_quota_wait_or_an_expired_login_is_an_event_and_the_item_stays_released(message, kind):
+    """Spec 032: not the item's failure: the step fails (item stays released, next run tries again) and the
+    item event log says which wait it is."""
+    events: list[tuple] = []
+    c, _ = ctx()
+    c.event = lambda k, outcome=None, **d: events.append((k, outcome, d))
+    with pytest.raises(StepError, match="learning service"):
+        CODE["learning.create_failed"](c, error={"node": "create", "message": message})
+    assert events and events[0][:2] == ("learning_wait", kind)
+
+
+def test_a_page_that_merely_mentions_quota_is_no_wait():
+    events: list[tuple] = []
+    c, _ = ctx()
+    c.event = lambda k, outcome=None, **d: events.append(k)
+    with pytest.raises(StepError):
+        CODE["learning.create_failed"](c, error={"message": "create: the quota page was unreachable"})
+    assert events == []

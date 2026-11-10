@@ -302,6 +302,9 @@ class VaultLayout(BaseModel):
             "read_processing_list": [self.inbox_dir],
             "read_in_progress": [self.inbox_dir],
             "inbox_in_progress": [self.inbox_dir, self.archive_root],
+            # spec 032: the index of a result folder (writes only ``_Index.md``) and the podcast copy
+            "write_results_index": list(write),
+            "import_audio": [self.attachments_dir],
             "read_notes": list(para),
             "read_improvements": [self.areas_dir],
             "update_improvements": [self.areas_dir],

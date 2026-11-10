@@ -88,3 +88,5 @@ The owner switches to NotebookLM without touching flows.
 - Q: Why does `create` start the podcast instead of a separate tool? → A: FR-001 lists four tools and the notebook is useless without its generation; the BPMN steps "Create notebook + source" and "Start podcast generation" are one tool call, the process picture is unchanged.
 - Q: Where does the output guard of the BPMN (after "Get audio + link") go? → A: Spec 009 (guard of derived text); nothing in this flow is model output, only ids, a link and a file path.
 - Q: NotebookLM? → A: Behind the same interface only (`NotebookLMDriver`); no driver is shipped and no test uses a Google account.
+
+> **Note (spec 032):** NotebookLM (`notebooklm_browser`, the shipped `nlm` CLI driver) is the default backend; Open Notebook is deprecated. Failures are classified, a quota refusal parks the notebook as `waiting_quota`, and a ready notebook gets a learning note in the vault.

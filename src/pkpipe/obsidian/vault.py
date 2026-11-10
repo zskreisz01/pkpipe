@@ -6,6 +6,7 @@ import contextlib
 import functools
 import os
 import re
+import shutil
 import unicodedata
 from collections import Counter
 from collections.abc import Callable
@@ -13,7 +14,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from pkpipe.domain import in_progress
+from pkpipe.domain import in_progress, results
 from pkpipe.domain.inbox_list import archive_text, list_items, parse_list, remove_entries
 from pkpipe.domain.journal_todos import DEFAULT_HEADING, JournalTodoError, replace_block
 from pkpipe.security import quarantine
@@ -394,6 +395,77 @@ class Vault:
         if is_conflict_name(target.name) or self.policy.in_quarantine(target):
             raise PathRejected("refusing to write the in-progress file there")
         return target
+
+    @_traced
+    def write_results_index(self, folder: str) -> dict[str, Any]:
+        """Rewrite ``<folder>/_Index.md`` from the notes pkpipe wrote there (spec 032): one table row per note
+        with ``type: resource_note`` or ``learning_note`` and a ``pkpipe_item``. The file is written only when
+        its text changed, so a run that adds nothing leaves the vault (and its git history) alone. Returns
+        ``{folder, notes, written}``; no note text is returned."""
+        root = self.policy.resolve(folder, "write_results_index", kind="folder")
+        if not root.is_dir():
+            return {"folder": folder.rstrip("/"), "notes": 0, "written": False}
+        rows = []
+        for entry in sorted(root.iterdir()):
+            if entry.suffix != ".md" or entry.name == results.INDEX_NAME or is_conflict_name(entry.name):
+                continue
+            try:
+                note = parse_note(entry.read_text(encoding="utf-8"))
+                row = results.index_row(
+                    entry.name, jsonable(note.front_matter) or {}, note.body, entry.stat().st_mtime
+                )
+            except (OSError, ValueError):
+                continue
+            if row:
+                rows.append(row)
+        rel = f"{folder.rstrip('/')}/{results.INDEX_NAME}"
+        target = self._writable(rel, "write_results_index")
+        if not rows and not target.is_file():
+            return {
+                "folder": folder.rstrip("/"),
+                "notes": 0,
+                "written": False,
+            }  # no index for a folder without notes
+        text = results.render_index(folder, rows)
+        try:
+            same = target.read_text(encoding="utf-8") == text
+        except OSError:
+            same = False
+        if not same:
+            update_text(target, lambda _existing: text)
+        return {"folder": folder.rstrip("/"), "notes": len(rows), "written": not same}
+
+    @_traced
+    def import_audio(self, src: str, name: str) -> dict[str, Any]:
+        """Copy a finished podcast from an allowed audio folder into ``<attachments>/Podcasts/<name>``
+        (spec 032, ``learning.copy_audio_to_vault``). Only a file below ``audio_import_dirs`` of the policy,
+        of an audio type and not larger than ``max_audio_bytes``; an existing file of the same size is kept.
+        Returns the vault-relative path and the size."""
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(m4a|mp3|mp4|wav|ogg)", name or ""):
+            raise PathRejected("audio name must be a plain file name of an audio type")
+        source = Path(src).expanduser()
+        try:
+            resolved = source.resolve(strict=True)
+        except OSError:
+            raise NoteNotFound("audio file not found") from None
+        allowed = [d.expanduser().resolve() for d in self.policy.audio_import_dirs]
+        if not any(resolved == d or d in resolved.parents for d in allowed):
+            raise PathRejected("the audio file is outside audio_import_dirs of the vault policy")
+        if not resolved.is_file() or resolved.suffix.lower() not in (".m4a", ".mp3", ".mp4", ".wav", ".ogg"):
+            raise PathRejected("only an audio file can be imported")
+        size = resolved.stat().st_size
+        if size > self.policy.max_audio_bytes:
+            raise PathRejected("the audio file is larger than max_audio_bytes")
+        folder = f"{self.policy.layout.attachments_dir.rstrip('/')}/Podcasts"
+        dest_dir = self.policy.resolve(folder, "import_audio", kind="folder")
+        dest = dest_dir / name
+        if dest.is_file() and dest.stat().st_size == size:
+            return {"path": f"{folder}/{name}", "bytes": size, "copied": False}
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        part = dest.with_name(f".{name}.part")
+        shutil.copyfile(resolved, part)
+        os.replace(part, dest)
+        return {"path": f"{folder}/{name}", "bytes": size, "copied": True}
 
     @_traced
     def read_in_progress(self) -> dict[str, Any]:

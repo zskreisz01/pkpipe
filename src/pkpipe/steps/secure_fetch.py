@@ -362,6 +362,7 @@ def decide(
 ) -> Verdict:
     """The verdict with the thresholds of ``security.json`` (shared with the security eval)."""
     guard = security.get("classifier") or {}
+    review = guard.get("review") or {}
     found = scan or {}
     required = bool(guard.get("required", True)) if classifier_required is None else classifier_required
     return evaluate(
@@ -373,8 +374,9 @@ def decide(
         heuristic_threshold=float((security.get("heuristics") or {}).get("threshold", 1.0)),
         classifier_threshold=float(guard.get("threshold", 0.5)),
         classifier_required=required,
-        review_enabled=bool((guard.get("review") or {}).get("enabled", False)),
+        review_enabled=bool(review.get("enabled", False)) and review.get("mode", "hold") == "hold",
         classifier_waived=classifier_waived,
+        auto_pass=review.get("mode") == "auto_pass",
     )
 
 
@@ -417,6 +419,21 @@ def verdict(
         for f in flags:
             ctx.ports.tracer.security_flag(f["detector"], action="flag", reason_code=f["reason_code"])
         item.update(flagged=True, security_flags=flags)
+    elif v.auto_passed:
+        # Spec 032: let through by the owner's rule; the evidence travels with the item and the log says so.
+        ctx.ports.tracer.security_flag(
+            "classifier", action="auto_pass", reason_code="classifier_injection_only"
+        )
+        item.update(
+            auto_passed={"reason": "classifier_injection_only", "evidence": v.evidence.get("classifier")}
+        )
+        ctx_event(
+            ctx,
+            "auto_passed",
+            "passed",
+            classifier=v.evidence.get("classifier"),
+            url=(ctx.item or {}).get("source_url"),
+        )
     elif v.review:
         # Spec 029: held for the owner, not quarantined. The evidence travels with the item; no page text.
         ctx.ports.tracer.security_flag("classifier", action="review", reason_code=v.review)

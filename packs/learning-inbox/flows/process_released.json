@@ -1,6 +1,6 @@
 {
   "id": "process_released",
-  "description": "06:00: release confirmed or overridden items, process each released item in its own instance (parallel, limited), write states and the processing list, remove the entries of processed list items from the INBOX list file (spec 020), keep the table of unfinished items (spec 031: INBOX-InProgress.md), send the run report (spec 024; the earlier one-line daily summary when report.enabled is false).",
+  "description": "06:00: release confirmed or overridden items, process each released item in its own instance (parallel, limited), write states and the processing list, remove the entries of processed list items from the INBOX list file (spec 020), keep the table of unfinished items (spec 031: INBOX-InProgress.md), send the run report (spec 024; the earlier one-line daily summary when report.enabled is false). Spec 032: after the INBOX-InProgress table, the `_Index.md` of every result folder is refreshed (subflow write_results_index; a failure never stops the report).",
   "bpmn": "process-inbox-items",
   "start": "read_triage",
   "max_parallel": 2,
@@ -145,6 +145,14 @@
       "bpmn_element": "Move unfinished entries to INBOX-InProgress",
       "config": {
         "flow": "inbox_in_progress"
+      }
+    },
+    {
+      "id": "results_index",
+      "type": "subflow",
+      "bpmn_element": "Refresh result indexes",
+      "config": {
+        "flow": "write_results_index"
       }
     },
     {
@@ -299,10 +307,19 @@
     },
     {
       "from": "in_progress",
-      "to": "report_cfg"
+      "to": "results_index"
     },
     {
       "from": "in_progress",
+      "to": "results_index",
+      "on": "error"
+    },
+    {
+      "from": "results_index",
+      "to": "report_cfg"
+    },
+    {
+      "from": "results_index",
       "to": "report_cfg",
       "on": "error"
     },

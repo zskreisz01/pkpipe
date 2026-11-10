@@ -41,6 +41,9 @@ class SnapshotScope:
 
 #: Tools that write only the generated todo block of a journal: their folder never enters a snapshot scope.
 JOURNAL_BLOCK_TOOLS = frozenset({"write_journal_todos"})
+#: Tools that only copy a generated file into the attachments folder (spec 032): the folder holds the owner's
+#: images and never enters a snapshot scope because of a podcast copy.
+COPY_ONLY_TOOLS = frozenset({"import_audio"})
 
 
 def journal_folder(layout: VaultLayout) -> str:
@@ -57,7 +60,7 @@ def journal_folder(layout: VaultLayout) -> str:
 def derive_scope(policy: VaultPolicy) -> SnapshotScope:
     layout = policy.layout
     folders = list(layout.snapshot_roots())
-    for tool in sorted(WRITING_VAULT_TOOLS - JOURNAL_BLOCK_TOOLS):
+    for tool in sorted(WRITING_VAULT_TOOLS - JOURNAL_BLOCK_TOOLS - COPY_ONLY_TOOLS):
         folders += policy.allow.get(tool, [])
     folders += [layout.quarantine_dir]
     managed = tuple(sorted(dict.fromkeys(policy.managed_files)))

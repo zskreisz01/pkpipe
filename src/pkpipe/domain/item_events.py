@@ -22,6 +22,9 @@ KIND_SOURCE = "source"
 KIND_QUARANTINED = "quarantined"
 KIND_HELD = "held"
 KIND_OWNER = "owner"
+KIND_AUTO_PASSED = "auto_passed"
+KIND_LEARNING_WAIT = "learning_wait"
+KIND_RESULT = "result"
 KIND_IN_PROGRESS = "in_progress"
 MAX_TEXT = 300
 
@@ -106,6 +109,15 @@ def describe(event: dict[str, Any]) -> str:
             "reopened": "open again: left INBOX-InProgress, entry back in the INBOX list",
         }
         return labels.get(str(outcome), f"INBOX-InProgress: {outcome}")
+    if kind == KIND_AUTO_PASSED:
+        return (
+            "auto-passed: only the injection detector fired (safety model Safe, heuristics and Reader "
+            "clean); the owner's auto_pass rule let the page through"
+        )
+    if kind == KIND_LEARNING_WAIT:
+        return f"learning service: waiting ({outcome}); the next run tries again"
+    if kind == KIND_RESULT:
+        return f"result written: {d.get('path') or d.get('what') or 'note'}"
     if kind == KIND_OWNER:
         return f"owner: {d.get('action')}"
     return f"{kind}: {outcome or ''}".strip()

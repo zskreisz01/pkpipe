@@ -1,7 +1,7 @@
 {
   "enabled": false,
   "categories": ["tool"],
-  "from_images": true,
+  "from_images": false,
   "from_notes": true,
   "max_candidates": 2,
   "max_results": 5,

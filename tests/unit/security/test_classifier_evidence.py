@@ -127,3 +127,64 @@ def test_an_accepted_warning_lets_the_page_pass_but_not_other_findings():
         classifier_waived=True,
     )
     assert bad.status == "flagged"  # the Reader still counts
+
+
+# -- spec 032: mode auto_pass ----------------------------------------------------------------------
+def test_auto_pass_lets_the_injection_detector_alone_through_with_its_evidence():
+    v = verdict(combined(QWEN_SAFE, DEBERTA), auto_pass=True)
+    assert v.status == "clean" and v.clean and v.auto_passed and v.flags == [] and v.review is None
+    assert v.scores["classifier_auto_passed"] is True
+    assert v.evidence["classifier"]["reading"] == READING_INJECTION_ONLY
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        {"classifier": combined(QWEN_UNSAFE, DEBERTA)},  # both models fire
+        {"classifier": combined(QWEN_SAFE, DEBERTA), "heuristics": {"score": 2.0, "matches": ["override"]}},
+        {"classifier": combined(QWEN_SAFE, DEBERTA), "reader": {"injection_suspected": True}},
+        {"classifier": combined(QWEN_SAFE, DEBERTA), "reader": {"canary_leaked": True}},
+        {"classifier": combined(QWEN_SAFE, DEBERTA), "reader": {"invalid_output": True}},
+        {"classifier": combined(QWEN_SAFE, DEBERTA), "reader": None},  # no Reader opinion
+        {"classifier": combined(DEBERTA)},  # no safety model
+        {"classifier": {"available": False}},  # fail closed
+    ],
+)
+def test_auto_pass_never_relaxes_any_other_finding(case):
+    v = evaluate(**{**CLEAN, **case}, auto_pass=True)
+    assert v.status == "flagged" and not v.clean and not v.auto_passed
+
+
+def test_the_safety_model_saying_controversial_quarantines_even_in_auto_pass():
+    controversial = {**QWEN_SAFE, "label": "Controversial", "categories": ["Politically Sensitive Topics"]}
+    v = verdict(combined(controversial, DEBERTA), auto_pass=True)
+    assert v.status == "flagged" and not v.auto_passed
+
+
+def test_auto_pass_without_the_detector_firing_is_just_clean():
+    v = verdict(
+        combined(QWEN_SAFE, {**DEBERTA, "max_score": 0.01, "scores": [0.01, 0.0, 0.0, 0.0]}), auto_pass=True
+    )
+    assert v.status == "clean" and not v.auto_passed
+
+
+def test_the_step_config_maps_the_mode_to_the_verdict():
+    from pkpipe.steps.secure_fetch import decide
+
+    scan = {"heuristics": {"score": 0.0, "matches": []}, "classifier": combined(QWEN_SAFE, DEBERTA)}
+    parts = {"url_check": CLEAN["url_check"], "fetch": CLEAN["fetch"], "scan": scan, "read": CLEAN["reader"]}
+    off = decide({"classifier": {"review": {"enabled": True, "mode": "hold"}}}, **parts)
+    auto = decide({"classifier": {"review": {"mode": "auto_pass"}}}, **parts)  # mode alone is enough
+    assert off.status == "review" and auto.status == "clean" and auto.auto_passed
+
+
+def test_the_run_report_counts_auto_passed_items():
+    from pkpipe.domain import run_report as rr
+
+    out = rr.summarize_results(
+        [
+            {"status": "done", "item": {"category": "tool", "note": "n.md", "auto_passed": {"reason": "x"}}},
+            {"status": "done", "item": {"category": "tool", "note": "m.md"}},
+        ]
+    )
+    assert out["auto_passed"] == 1 and out["processed"] == 2

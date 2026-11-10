@@ -15,6 +15,8 @@ class BackendName(StrEnum):
 
 class JobStatus(StrEnum):
     GENERATING = "generating"
+    #: A quota window is exhausted (spec 032): the notebook is kept, the audio starts after ``retry_after``.
+    WAITING_QUOTA = "waiting_quota"
     READY = "ready"
     FAILED = "failed"
 
@@ -33,6 +35,8 @@ class NotebookJob(BaseModel):
     #: Backend specific reference needed later (for Open Notebook: the podcast episode id).
     backend_ref: str | None = None
     poll_errors: int = 0
+    #: Epoch seconds when a ``waiting_quota`` job may start its audio overview (spec 032).
+    retry_after: float | None = None
     started_at: float = 0.0
     finished_at: float | None = None
 

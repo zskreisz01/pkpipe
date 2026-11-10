@@ -423,6 +423,12 @@ class AppStore:
             ).fetchall()
         return [r["item_id"] for r in rows]
 
+    def item_ids_with_event(self, kind: str) -> set[str]:
+        """Items with at least one event of this kind (spec 032: ``auto_passed``, the triage badge)."""
+        with self._conn() as c:
+            rows = c.execute("SELECT DISTINCT item_id FROM item_events WHERE kind = ?", (kind,)).fetchall()
+        return {r["item_id"] for r in rows}
+
     def audit_of(self, item_id: str, limit: int = 200) -> list[dict[str, Any]]:
         """The owner actions on one item (the audit rows that name it as target), oldest first."""
         with self._conn() as c:

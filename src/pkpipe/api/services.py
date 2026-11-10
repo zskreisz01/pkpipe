@@ -266,6 +266,7 @@ class AppServices:
         held = self._held_ids() if failed else set()
         limit = self.retry_max()
         statuses = self._processing_statuses()
+        auto_passed = self.store.item_ids_with_event("auto_passed")
         rows = []
         for r in data["rows"]:
             effective = r["override"] or r["ai_suggested_category"]
@@ -292,6 +293,10 @@ class AppServices:
             }
             if not with_comment:
                 row.pop("comment", None)
+            if r["item_id"] in auto_passed:
+                row["auto_passed"] = (
+                    True  # spec 032: the injection detector alone fired, the rule let it pass
+                )
             if r["state"] == ItemState.PROCESSED.value and r["item_id"] in failed:
                 # spec 027: the processing of this item failed; the owner may send it through again
                 done = retries.get(r["item_id"], 0)

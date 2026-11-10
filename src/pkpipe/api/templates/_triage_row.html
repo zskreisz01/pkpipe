@@ -10,7 +10,7 @@
     <div class="muted">{{ r.kind }}{% if r.topic %} · <span data-testid="topic">{{ r.topic }}</span>{% endif %}</div>
     {% if r.needs_owner %}<div class="warn" data-testid="needs-owner">needs a category from you</div>{% endif %}
   </td>
-  <td><span class="pill {{ r.outcome }}" data-testid="state" title="triage state: {{ r.state }}">{{ r.outcome_label }}</span></td>
+  <td><span class="pill {{ r.outcome }}" data-testid="state" title="triage state: {{ r.state }}">{{ r.outcome_label }}</span>{% if r.auto_passed %}<div class="muted" data-testid="auto-passed" title="Only the injection detector fired; the safety model said Safe and the Reader was clean. See the item history.">auto-passed</div>{% endif %}</td>
   <td>{{ r.ai_suggested_category }}{% if r.confirm %} <span class="ok" data-testid="confirmed">&#10003; confirmed</span>{% endif %}
     {% if r.override %}<div>override: <strong data-testid="override">{{ r.override }}</strong></div>{% endif %}
     {% if r.proposal_note %}<div class="muted" data-testid="proposal-note">proposal note: <code>{{ r.proposal_note }}</code></div>{% endif %}

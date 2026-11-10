@@ -1,8 +1,16 @@
 {
   "id": "learning_material",
-  "description": "URL check, then a notebook from the URL and the prompt template only, wait for the generation result (poll + deadline above the gateway timeout), fetch audio and link, update the list. A URL the gateway refuses (DNS, deny list) goes to handle_security_flag (log, deny-list, quarantine, alert); any other create error leaves the item released for the next run. No session runs and no derived text is written to the vault (only notebook id, link and audio path), so there is no output to guard.",
+  "description": "URL check, then a notebook from the URL and the prompt template only, wait for the generation result (poll + deadline above the gateway timeout), fetch audio and link, update the list. A URL the gateway refuses (DNS, deny list) goes to handle_security_flag (log, deny-list, quarantine, alert); any other create error leaves the item released for the next run. No session runs and no derived text is written to the vault (only notebook id, link and audio path), so there is no output to guard. Spec 032: when the notebook and the audio are ready, a learning note (source, notebook link, podcast, history link; no derived text) is written into the category folder and the list row points at it; the podcast is copied into the vault only with learning.copy_audio_to_vault. An image item without an address becomes its own result note from the image description.",
   "bpmn": "process-learning-material",
   "nodes": [
+    {
+      "id": "load_description",
+      "type": "subflow",
+      "bpmn_element": "Load image description from the cache (image items; no model call)",
+      "config": {
+        "flow": "load_image_description"
+      }
+    },
     {
       "id": "fetch_note",
       "type": "tool",
@@ -130,7 +138,8 @@
           "nb_id": "${create.nb_id}",
           "link": "${link.url}",
           "audio_path": "${audio.audio_path}",
-          "processing_status": "ready"
+          "processing_status": "ready",
+          "note": "${learning_note.path}"
         }
       }
     },
@@ -173,9 +182,144 @@
           "failure_reason": "audio could not be fetched"
         }
       }
+    },
+    {
+      "id": "image_note",
+      "type": "code",
+      "bpmn_element": "Write image note from the description",
+      "config": {
+        "function": "image.result_note"
+      }
+    },
+    {
+      "id": "image_guard",
+      "type": "output_guard",
+      "bpmn_element": "Output guard (canary, heuristics, Qwen3Guard + DeBERTa)",
+      "config": {
+        "input": [
+          "image_note"
+        ],
+        "canary": false
+      }
+    },
+    {
+      "id": "write_image",
+      "type": "tool",
+      "bpmn_element": "Write image note from the description",
+      "config": {
+        "tool": "obsidian:write_note",
+        "arguments": {
+          "path": "${image_note.path}",
+          "body": "${image_note.body}",
+          "front_matter": "${image_note.front_matter}",
+          "overwrite": true
+        }
+      }
+    },
+    {
+      "id": "record_image",
+      "type": "code",
+      "bpmn_element": "Update list: status ready",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "note": "${image_note.path}",
+          "processing_status": "done"
+        }
+      }
+    },
+    {
+      "id": "archive_image",
+      "type": "tool",
+      "bpmn_element": "Archive item in INBOX",
+      "config": {
+        "tool": "obsidian:move_note",
+        "arguments": {
+          "src": "${item.path}",
+          "dst": "${image_note.archive_path}"
+        }
+      }
+    },
+    {
+      "id": "archive_image_failed",
+      "type": "code",
+      "bpmn_element": "Archive item in INBOX",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "archived": false
+        }
+      }
+    },
+    {
+      "id": "audio_plan",
+      "type": "code",
+      "bpmn_element": "Write learning note (source, notebook, podcast)",
+      "config": {
+        "function": "learning.audio_plan",
+        "args": {
+          "audio": "${audio}"
+        }
+      }
+    },
+    {
+      "id": "import_audio",
+      "type": "tool",
+      "bpmn_element": "Write learning note (source, notebook, podcast)",
+      "config": {
+        "tool": "obsidian:import_audio",
+        "arguments": {
+          "src": "${audio_plan.src}",
+          "name": "${audio_plan.name}"
+        }
+      }
+    },
+    {
+      "id": "learning_note",
+      "type": "code",
+      "bpmn_element": "Write learning note (source, notebook, podcast)",
+      "config": {
+        "function": "learning.note"
+      }
+    },
+    {
+      "id": "write_learning_note",
+      "type": "tool",
+      "bpmn_element": "Write learning note (source, notebook, podcast)",
+      "config": {
+        "tool": "obsidian:write_note",
+        "arguments": {
+          "path": "${learning_note.path}",
+          "body": "${learning_note.body}",
+          "front_matter": "${learning_note.front_matter}",
+          "overwrite": true
+        }
+      }
+    },
+    {
+      "id": "ready_no_note",
+      "type": "code",
+      "bpmn_element": "Update list: status ready",
+      "config": {
+        "function": "item.set",
+        "args": {
+          "nb_id": "${create.nb_id}",
+          "link": "${link.url}",
+          "audio_path": "${audio.audio_path}",
+          "processing_status": "ready"
+        }
+      }
     }
   ],
   "edges": [
+    {
+      "from": "START",
+      "to": "load_description",
+      "when": {
+        "path": "item.kind",
+        "eq": "image"
+      }
+    },
     {
       "from": "START",
       "to": "fetch_note",
@@ -186,6 +330,27 @@
     },
     {
       "from": "START",
+      "to": "read",
+      "default": true
+    },
+    {
+      "from": "load_description",
+      "to": "security_flag",
+      "when": {
+        "path": "item.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "load_description",
+      "to": "fetch_note",
+      "when": {
+        "path": "item.path",
+        "exists": true
+      }
+    },
+    {
+      "from": "load_description",
       "to": "read",
       "default": true
     },
@@ -207,11 +372,32 @@
     },
     {
       "from": "prepare",
+      "to": "image_note",
+      "when": {
+        "path": "prepare.status",
+        "eq": "image_note"
+      }
+    },
+    {
+      "from": "prepare",
       "to": "no_url",
       "when": {
         "path": "prepare.status",
         "eq": "no_url"
       }
+    },
+    {
+      "from": "image_note",
+      "to": "image_guard",
+      "when": {
+        "path": "image_note.status",
+        "eq": "ok"
+      }
+    },
+    {
+      "from": "image_note",
+      "to": "no_url",
+      "default": true
     },
     {
       "from": "prepare",
@@ -255,11 +441,81 @@
     },
     {
       "from": "audio",
-      "to": "ready"
+      "to": "audio_failed",
+      "on": "error"
+    },
+    {
+      "from": "image_guard",
+      "to": "security_flag",
+      "when": {
+        "path": "image_guard.flagged",
+        "truthy": true
+      }
+    },
+    {
+      "from": "image_guard",
+      "to": "write_image",
+      "default": true
+    },
+    {
+      "from": "write_image",
+      "to": "record_image"
+    },
+    {
+      "from": "record_image",
+      "to": "archive_image",
+      "when": {
+        "path": "item.path",
+        "exists": true
+      }
+    },
+    {
+      "from": "record_image",
+      "to": "END",
+      "default": true
+    },
+    {
+      "from": "archive_image",
+      "to": "archive_image_failed",
+      "on": "error"
     },
     {
       "from": "audio",
-      "to": "audio_failed",
+      "to": "audio_plan"
+    },
+    {
+      "from": "audio_plan",
+      "to": "import_audio",
+      "when": {
+        "path": "audio_plan.copy",
+        "truthy": true
+      }
+    },
+    {
+      "from": "audio_plan",
+      "to": "learning_note",
+      "default": true
+    },
+    {
+      "from": "import_audio",
+      "to": "learning_note"
+    },
+    {
+      "from": "import_audio",
+      "to": "learning_note",
+      "on": "error"
+    },
+    {
+      "from": "learning_note",
+      "to": "write_learning_note"
+    },
+    {
+      "from": "write_learning_note",
+      "to": "ready"
+    },
+    {
+      "from": "write_learning_note",
+      "to": "ready_no_note",
       "on": "error"
     }
   ]

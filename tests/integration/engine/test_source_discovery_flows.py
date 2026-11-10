@@ -127,7 +127,7 @@ def make(tmp_path, pack_dir):
     return build
 
 
-ON = {"enabled": True, "categories": ["tool"]}
+ON = {"enabled": True, "categories": ["tool"], "from_images": True}
 
 
 def test_an_image_without_an_address_is_searched_fetched_and_evaluated(make):
@@ -179,12 +179,15 @@ def test_a_note_without_a_link_is_searched_with_its_text(make):
     assert w.plist()[item].status == "done"
 
 
-def test_no_result_fails_the_item_with_a_hint_not_silently(make):
+def test_no_result_gives_the_image_its_own_note_instead_of_a_failure(make):
+    """Spec 032: the search found nothing; the validated description becomes the item's result note."""
     w = make(ON, results=[])
     item = w.release("shot.jpg")
     row = w.plist()[item]
-    assert row.status == "failed" and "no source found by web search" in (row.link or "")
-    assert w.web.fetched == []
+    assert row.status == "done" and w.web.fetched == []
+    (note,) = w.notes_of(item)
+    text = note.read_text(encoding="utf-8")
+    assert "origin: image_description" in text and "Vectorlite" in text and "vector search for SQLite" in text
 
 
 def test_nothing_searchable_in_the_description_is_a_failure_without_a_search(make):
@@ -197,20 +200,20 @@ def test_a_blocked_term_refuses_the_query_before_it_leaves(make):
     w = make(ON, security={"query_guard": {"blocked_terms": ["vectorlite"]}})
     item = w.release("shot.jpg")
     assert [q for q in w.search.queries if "ectorlite" in q] == []
-    assert "web query guard" in (w.plist()[item].link or "") and w.web.fetched == []
+    assert w.web.fetched == [] and w.plist()[item].status == "done"  # spec 032: the local note is no query
 
 
-def test_without_the_switch_the_behaviour_is_the_old_failure_and_no_search(make):
+def test_without_the_switch_the_image_gets_its_own_note_and_no_search(make):
     w = make(None)
     item = w.release("shot.jpg")
     assert w.search.queries == [] and w.web.fetched == []
-    assert "no source URL in the note" in (w.plist()[item].link or "")
+    assert w.plist()[item].status == "done" and len(w.notes_of(item)) == 1
 
 
 def test_a_category_that_is_not_listed_is_not_searched(make):
-    w = make({"enabled": True, "categories": ["business"]})
+    w = make({"enabled": True, "categories": ["business"], "from_images": True})
     item = w.release("shot.jpg")
-    assert w.search.queries == [] and "no source URL" in (w.plist()[item].link or "")
+    assert w.search.queries == [] and w.plist()[item].status == "done" and len(w.notes_of(item)) == 1
 
 
 def test_the_query_and_the_description_text_reach_no_span_message_or_trace(make):
@@ -297,3 +300,64 @@ def test_an_accepted_warning_lets_the_held_page_through(make):
     lists.owner_decide(w.triage_path, item, override="tool")
     assert w.svc.start("process_released").ok
     assert w.plist()[item].status == "done", w.plist()[item]
+
+
+# -- spec 032: the image note is guarded like any text derived from external content -------------
+def test_an_injection_in_the_image_description_quarantines_the_item_and_no_note_is_written(make):
+    from tests.fakes import FakeClassifier
+
+    w = make(ON, results=[])
+    # the rule matches text that exists only in the rendered note, so the triage-time scan of the
+    # description passes and it is the output guard of the note that flags it
+    w.ports.extra["classifier"] = FakeClassifier(rules={"No page was found for this image": 0.99})
+    item = w.release("shot.jpg")
+    state = next(r["state"] for r in lists.read_triage(w.triage_path)["rows"] if r["item_id"] == item)
+    assert state == "quarantined" and w.notes_of(item) == []
+
+
+def test_an_image_with_an_unusable_description_still_fails_with_the_search_reason(make):
+    w = make(ON)  # blank.jpg: no topic worth a note, nothing searchable
+    item = w.release("blank.jpg")
+    row = w.plist()[item]
+    assert row.status == "failed" and "nothing searchable" in (row.link or "") and w.notes_of(item) == []
+
+
+# -- spec 032: auto_pass lets the injection detector alone through, logged ---------------------
+AUTO = {"classifier": {"review": {"enabled": True, "mode": "auto_pass"}}}
+
+
+def _auto_world(make, classifier, security=AUTO):
+    from tests.fakes import FakeClassifierReview, FakeItemEvents
+
+    w = make(ON, security=security)
+    w.ports.extra["classifier"] = classifier
+    w.ports.extra["classifier_reviews"] = FakeClassifierReview()
+    w.ports.extra["item_events"] = FakeItemEvents()
+    return w
+
+
+def test_auto_pass_lets_the_page_through_and_logs_the_evidence(make):
+    w = _auto_world(make, _two_models({"vectorlite adds": 0.99}))
+    item = w.release("shot.jpg")
+    assert w.plist()[item].status == "done" and len(w.notes_of(item)) == 1
+    assert w.ports.extra["classifier_reviews"].review_of(item) is None  # not held
+    assert w.ports.extra["security_log"].rows == []  # nothing logged as malicious, no host deny-listed
+    (event,) = [e for e in w.ports.extra["item_events"].events_of(item) if e["kind"] == "auto_passed"]
+    assert event["detail"]["classifier"]["reading"] == "injection_detector_only"
+
+
+def test_auto_pass_still_quarantines_when_the_safety_model_fires_too(make):
+    clf = _two_models({"vectorlite adds": 0.99}, labels={"vectorlite adds": ("Unsafe", ["Jailbreak"])})
+    w = _auto_world(make, clf)
+    item = w.release("shot.jpg")
+    state = next(r["state"] for r in lists.read_triage(w.triage_path)["rows"] if r["item_id"] == item)
+    assert state == "quarantined"
+    assert [e for e in w.ports.extra["item_events"].events_of(item) if e["kind"] == "auto_passed"] == []
+
+
+def test_the_default_mode_still_holds_the_item(make):
+    w = _auto_world(
+        make, _two_models({"vectorlite adds": 0.99}), security={"classifier": {"review": {"enabled": True}}}
+    )
+    item = w.release("shot.jpg")
+    assert w.plist()[item].status == "failed" and "held for your decision" in (w.plist()[item].link or "")

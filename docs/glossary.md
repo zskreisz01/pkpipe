@@ -20,7 +20,7 @@ title: Glossary
 | Canary | Per-run random token in system instructions; its appearance signals a leak |
 | Held for review (classifier warning) | Spec 029: only the injection detector fired, the safety model said Safe; the item waits for the owner's decision instead of going to quarantine |
 | Quarantine | Inert storage of flagged content plus URL log and deny-list (protected domains excepted, spec 028) |
-| Learning gateway | MCP server hiding the learning backend (Open Notebook, NotebookLM, fake) |
+| Learning gateway | MCP server hiding the learning backend (NotebookLM by default, fake; Open Notebook is deprecated) |
 | Eval gate | Required green eval before a change is published |
 | Run report | The summary the pipeline sends after every triage and release run (counts, created evaluations / notebooks / podcasts, todos); spec 024 |
 | Todo block | The generated lines between the `pkpipe-todo` markers in the daily journal: `date - todo - item count - link` |
@@ -31,4 +31,8 @@ title: Glossary
 | Config form | The generated edit form of a config section in the UI (spec 026); it edits the same draft as the JSON view |
 
 - **INBOX-InProgress** (spec 031): the machine-owned table `INBOX-InProgress.md` in the INBOX folder with one row per item that was worked on but not closed (processing failed, held for review, quarantined): the item's exact INBOX entry, a model-written *situation*, *cause* and *next step* built from pkpipe's own records, and a link to the item history. A closed item leaves it.
+- **Learning note** (spec 032): the note a ready notebook gets in the learning folder (`<name>-<item id>.md`, `type: learning_note`): the source address, the notebook link, the podcast file and the history link; only facts of pkpipe's own, never page text.
+- **Result index** (spec 032): the machine-owned `_Index.md` in every result folder (Tools, Learning, Marketing, Misc, ...): a plain Markdown table of the notes pkpipe wrote there, newest first, rewritten after a release run only when it changed.
+- **Auto-pass** (spec 032): `security.classifier.review.mode: auto_pass` lets a page through whose only finding is the injection detector (safety model Safe, heuristics clean, Reader not suspicious); the evidence is logged and the item shows *auto-passed*. Every other finding still quarantines.
+- **Image note** (spec 032): the result note of an image item that shows no address and is not searched for: the validated description in the category's folder (guarded like any text derived from external content).
 - **Outcome** (spec 031): how a *processed* triage row went (done, ready, failed, held, unprocessed), derived from the processing list, the held review and the quarantine; the stored state stays `processed`.

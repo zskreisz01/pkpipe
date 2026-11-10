@@ -20,6 +20,8 @@
       "read_processing_list",
       "read_in_progress",
       "inbox_in_progress",
+      "write_results_index",
+      "import_audio",
       "read_image",
       "unreviewed_notes",
       "failed_items",
@@ -45,7 +47,7 @@
   "learning": {
     "transport": "streamable_http",
     "url": "http://127.0.0.1:8703/mcp",
-    "backend": "open_notebook",
+    "backend": "notebooklm_browser",
     "allow": [
       "create",
       "status",

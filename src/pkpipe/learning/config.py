@@ -26,7 +26,7 @@ OPTION_KEYS = {"timeout_s", "data_dir", "audio_dir", "backend_options"}
 
 @dataclass
 class GatewaySettings:
-    backend: str = "open_notebook"
+    backend: str = "notebooklm_browser"
     backend_options: dict[str, Any] = field(default_factory=dict)
     timeout_s: float = DEFAULT_TIMEOUT_S
     data_dir: Path = Path("~/.local/share/pkpipe/learning")
@@ -55,7 +55,7 @@ class GatewaySettings:
         url_filter = (data.get("security") or {}).get("url_filter") or {}
         base = Path(env.get("PKPIPE_DATA_DIR") or "~/.local/share/pkpipe") / "learning"
         return cls(
-            backend=server.get("backend") or "open_notebook",
+            backend=server.get("backend") or "notebooklm_browser",
             backend_options=dict(options.get("backend_options") or {}),
             timeout_s=timeout,
             data_dir=Path(options.get("data_dir") or base).expanduser(),

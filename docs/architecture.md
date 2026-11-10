@@ -28,7 +28,7 @@ The binding rules are in the constitution (`.specify/memory/constitution.md`). I
 | Model | Any OpenAI-compatible server; default LM Studio, run headless as the `llmster` daemon (`lms daemon up`), with a ~9B instruct model, JSON-schema structured output |
 | Tools | MCP over Streamable HTTP (`langchain-mcp-adapters`, FastMCP) |
 | Web fetch | web-fetch MCP server: Lightpanda (headless) behind a filtering proxy, one Playwright + Chromium fallback |
-| Learning backend | Open Notebook (REST) with local TTS (Speaches / Kokoro); NotebookLM as optional backend |
+| Learning backend | NotebookLM via the `nlm` CLI driver (default, spec 032); Open Notebook (REST, local TTS) is deprecated |
 | Guards | Local classifiers: Qwen3Guard-Gen-0.6B (harmful content, jailbreak) + ProtectAI DeBERTa (prompt injection), [decision 0001](decisions/0001-injection-classifier.md); canary, heuristics and verdicts in code |
 | Observability | OpenTelemetry (OpenInference, FastAPI, httpx) → Phoenix (local default) or Langfuse |
 | Docs | Docusaurus, GitHub Pages |
@@ -52,7 +52,7 @@ C4Context
     System_Ext(model, "Model server", "LM Studio (headless llmster daemon) / Ollama, OpenAI-compatible")
     System_Ext(obs, "Observability backend", "Phoenix (local default) or Langfuse")
     System_Ext(web, "Web", "Search providers, web pages")
-    System_Ext(learn, "Learning service", "Open Notebook + Speaches TTS, or NotebookLM")
+    System_Ext(learn, "Learning service", "NotebookLM (nlm CLI); Open Notebook is deprecated")
     Rel(owner, vault, "Captures, confirms")
     Rel(owner, pkpipe, "Configures, triages", "HTTP UI")
     Rel(chat, owner, "Notifies")
@@ -96,7 +96,7 @@ C4Container
         Container(mfetch, "web-fetch :8704", "FastMCP, pkpipe.webfetch", "fetch_page only: URL policy, filtering proxy, Lightpanda, Chromium fallback")
         Container(browsers, "Headless browsers", "child processes", "Lightpanda, Playwright + Chromium")
         Container(mlearn, "learning-gateway :8703", "FastMCP, pkpipe.learning", "create, status, link, audio; SQLite job store")
-        Container(on, "Open Notebook", "Docker", "API + SurrealDB + Speaches (Kokoro) TTS")
+        Container(on, "Open Notebook (deprecated)", "Docker, optional", "API + SurrealDB + Speaches (Kokoro) TTS")
     }
     Rel(owner, app, "UI, API", "HTTP")
     Rel(agent, app, "tools", "MCP /mcp")
